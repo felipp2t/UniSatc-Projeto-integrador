@@ -1,9 +1,6 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "extends": [
-    "ultracite/biome/core",
-    "ultracite/biome/react"
-  ],
+  "extends": ["ultracite/biome/core", "ultracite/biome/react"],
   "javascript": {
     "formatter": {
       "indentStyle": "space",
@@ -39,9 +36,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "src/components/ui/**"
-      ],
+      "includes": ["src/components/ui/**"],
       "linter": {
         "rules": {
           "complexity": {
@@ -51,10 +46,7 @@
       }
     },
     {
-      "includes": [
-        "src/pages/**/$*.tsx",
-        "src/pages/**/$*.ts"
-      ],
+      "includes": ["src/pages/**/$*.tsx", "src/pages/**/$*.ts"],
       "linter": {
         "rules": {
           "style": {
@@ -64,9 +56,7 @@
       }
     },
     {
-      "includes": [
-        "src/http/schemas/**"
-      ],
+      "includes": ["src/http/schemas/**"],
       "linter": {
         "rules": {
           "style": {
@@ -75,9 +65,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": [
-                      "**/lib/zod"
-                    ],
+                    "group": ["**/lib/zod"],
                     "message": "Schemas devem importar 'zod' direto (zod-compiler nao compila via alias)."
                   }
                 ]
@@ -88,10 +76,7 @@
       }
     },
     {
-      "includes": [
-        ".claude/skills/**",
-        ".agents/skills/**"
-      ],
+      "includes": [".claude/skills/**", ".agents/skills/**"],
       "linter": {
         "enabled": false
       },
