@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-router": "1.170.32",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3"
@@ -8,14 +9,15 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@biomejs/biome": "2.5.9",
-    "knip": "6.34.0",
     "@rolldown/plugin-babel": "^0.2.3",
+    "@tanstack/router-plugin": "1.168.35",
     "@types/babel__core": "^7.20.5",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
     "babel-plugin-react-compiler": "^1.0.0",
+    "knip": "6.34.0",
     "typescript": "~6.0.2",
     "ultracite": "7.10.7",
     "vite": "^8.2.2"
