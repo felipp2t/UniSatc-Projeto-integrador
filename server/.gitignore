@@ -1,0 +1,34 @@
+# Java / Spring (server)
+
+# build output — Maven + Gradle
+target/
+build/
+out/
+bin/
+!src/**/bin/
+.gradle/
+
+# compiled
+*.class
+*.jar
+*.war
+*.ear
+!**/gradle/wrapper/gradle-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# logs / crash dumps
+logs/
+*.log
+hs_err_pid*
+replay_pid*
+
+# env
+.env
+.env.*
+!.env.example
+
+# IDE (module-level)
+*.iml
+.classpath
+.project
+.settings/
