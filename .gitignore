@@ -7,7 +7,6 @@ Thumbs.db
 
 # editor
 .idea/
-.vscode/
 *.swp
 *~
 
