@@ -35,24 +35,28 @@ jobs:
       - uses: actions/checkout@v4
       - id: check
         run: echo "exists=$(test -f web/package.json && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@v4
+        if: steps.check.outputs.exists == 'true'
+        with:
+          package_json_file: web/package.json
       - uses: actions/setup-node@v4
         if: steps.check.outputs.exists == 'true'
         with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: web/package-lock.json
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
       - name: Install
         if: steps.check.outputs.exists == 'true'
         working-directory: web
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Lint
         if: steps.check.outputs.exists == 'true'
         working-directory: web
-        run: npm run lint --if-present
-      - name: Build
+        run: pnpm run check
+      - name: Typecheck & build
         if: steps.check.outputs.exists == 'true'
         working-directory: web
-        run: npm run build --if-present
+        run: pnpm run build
       - name: Skip (web/package.json not found yet)
         if: steps.check.outputs.exists == 'false'
         run: echo "web/package.json not found yet, skipping"
