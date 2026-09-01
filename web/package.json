@@ -1,4 +1,17 @@
 {
+  "name": "web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "check": "ultracite check",
+    "dev": "vite",
+    "fix": "ultracite fix",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "1.170.32",
@@ -22,17 +35,5 @@
     "ultracite": "7.10.7",
     "vite": "^8.2.2"
   },
-  "name": "web",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "lint": "biome lint .",
-    "format": "biome format --write .",
-    "check": "ultracite check",
-    "fix": "ultracite fix"
-  },
-  "type": "module",
-  "version": "0.0.0",
-  "private": true
+  "packageManager": "pnpm@11.10.0"
 }
