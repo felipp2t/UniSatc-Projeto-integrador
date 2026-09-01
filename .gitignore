@@ -1,0 +1,21 @@
+# Root — cross-cutting only.
+# Stack-specific rules live in web/.gitignore and server/.gitignore.
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# secrets / local
+.env
+.env.*
+!.env.example
+*.local
+
+# misc
+*.log
