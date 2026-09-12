@@ -1,7 +1,7 @@
 package com.rootly.api.service;
 
-import com.rootly.api.dto.ChangePasswordRequest;
-import com.rootly.api.dto.UpdateProfileRequest;
+import com.rootly.api.dto.user.ChangePasswordRequest;
+import com.rootly.api.dto.user.UpdateProfileRequest;
 import com.rootly.api.entity.User;
 import com.rootly.api.exception.InvalidCredentialsException;
 import com.rootly.api.exception.ResourceNotFoundException;
@@ -60,7 +60,6 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
 
-        // forca novo login em todas as sessoes, igual ao rootly original
         refreshTokenRepository.deleteAllByUserId(userId);
     }
 }

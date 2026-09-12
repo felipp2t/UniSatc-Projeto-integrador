@@ -10,17 +10,21 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-// limita brute-force em login e aceite de convite, igual ao authRateLimit do rootly original (5 req/min)
+// limita brute-force/spam em login, cadastro e recuperacao de senha, igual ao authRateLimit do rootly original (5 req/min)
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final int MAX_REQUESTS_PER_MINUTE = 5;
+
+    private static final List<String> LIMITED_PATHS =
+            List.of("/auth/login", "/auth/register", "/auth/forgot-password", "/auth/reset-password");
 
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
 
@@ -55,13 +59,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean isRateLimited(HttpServletRequest request) {
-        String method = request.getMethod();
-        String uri = request.getRequestURI();
-
-        boolean isLogin = "POST".equals(method) && "/auth/login".equals(uri);
-        boolean isAcceptInvite = "POST".equals(method) && uri.startsWith("/invites/") && uri.endsWith("/accept");
-
-        return isLogin || isAcceptInvite;
+        return "POST".equals(request.getMethod()) && LIMITED_PATHS.contains(request.getRequestURI());
     }
 
     private Bucket newBucket() {

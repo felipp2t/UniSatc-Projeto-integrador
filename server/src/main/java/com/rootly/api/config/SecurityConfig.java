@@ -32,7 +32,10 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/auth/login",
                                 "/auth/refresh",
-                                "/invites/*/accept")
+                                "/auth/logout",
+                                "/auth/register",
+                                "/auth/forgot-password",
+                                "/auth/reset-password")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

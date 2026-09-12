@@ -1,4 +1,4 @@
-package com.rootly.api.dto;
+package com.rootly.api.dto.user;
 
 import com.rootly.api.entity.User;
 

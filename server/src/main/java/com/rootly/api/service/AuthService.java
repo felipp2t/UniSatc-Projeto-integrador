@@ -1,21 +1,23 @@
 package com.rootly.api.service;
 
-import com.rootly.api.dto.AcceptInviteRequest;
-import com.rootly.api.dto.LoginRequest;
-import com.rootly.api.dto.TokenPair;
+import com.rootly.api.dto.auth.ForgotPasswordRequest;
+import com.rootly.api.dto.auth.LoginRequest;
+import com.rootly.api.dto.auth.RegisterRequest;
+import com.rootly.api.dto.auth.ResetPasswordRequest;
+import com.rootly.api.dto.auth.TokenPair;
+import com.rootly.api.entity.PasswordResetToken;
 import com.rootly.api.entity.RefreshToken;
 import com.rootly.api.entity.User;
-import com.rootly.api.entity.WorkspaceInvite;
-import com.rootly.api.entity.WorkspaceMember;
-import com.rootly.api.enums.WorkspaceInviteStatus;
+import com.rootly.api.entity.UserInvite;
+import com.rootly.api.exception.ConflictException;
 import com.rootly.api.exception.InvalidCredentialsException;
 import com.rootly.api.exception.InvalidInviteException;
 import com.rootly.api.exception.ResourceNotFoundException;
 import com.rootly.api.exception.ValidationException;
+import com.rootly.api.repository.PasswordResetTokenRepository;
 import com.rootly.api.repository.RefreshTokenRepository;
+import com.rootly.api.repository.UserInviteRepository;
 import com.rootly.api.repository.UserRepository;
-import com.rootly.api.repository.WorkspaceInviteRepository;
-import com.rootly.api.repository.WorkspaceMemberRepository;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -31,38 +33,49 @@ public class AuthService {
 
     private final RefreshTokenRepository refreshTokenRepository;
 
-    private final WorkspaceInviteRepository workspaceInviteRepository;
+    private final UserInviteRepository userInviteRepository;
 
-    private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     private final PasswordEncoder passwordEncoder;
 
     private final JwtService jwtService;
 
+    private final MailService mailService;
+
     private final long refreshTokenExpirationMs;
+
+    private final long passwordResetExpirationMs;
 
     public AuthService(
             UserRepository userRepository,
 
             RefreshTokenRepository refreshTokenRepository,
 
-            WorkspaceInviteRepository workspaceInviteRepository,
+            UserInviteRepository userInviteRepository,
 
-            WorkspaceMemberRepository workspaceMemberRepository,
+            PasswordResetTokenRepository passwordResetTokenRepository,
 
             PasswordEncoder passwordEncoder,
 
             JwtService jwtService,
 
+            MailService mailService,
+
             @Value("${jwt.refresh-token-expiration-ms}")
-            long refreshTokenExpirationMs) {
+            long refreshTokenExpirationMs,
+
+            @Value("${password-reset.expiration-ms}")
+            long passwordResetExpirationMs) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
-        this.workspaceInviteRepository = workspaceInviteRepository;
-        this.workspaceMemberRepository = workspaceMemberRepository;
+        this.userInviteRepository = userInviteRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.mailService = mailService;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
+        this.passwordResetExpirationMs = passwordResetExpirationMs;
     }
 
     @Transactional
@@ -101,43 +114,75 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenPair acceptInviteAndRegister(UUID inviteId, AcceptInviteRequest request) {
+    public TokenPair register(RegisterRequest request) {
         if (!request.password().equals(request.confirmPassword())) {
             throw new ValidationException("As senhas não conferem");
         }
 
-        WorkspaceInvite invite = workspaceInviteRepository.findById(inviteId)
-                .orElseThrow(() -> new ResourceNotFoundException("Convite de workspace não encontrado"));
-
-        if (invite.getStatus() != WorkspaceInviteStatus.pending) {
-            throw new InvalidInviteException("Convite já está " + statusPt(invite.getStatus()));
-        }
+        UserInvite invite = userInviteRepository.findByEmailAndToken(request.email(), request.token())
+                .orElseThrow(() -> new ResourceNotFoundException("Convite não encontrado"));
 
         if (invite.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            userInviteRepository.delete(invite);
             throw new InvalidInviteException("Convite expirado");
         }
 
-        User user = invite.getInvitedUser();
+        if (userRepository.findByEmail(request.email()).isPresent()) {
+            throw new ConflictException("E-mail já possui uma conta");
+        }
+
+        User user = new User();
         user.setName(request.name());
+        user.setEmail(request.email());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         userRepository.save(user);
 
-        invite.setStatus(WorkspaceInviteStatus.accepted);
-        workspaceInviteRepository.save(invite);
-
-        boolean alreadyMember = workspaceMemberRepository
-                .findByUserIdAndWorkspaceId(user.getId(), invite.getWorkspace().getId())
-                .isPresent();
-
-        if (!alreadyMember) {
-            WorkspaceMember member = new WorkspaceMember();
-            member.setUser(user);
-            member.setWorkspace(invite.getWorkspace());
-            member.setRole(invite.getRole());
-            workspaceMemberRepository.save(member);
-        }
+        userInviteRepository.delete(invite);
 
         return issueTokenPair(user.getId());
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        // resposta pro cliente e sempre a mesma, exista ou nao o e-mail (evita enumeracao de contas)
+        userRepository.findByEmail(request.email()).ifPresent(this::issuePasswordResetToken);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new ValidationException("As senhas não conferem");
+        }
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.token())
+                .orElseThrow(() -> new InvalidCredentialsException("Token de redefinição inválido"));
+
+        UUID userId = resetToken.getUser().getId();
+        passwordResetTokenRepository.delete(resetToken);
+
+        if (resetToken.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            throw new InvalidCredentialsException("Token de redefinição inválido");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+
+        // forca novo login em todas as sessoes, igual a troca de senha manual
+        refreshTokenRepository.deleteAllByUserId(userId);
+    }
+
+    private void issuePasswordResetToken(User user) {
+        passwordResetTokenRepository.deleteAllByUserId(user.getId());
+
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setToken(UUID.randomUUID().toString());
+        resetToken.setUser(user);
+        resetToken.setExpiresAt(OffsetDateTime.now().plus(Duration.ofMillis(passwordResetExpirationMs)));
+        passwordResetTokenRepository.save(resetToken);
+
+        mailService.sendPasswordResetEmail(user.getEmail(), resetToken.getToken());
     }
 
     private TokenPair issueTokenPair(UUID userId) {
@@ -150,15 +195,5 @@ public class AuthService {
         String accessToken = jwtService.generateAccessToken(userId);
 
         return new TokenPair(accessToken, refreshToken.getToken());
-    }
-
-    // traduz o status do convite pra portugues nas mensagens de erro
-    private String statusPt(WorkspaceInviteStatus status) {
-        return switch (status) {
-            case accepted -> "aceito";
-            case declined -> "recusado";
-            case revoked -> "revogado";
-            case pending -> "pendente";
-        };
     }
 }

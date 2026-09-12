@@ -1,4 +1,4 @@
-package com.rootly.api.dto;
+package com.rootly.api.dto.user;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

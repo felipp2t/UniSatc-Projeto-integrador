@@ -1,6 +1,5 @@
-package com.rootly.api.dto;
+package com.rootly.api.dto.auth;
 
-// par access/refresh token, usado internamente entre o AuthService e o controller (cookies, RNF01)
 public record TokenPair(
         String accessToken,
 

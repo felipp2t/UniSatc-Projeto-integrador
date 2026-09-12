@@ -1,8 +1,8 @@
 package com.rootly.api.controller;
 
-import com.rootly.api.dto.ChangePasswordRequest;
-import com.rootly.api.dto.UpdateProfileRequest;
-import com.rootly.api.dto.UserResponse;
+import com.rootly.api.dto.user.ChangePasswordRequest;
+import com.rootly.api.dto.user.UpdateProfileRequest;
+import com.rootly.api.dto.user.UserResponse;
 import com.rootly.api.service.UserService;
 import jakarta.validation.Valid;
 import java.util.UUID;
