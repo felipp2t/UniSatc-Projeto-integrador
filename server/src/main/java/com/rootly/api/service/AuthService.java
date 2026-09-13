@@ -41,7 +41,9 @@ public class AuthService {
 
     private final JwtService jwtService;
 
-    private final MailService mailService;
+    private final EmailOutboxService emailOutboxService;
+
+    private final CredentialService credentialService;
 
     private final long refreshTokenExpirationMs;
 
@@ -60,7 +62,9 @@ public class AuthService {
 
             JwtService jwtService,
 
-            MailService mailService,
+            EmailOutboxService emailOutboxService,
+
+            CredentialService credentialService,
 
             @Value("${jwt.refresh-token-expiration-ms}")
             long refreshTokenExpirationMs,
@@ -73,7 +77,8 @@ public class AuthService {
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.mailService = mailService;
+        this.emailOutboxService = emailOutboxService;
+        this.credentialService = credentialService;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
         this.passwordResetExpirationMs = passwordResetExpirationMs;
     }
@@ -95,13 +100,12 @@ public class AuthService {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
                 .orElseThrow(() -> new InvalidCredentialsException("Token de atualização inválido"));
 
-        UUID userId = refreshToken.getUser().getId();
-        refreshTokenRepository.delete(refreshToken);
-
-        if (refreshToken.getExpiresAt().isBefore(OffsetDateTime.now())) {
+        if (!refreshToken.getExpiresAt().isAfter(OffsetDateTime.now())) {
             throw new InvalidCredentialsException("Token de atualização inválido");
         }
 
+        UUID userId = refreshToken.getUser().getId();
+        refreshTokenRepository.delete(refreshToken);
         return issueTokenPair(userId);
     }
 
@@ -122,8 +126,7 @@ public class AuthService {
         UserInvite invite = userInviteRepository.findByEmailAndToken(request.email(), request.token())
                 .orElseThrow(() -> new ResourceNotFoundException("Convite não encontrado"));
 
-        if (invite.getExpiresAt().isBefore(OffsetDateTime.now())) {
-            userInviteRepository.delete(invite);
+        if (!invite.getExpiresAt().isAfter(OffsetDateTime.now())) {
             throw new InvalidInviteException("Convite expirado");
         }
 
@@ -157,20 +160,11 @@ public class AuthService {
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.token())
                 .orElseThrow(() -> new InvalidCredentialsException("Token de redefinição inválido"));
 
-        UUID userId = resetToken.getUser().getId();
-        passwordResetTokenRepository.delete(resetToken);
-
-        if (resetToken.getExpiresAt().isBefore(OffsetDateTime.now())) {
+        if (!resetToken.getExpiresAt().isAfter(OffsetDateTime.now())) {
             throw new InvalidCredentialsException("Token de redefinição inválido");
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        userRepository.save(user);
-
-        // forca novo login em todas as sessoes, igual a troca de senha manual
-        refreshTokenRepository.deleteAllByUserId(userId);
+        credentialService.updatePassword(resetToken.getUser().getId(), request.newPassword());
     }
 
     private void issuePasswordResetToken(User user) {
@@ -182,7 +176,8 @@ public class AuthService {
         resetToken.setExpiresAt(OffsetDateTime.now().plus(Duration.ofMillis(passwordResetExpirationMs)));
         passwordResetTokenRepository.save(resetToken);
 
-        mailService.sendPasswordResetEmail(user.getEmail(), resetToken.getToken());
+        emailOutboxService.enqueuePasswordReset(
+                user.getEmail(), resetToken.getToken(), resetToken.getExpiresAt());
     }
 
     private TokenPair issueTokenPair(UUID userId) {

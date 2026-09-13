@@ -1,6 +1,7 @@
 package com.rootly.api.repository;
 
 import com.rootly.api.entity.PasswordResetToken;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,4 +11,6 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     Optional<PasswordResetToken> findByToken(String token);
 
     void deleteAllByUserId(UUID userId);
+
+    long deleteByExpiresAtLessThanEqual(OffsetDateTime now);
 }

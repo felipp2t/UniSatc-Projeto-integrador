@@ -6,7 +6,6 @@ import com.rootly.api.entity.User;
 import com.rootly.api.exception.InvalidCredentialsException;
 import com.rootly.api.exception.ResourceNotFoundException;
 import com.rootly.api.exception.ValidationException;
-import com.rootly.api.repository.RefreshTokenRepository;
 import com.rootly.api.repository.UserRepository;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,19 +17,19 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    private final RefreshTokenRepository refreshTokenRepository;
-
     private final PasswordEncoder passwordEncoder;
+
+    private final CredentialService credentialService;
 
     public UserService(
             UserRepository userRepository,
 
-            RefreshTokenRepository refreshTokenRepository,
+            PasswordEncoder passwordEncoder,
 
-            PasswordEncoder passwordEncoder) {
+            CredentialService credentialService) {
         this.userRepository = userRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
+        this.credentialService = credentialService;
     }
 
     public User getMe(UUID userId) {
@@ -41,7 +40,7 @@ public class UserService {
     @Transactional
     public void updateProfile(UUID userId, UpdateProfileRequest request) {
         User user = getMe(userId);
-        user.setName(request.name().trim());
+        user.setName(request.name());
         userRepository.save(user);
     }
 
@@ -57,9 +56,6 @@ public class UserService {
             throw new InvalidCredentialsException("Senha atual incorreta");
         }
 
-        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        userRepository.save(user);
-
-        refreshTokenRepository.deleteAllByUserId(userId);
+        credentialService.updatePassword(userId, request.newPassword());
     }
 }

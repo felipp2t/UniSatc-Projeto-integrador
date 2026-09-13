@@ -20,7 +20,7 @@ public class InviteService {
 
     private final UserRepository userRepository;
 
-    private final MailService mailService;
+    private final EmailOutboxService emailOutboxService;
 
     private final long inviteExpirationMs;
 
@@ -29,13 +29,13 @@ public class InviteService {
 
             UserRepository userRepository,
 
-            MailService mailService,
+            EmailOutboxService emailOutboxService,
 
             @Value("${invite.expiration-ms}")
             long inviteExpirationMs) {
         this.userInviteRepository = userInviteRepository;
         this.userRepository = userRepository;
-        this.mailService = mailService;
+        this.emailOutboxService = emailOutboxService;
         this.inviteExpirationMs = inviteExpirationMs;
     }
 
@@ -54,6 +54,6 @@ public class InviteService {
         invite.setExpiresAt(OffsetDateTime.now().plus(Duration.ofMillis(inviteExpirationMs)));
         userInviteRepository.save(invite);
 
-        mailService.sendInviteEmail(invite.getEmail(), invite.getToken());
+        emailOutboxService.enqueueInvite(invite.getEmail(), invite.getToken(), invite.getExpiresAt());
     }
 }
