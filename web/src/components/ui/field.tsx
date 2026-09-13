@@ -70,11 +70,16 @@ const fieldVariants = cva(
 function Field({
   className,
   orientation = 'vertical',
+  invalid = false,
   ...props
-}: React.ComponentProps<'div'> & VariantProps<typeof fieldVariants>) {
+}: React.ComponentProps<'div'> &
+  VariantProps<typeof fieldVariants> & {
+    invalid?: boolean
+  }) {
   return (
     <div
       className={cn(fieldVariants({ orientation }), className)}
+      data-invalid={invalid || undefined}
       data-orientation={orientation}
       data-slot='field'
       {...props}
@@ -174,6 +179,7 @@ function FieldError({
   className,
   children,
   errors,
+  id,
   ...props
 }: React.ComponentProps<'div'> & {
   errors?: Array<{ message?: string } | undefined>
@@ -213,6 +219,7 @@ function FieldError({
     <div
       className={cn('font-normal text-destructive text-xs/relaxed', className)}
       data-slot='field-error'
+      id={id}
       role='alert'
       {...props}
     >

@@ -1,6 +1,8 @@
+import { File02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useForm, useStore } from '@tanstack/react-form'
 import { cn } from 'cn'
-import { useCallback, useState } from 'react'
+import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,6 +44,7 @@ export interface Item {
 }
 
 interface ItemCardProps extends React.ComponentProps<'div'> {
+  error?: string
   isMutating?: boolean
   item: Item
   onArchive?: (item: Item) => Promise<void> | void
@@ -55,19 +58,31 @@ export function ItemCard({
   onRestore,
   onDelete,
   isMutating = false,
+  error,
   className,
   ...props
 }: ItemCardProps) {
   const archived = Boolean(item.archivedAt)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [internalMutationError, setInternalMutationError] = useState<string>()
   const action = archived ? onRestore : onArchive
   const handleAction = useCallback(async () => {
-    await action?.(item)
+    setInternalMutationError(undefined)
+    try {
+      await action?.(item)
+    } catch (mutationError) {
+      setInternalMutationError(getErrorMessage(mutationError))
+    }
   }, [action, item])
   const closeDeleteDialog = useCallback(() => setDeleteOpen(false), [])
   const handleDelete = useCallback(async () => {
-    await onDelete?.(item)
-    setDeleteOpen(false)
+    setInternalMutationError(undefined)
+    try {
+      await onDelete?.(item)
+      setDeleteOpen(false)
+    } catch (mutationError) {
+      setInternalMutationError(getErrorMessage(mutationError))
+    }
   }, [item, onDelete])
   return (
     <div
@@ -81,9 +96,11 @@ export function ItemCard({
     >
       <div className='flex items-center justify-between gap-3'>
         <div className='flex min-w-0 items-center gap-2'>
-          <span aria-hidden='true' className='text-primary'>
-            ◆
-          </span>
+          <HugeiconsIcon
+            aria-hidden='true'
+            className='size-4 text-primary'
+            icon={File02Icon}
+          />
           <span className='truncate font-bold font-mono text-sm'>
             {item.title}
           </span>
@@ -140,6 +157,11 @@ export function ItemCard({
           </Dialog>
         ) : null}
       </div>
+      {(error ?? internalMutationError) ? (
+        <p className='text-destructive text-xs'>
+          {error ?? internalMutationError}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -179,7 +201,9 @@ function normalizeUrl(value: string) {
 }
 interface NewItemCardProps {
   children: React.ReactNode
+  error?: string
   folderId?: string
+  isCreating?: boolean
   onCreate: (input: {
     workspaceId: string
     folderId?: string
@@ -201,7 +225,17 @@ interface TypeField {
   value: ItemType
 }
 
-function ItemTypeSelect({ field }: { field: TypeField }) {
+function ItemTypeSelect({
+  field,
+  describedBy,
+  invalid,
+  disabled,
+}: {
+  field: TypeField
+  describedBy?: string
+  invalid?: boolean
+  disabled?: boolean
+}) {
   const handleChange = useCallback(
     (value: string | null) => {
       if (value) field.handleChange(value as ItemType)
@@ -210,7 +244,11 @@ function ItemTypeSelect({ field }: { field: TypeField }) {
   )
   return (
     <Select id='item-type' onValueChange={handleChange} value={field.value}>
-      <SelectTrigger>
+      <SelectTrigger
+        aria-describedby={describedBy}
+        aria-invalid={invalid}
+        disabled={disabled}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -227,14 +265,24 @@ function ItemTypeSelect({ field }: { field: TypeField }) {
 function ItemContentControl({
   field,
   type,
+  describedBy,
+  invalid,
+  disabled,
 }: {
   field: ContentField
   type: ItemType
+  describedBy?: string
+  invalid?: boolean
+  disabled?: boolean
 }) {
   if (type === 'document') {
     return (
       <FileInput
+        aria-describedby={describedBy}
+        aria-invalid={invalid}
         id='item-content'
+        isInvalid={invalid}
+        onBlur={field.handleBlur}
         onChange={field.handleChange}
         value={field.value instanceof File ? field.value : null}
       />
@@ -243,6 +291,9 @@ function ItemContentControl({
   if (type === 'secret') {
     return (
       <SecretInput
+        aria-describedby={describedBy}
+        aria-invalid={invalid}
+        disabled={disabled}
         id='item-content'
         onBlur={field.handleBlur}
         onValueChange={field.handleChange}
@@ -253,6 +304,9 @@ function ItemContentControl({
   if (type === 'text') {
     return (
       <Textarea
+        aria-describedby={describedBy}
+        aria-invalid={invalid}
+        disabled={disabled}
         id='item-content'
         onBlur={field.handleBlur}
         onValueChange={field.handleChange}
@@ -262,6 +316,9 @@ function ItemContentControl({
   }
   return (
     <Input
+      aria-describedby={describedBy}
+      aria-invalid={invalid}
+      disabled={disabled}
       id='item-content'
       onBlur={field.handleBlur}
       onValueChange={field.handleChange}
@@ -276,8 +333,12 @@ export function NewItemCard({
   workspaceId,
   folderId,
   onCreate,
+  error,
+  isCreating = false,
 }: NewItemCardProps) {
   const [open, setOpen] = useState(false)
+  const [internalError, setInternalError] = useState<string>()
+  const formId = useId()
   const form = useForm({
     defaultValues: {
       content: '' as File | string,
@@ -285,18 +346,23 @@ export function NewItemCard({
       type: 'document' as ItemType,
     },
     onSubmit: async ({ value, formApi }) => {
-      await onCreate({
-        content:
-          value.type === 'link' && typeof value.content === 'string'
-            ? normalizeUrl(value.content)
-            : value.content,
-        folderId,
-        title: value.title.trim(),
-        type: value.type,
-        workspaceId,
-      })
-      formApi.reset()
-      setOpen(false)
+      setInternalError(undefined)
+      try {
+        await onCreate({
+          content:
+            value.type === 'link' && typeof value.content === 'string'
+              ? normalizeUrl(value.content)
+              : value.content,
+          folderId,
+          title: value.title.trim(),
+          type: value.type,
+          workspaceId,
+        })
+        formApi.reset()
+        setOpen(false)
+      } catch (submissionError) {
+        setInternalError(getErrorMessage(submissionError))
+      }
     },
     validators: { onSubmit: itemSchema },
   })
@@ -309,9 +375,14 @@ export function NewItemCard({
   )
   const closeDialog = useCallback(() => setOpen(false), [])
   const selectedType = useStore(form.store, (state) => state.values.type)
+  const formSubmitting = useStore(form.store, (state) => state.isSubmitting)
+  const submitting = isCreating || formSubmitting
+  const displayedError = error ?? internalError
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger render={<div className='cursor-pointer' />}>
+      <DialogTrigger
+        render={<button className='contents text-left' type='button' />}
+      >
         {children}
       </DialogTrigger>
       <DialogContent>
@@ -321,55 +392,81 @@ export function NewItemCard({
         <form onSubmit={submit}>
           <FieldGroup>
             <form.Field name='title'>
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Título</FieldLabel>
-                  <Input
-                    id={field.name}
-                    onBlur={field.handleBlur}
-                    onValueChange={field.handleChange}
-                    value={field.state.value}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
+              {(field) => {
+                const errorId = `${formId}-${field.name}-error`
+                const invalid = field.state.meta.errors.length > 0
+                return (
+                  <Field invalid={invalid}>
+                    <FieldLabel htmlFor={field.name}>Título</FieldLabel>
+                    <Input
+                      aria-describedby={invalid ? errorId : undefined}
+                      aria-invalid={invalid}
+                      disabled={submitting}
+                      id={field.name}
+                      onBlur={field.handleBlur}
+                      onValueChange={field.handleChange}
+                      value={field.state.value}
+                    />
+                    <FieldError errors={field.state.meta.errors} id={errorId} />
+                  </Field>
+                )
+              }}
             </form.Field>
             <form.Field name='type'>
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor='item-type'>Tipo</FieldLabel>
-                  <ItemTypeSelect
-                    field={{
-                      handleChange: field.handleChange,
-                      value: field.state.value,
-                    }}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
+              {(field) => {
+                const errorId = `${formId}-${field.name}-error`
+                const invalid = field.state.meta.errors.length > 0
+                return (
+                  <Field invalid={invalid}>
+                    <FieldLabel htmlFor='item-type'>Tipo</FieldLabel>
+                    <ItemTypeSelect
+                      describedBy={invalid ? errorId : undefined}
+                      disabled={submitting}
+                      field={{
+                        handleChange: field.handleChange,
+                        value: field.state.value,
+                      }}
+                      invalid={invalid}
+                    />
+                    <FieldError errors={field.state.meta.errors} id={errorId} />
+                  </Field>
+                )
+              }}
             </form.Field>
             <form.Field name='content'>
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor='item-content'>Conteúdo</FieldLabel>
-                  <ItemContentControl
-                    field={{
-                      handleBlur: field.handleBlur,
-                      handleChange: field.handleChange,
-                      value: field.state.value,
-                    }}
-                    type={selectedType}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
+              {(field) => {
+                const errorId = `${formId}-${field.name}-error`
+                const invalid = field.state.meta.errors.length > 0
+                return (
+                  <Field invalid={invalid}>
+                    <FieldLabel htmlFor='item-content'>Conteúdo</FieldLabel>
+                    <ItemContentControl
+                      describedBy={invalid ? errorId : undefined}
+                      disabled={submitting}
+                      field={{
+                        handleBlur: field.handleBlur,
+                        handleChange: field.handleChange,
+                        value: field.state.value,
+                      }}
+                      invalid={invalid}
+                      type={selectedType}
+                    />
+                    <FieldError errors={field.state.meta.errors} id={errorId} />
+                  </Field>
+                )
+              }}
             </form.Field>
           </FieldGroup>
           <DialogFooter className='mt-4'>
             <Button onClick={closeDialog} type='button' variant='outline'>
               Cancelar
             </Button>
-            <Button type='submit'>Criar item</Button>
+            {displayedError ? (
+              <p className='text-destructive text-xs'>{displayedError}</p>
+            ) : null}
+            <Button disabled={submitting} type='submit'>
+              {submitting ? 'Criando...' : 'Criar item'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -391,3 +488,9 @@ export function ItemCardSkeleton({ className }: { className?: string }) {
   )
 }
 export type { ItemCardProps, NewItemCardProps }
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível concluir a operação.'
+}

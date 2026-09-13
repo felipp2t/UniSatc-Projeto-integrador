@@ -5,6 +5,8 @@ import { useCallback, useRef, useState } from 'react'
 
 interface FileInputProps {
   accept?: string
+  'aria-describedby'?: string
+  'aria-invalid'?: boolean | 'false' | 'true'
   className?: string
   id?: string
   isInvalid?: boolean
@@ -21,6 +23,8 @@ export function FileInput({
   accept,
   className,
   id,
+  'aria-describedby': ariaDescribedby,
+  'aria-invalid': ariaInvalid,
 }: FileInputProps) {
   const [internalFile, setInternalFile] = useState<File | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -35,11 +39,11 @@ export function FileInput({
     [onChange]
   )
   const handleDragOver = useCallback(
-    (event: React.DragEvent<HTMLLabelElement>) => event.preventDefault(),
+    (event: React.DragEvent<HTMLDivElement>) => event.preventDefault(),
     []
   )
   const handleDrop = useCallback(
-    (event: React.DragEvent<HTMLLabelElement>) => {
+    (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault()
       selectFile(event.dataTransfer.files[0])
     },
@@ -52,20 +56,22 @@ export function FileInput({
   )
 
   return (
-    <label
+    <div
       className={cn(
-        'flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 border border-border border-dashed bg-outline p-4 text-center transition-colors hover:border-primary/60',
+        'relative flex min-h-40 flex-col items-center justify-center gap-2 border border-border border-dashed bg-outline p-4 text-center transition-colors hover:border-primary/60',
         isInvalid && 'border-destructive ring-2 ring-destructive/20',
         className
       )}
-      onBlur={onBlur}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       <input
         accept={accept}
-        className='hidden'
+        aria-describedby={ariaDescribedby}
+        aria-invalid={ariaInvalid ?? isInvalid}
+        className='absolute inset-0 cursor-pointer opacity-0'
         id={id}
+        onBlur={onBlur}
         onChange={handleInputChange}
         ref={inputRef}
         type='file'
@@ -97,7 +103,7 @@ export function FileInput({
           </span>
         </>
       )}
-    </label>
+    </div>
   )
 }
 

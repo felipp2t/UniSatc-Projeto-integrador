@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 
 interface HeaderProps extends React.ComponentProps<'header'> {
@@ -17,8 +17,16 @@ export function Header({
   className,
   ...props
 }: HeaderProps) {
+  const [logoutError, setLogoutError] = useState<string>()
   const logout = useCallback(async () => {
-    await onLogout?.()
+    setLogoutError(undefined)
+    try {
+      await onLogout?.()
+    } catch (error) {
+      setLogoutError(
+        error instanceof Error ? error.message : 'Não foi possível sair.'
+      )
+    }
   }, [onLogout])
   return (
     <header
@@ -51,6 +59,11 @@ export function Header({
           </Button>
         ) : null}
       </div>
+      {logoutError ? (
+        <p className='mx-auto max-w-7xl px-6 pb-2 text-destructive text-xs'>
+          {logoutError}
+        </p>
+      ) : null}
     </header>
   )
 }

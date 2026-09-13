@@ -1,6 +1,8 @@
-import { useForm } from '@tanstack/react-form'
+import { Folder02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { useForm, useStore } from '@tanstack/react-form'
 import { cn } from 'cn'
-import { useCallback, useState } from 'react'
+import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,9 +45,15 @@ export function FolderCard({
   ...props
 }: FolderCardProps) {
   const [open, setOpen] = useState(false)
+  const [internalDeleteError, setInternalDeleteError] = useState<string>()
   const handleDelete = useCallback(async () => {
-    await onDelete?.(folderId)
-    setOpen(false)
+    setInternalDeleteError(undefined)
+    try {
+      await onDelete?.(folderId)
+      setOpen(false)
+    } catch (deleteError) {
+      setInternalDeleteError(getErrorMessage(deleteError))
+    }
   }, [folderId, onDelete])
   const closeDeleteDialog = useCallback(() => setOpen(false), [])
   return (
@@ -59,7 +67,7 @@ export function FolderCard({
     >
       <div className='flex items-center gap-2'>
         <span aria-hidden='true' className='text-lg text-primary'>
-          ▰
+          <HugeiconsIcon icon={Folder02Icon} strokeWidth={2} />
         </span>
         <span className='min-w-0 truncate font-bold font-mono text-sm'>
           {name}
@@ -101,7 +109,11 @@ export function FolderCard({
           </DialogContent>
         </Dialog>
       ) : null}
-      {error ? <p className='text-destructive text-xs'>{error}</p> : null}
+      {(error ?? internalDeleteError) ? (
+        <p className='text-destructive text-xs'>
+          {error ?? internalDeleteError}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -132,12 +144,19 @@ export function NewFolderCard({
   isCreating = false,
 }: NewFolderCardProps) {
   const [open, setOpen] = useState(false)
+  const [internalError, setInternalError] = useState<string>()
+  const formId = useId()
   const form = useForm({
     defaultValues: { name: '' },
     onSubmit: async ({ value, formApi }) => {
-      await onCreate({ name: value.name.trim(), parentId, workspaceId })
-      formApi.reset()
-      setOpen(false)
+      setInternalError(undefined)
+      try {
+        await onCreate({ name: value.name.trim(), parentId, workspaceId })
+        formApi.reset()
+        setOpen(false)
+      } catch (submissionError) {
+        setInternalError(getErrorMessage(submissionError))
+      }
     },
     validators: { onSubmit: folderSchema },
   })
@@ -149,9 +168,14 @@ export function NewFolderCard({
     [form]
   )
   const closeDialog = useCallback(() => setOpen(false), [])
+  const formSubmitting = useStore(form.store, (state) => state.isSubmitting)
+  const submitting = isCreating || formSubmitting
+  const displayedError = error ?? internalError
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger render={<div className='cursor-pointer' />}>
+      <DialogTrigger
+        render={<button className='contents text-left' type='button' />}
+      >
         {children}
       </DialogTrigger>
       <DialogContent>
@@ -164,27 +188,36 @@ export function NewFolderCard({
         <form onSubmit={submit}>
           <FieldGroup>
             <form.Field name='name'>
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Nome</FieldLabel>
-                  <Input
-                    id={field.name}
-                    onBlur={field.handleBlur}
-                    onValueChange={field.handleChange}
-                    value={field.state.value}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
+              {(field) => {
+                const errorId = `${formId}-${field.name}-error`
+                const invalid = field.state.meta.errors.length > 0
+                return (
+                  <Field invalid={invalid}>
+                    <FieldLabel htmlFor={field.name}>Nome</FieldLabel>
+                    <Input
+                      aria-describedby={invalid ? errorId : undefined}
+                      aria-invalid={invalid}
+                      disabled={submitting}
+                      id={field.name}
+                      onBlur={field.handleBlur}
+                      onValueChange={field.handleChange}
+                      value={field.state.value}
+                    />
+                    <FieldError errors={field.state.meta.errors} id={errorId} />
+                  </Field>
+                )
+              }}
             </form.Field>
           </FieldGroup>
           <DialogFooter className='mt-4'>
             <Button onClick={closeDialog} type='button' variant='outline'>
               Cancelar
             </Button>
-            {error ? <p className='text-destructive text-xs'>{error}</p> : null}
-            <Button disabled={isCreating} type='submit'>
-              {isCreating ? 'Criando...' : 'Criar pasta'}
+            {displayedError ? (
+              <p className='text-destructive text-xs'>{displayedError}</p>
+            ) : null}
+            <Button disabled={submitting} type='submit'>
+              {submitting ? 'Criando...' : 'Criar pasta'}
             </Button>
           </DialogFooter>
         </form>
@@ -208,3 +241,9 @@ export function FolderCardSkeleton({ className }: { className?: string }) {
 }
 
 export type { FolderCardProps, NewFolderCardProps }
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível criar a pasta.'
+}

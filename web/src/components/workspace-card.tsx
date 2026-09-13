@@ -1,6 +1,6 @@
-import { useForm } from '@tanstack/react-form'
+import { useForm, useStore } from '@tanstack/react-form'
 import { cn } from 'cn'
-import { useCallback, useState } from 'react'
+import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,6 +33,12 @@ interface WorkspaceCardProps extends React.ComponentProps<'div'> {
   workspace: Workspace
   workspaceHref?: string
 }
+interface NewWorkspaceCardProps {
+  children: React.ReactNode
+  error?: string
+  isCreating?: boolean
+  onCreate: (name: string) => Promise<void> | void
+}
 export function WorkspaceCard({
   workspace,
   workspaceHref = '#',
@@ -43,8 +49,14 @@ export function WorkspaceCard({
   className,
   ...props
 }: WorkspaceCardProps) {
+  const [internalDeleteError, setInternalDeleteError] = useState<string>()
   const handleDelete = useCallback(async () => {
-    await onDelete?.(workspace.id)
+    setInternalDeleteError(undefined)
+    try {
+      await onDelete?.(workspace.id)
+    } catch (deleteError) {
+      setInternalDeleteError(getErrorMessage(deleteError))
+    }
   }, [onDelete, workspace.id])
   return (
     <div
@@ -83,31 +95,45 @@ export function WorkspaceCard({
           Excluir
         </Button>
       ) : null}
-      {error ? <p className='text-destructive text-xs'>{error}</p> : null}
+      {(error ?? internalDeleteError) ? (
+        <p className='text-destructive text-xs'>
+          {error ?? internalDeleteError}
+        </p>
+      ) : null}
     </div>
   )
 }
 export function NewWorkspaceCard({
   children,
   onCreate,
-}: {
-  children: React.ReactNode
-  onCreate: (name: string) => Promise<void> | void
-}) {
+  error: externalError,
+  isCreating = false,
+}: NewWorkspaceCardProps) {
   const [open, setOpen] = useState(false)
+  const [internalError, setInternalError] = useState<string>()
+  const formId = useId()
   const form = useForm({
     defaultValues: { name: '' },
     onSubmit: async ({ value, formApi }) => {
-      await onCreate(value.name.trim())
-      formApi.reset()
-      setOpen(false)
+      setInternalError(undefined)
+      try {
+        await onCreate(value.name.trim())
+        formApi.reset()
+        setOpen(false)
+      } catch (submissionError) {
+        setInternalError(getErrorMessage(submissionError))
+      }
     },
     validators: {
       onSubmit: z.object({
-        name: z.string().min(3, 'O nome deve ter pelo menos 3 caracteres.'),
+        name: z
+          .string()
+          .trim()
+          .min(3, 'O nome deve ter pelo menos 3 caracteres.'),
       }),
     },
   })
+  const submitting = useStore(form.store, (state) => state.isSubmitting)
   const submit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault()
@@ -116,9 +142,12 @@ export function NewWorkspaceCard({
     [form]
   )
   const closeDialog = useCallback(() => setOpen(false), [])
+  const error = externalError ?? internalError
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger render={<div className='cursor-pointer' />}>
+      <DialogTrigger
+        render={<button className='contents text-left' type='button' />}
+      >
         {children}
       </DialogTrigger>
       <DialogContent>
@@ -131,25 +160,35 @@ export function NewWorkspaceCard({
         <form onSubmit={submit}>
           <FieldGroup>
             <form.Field name='name'>
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Nome</FieldLabel>
-                  <Input
-                    id={field.name}
-                    onBlur={field.handleBlur}
-                    onValueChange={field.handleChange}
-                    value={field.state.value}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
+              {(field) => {
+                const errorId = `${formId}-${field.name}-error`
+                const invalid = field.state.meta.errors.length > 0
+                return (
+                  <Field invalid={invalid}>
+                    <FieldLabel htmlFor={field.name}>Nome</FieldLabel>
+                    <Input
+                      aria-describedby={invalid ? errorId : undefined}
+                      aria-invalid={invalid}
+                      disabled={isCreating || submitting}
+                      id={field.name}
+                      onBlur={field.handleBlur}
+                      onValueChange={field.handleChange}
+                      value={field.state.value}
+                    />
+                    <FieldError errors={field.state.meta.errors} id={errorId} />
+                  </Field>
+                )
+              }}
             </form.Field>
           </FieldGroup>
           <DialogFooter className='mt-4'>
+            {error ? <p className='text-destructive text-xs'>{error}</p> : null}
             <Button onClick={closeDialog} type='button' variant='outline'>
               Cancelar
             </Button>
-            <Button type='submit'>Criar workspace</Button>
+            <Button disabled={isCreating || submitting} type='submit'>
+              {isCreating || submitting ? 'Criando...' : 'Criar workspace'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -169,4 +208,10 @@ export function WorkspaceCardSkeleton({ className }: { className?: string }) {
     </div>
   )
 }
-export type { WorkspaceCardProps }
+export type { NewWorkspaceCardProps, WorkspaceCardProps }
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível concluir a operação.'
+}
