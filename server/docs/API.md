@@ -16,8 +16,12 @@ Convenções gerais:
 - Senhas nunca são retornadas em nenhuma resposta.
 - `POST /auth/login`, `POST /auth/register`, `POST /auth/forgot-password` e
   `POST /auth/reset-password` (sujeitos a brute-force/spam) têm rate limit de 5 requisições por
-  minuto por IP, via `RateLimitFilter` (Bucket4j, em memória) — passar do limite responde
-  `429 Too Many Requests`.
+  minuto por IP, via `RateLimitFilter` (janela fixa em memória) — passar do limite responde
+  `429 Too Many Requests`. O registro remove IPs inativos e tem limite rígido de 10.000 entradas;
+  ao atingir esse limite, novos IPs recebem `429` até haver espaço, sem reiniciar limites ativos.
+- Convites e recuperações usam uma outbox transacional: token e e-mail são gravados juntos, mas o
+  SMTP é chamado por um worker após o commit. Falhas de envio são tentadas novamente até 5 vezes;
+  por isso, a resposta HTTP confirma que o e-mail foi enfileirado, não que já foi entregue.
 - Não existe cadastro público: uma conta só nasce quando alguém já autenticado envia um convite
   (RF01) e o convidado conclui o cadastro com o token recebido por e-mail (RF02). Hoje qualquer
   usuário autenticado pode convidar; restringir isso a administradores é trabalho futuro (quando
@@ -38,7 +42,8 @@ O que a função faz, em ordem:
    antigo).
 3. Cria um `UserInvite` com um token opaco (`UUID.randomUUID()`), associado a quem convidou
    (`invited_by_user_id`) e com validade de 7 dias (`invite.expiration-ms`).
-4. Envia o e-mail com o link `${FRONTEND_URL}/cadastro?email=...&token=...`.
+4. Grava na outbox o e-mail com o link `${FRONTEND_URL}/cadastro?email=...&token=...`; o worker
+   envia após o commit e aplica retentativas em falhas temporárias.
 
 | | |
 |---|---|
@@ -61,7 +66,8 @@ e-mail (RF01).
 O que a função faz, em ordem:
 1. Valida que `password == confirmPassword` (senão `400`).
 2. Busca o convite (`user_invite`) por `email` + `token` (senão `404`).
-3. Confere se `expires_at` ainda não passou; se expirou, apaga o convite e responde `409`.
+3. Confere se `expires_at` ainda não passou; se expirou, responde `409` sem alterar o registro.
+   A manutenção agendada remove convites expirados fora da transação da requisição.
 4. Confere que ainda não existe usuário com esse `email` (senão `409`).
 5. Cria o `User` com `name`, `email` e `password_hash` (Argon2) a partir da senha enviada.
 6. Apaga o convite (uso único).
@@ -111,10 +117,10 @@ pedir login de novo — usado quando o `accessToken` (curta duração) expira.
 O que a função faz:
 1. Lê o cookie `refreshToken` da requisição (`401` se ausente).
 2. Busca esse token na tabela `refresh_token` (`401` se não existir).
-3. Deleta o token encontrado (uso único — todo refresh invalida o token anterior).
-4. Confere se ele já havia expirado (`401` se sim — mesmo já tendo sido deletado no passo
-   anterior).
-5. Emite um novo access token + um novo refresh token (rotação), devolvidos como cookies.
+3. Confere se ele expirou (`401` se sim, sem tentar apagar dentro da transação que será revertida).
+4. Se estiver válido, deleta o token encontrado (uso único — todo refresh invalida o anterior).
+5. Emite um novo access token + um novo refresh token (rotação), devolvidos como cookies. Tokens
+   expirados são removidos pela manutenção agendada.
 
 | | |
 |---|---|
@@ -155,8 +161,8 @@ O que a função faz:
 1. Busca o usuário por `email`. Se não existir, não faz nada — mas a resposta é idêntica à do
    caso de sucesso, para não revelar se o e-mail está cadastrado.
 2. Se existir, apaga tokens de redefinição anteriores desse usuário, cria um novo
-   `PasswordResetToken` (validade de 1h, `password-reset.expiration-ms`) e envia o e-mail com o
-   link `${FRONTEND_URL}/redefinir-senha?token=...`.
+   `PasswordResetToken` (validade de 1h, `password-reset.expiration-ms`) e grava na outbox o e-mail
+   com o link `${FRONTEND_URL}/redefinir-senha?token=...`. O worker envia após o commit.
 
 | | |
 |---|---|
@@ -174,12 +180,12 @@ Define uma nova senha a partir do token recebido por e-mail (RF06).
 
 O que a função faz:
 1. Valida que `newPassword == confirmPassword` (senão `400`).
-2. Busca o `PasswordResetToken` (senão `401`) e o apaga (uso único).
-3. Confere se ele já havia expirado (`401` se sim — mesmo já tendo sido apagado no passo
-   anterior).
+2. Busca o `PasswordResetToken` (senão `401`).
+3. Confere se ele expirou (`401` se sim, sem alterar o registro); a manutenção agendada remove
+   tokens expirados.
 4. Grava o novo `password_hash` (Argon2) no usuário associado ao token.
-5. **Deleta todos os refresh tokens do usuário** — qualquer outra sessão/dispositivo logado
-   precisa autenticar de novo.
+5. **Deleta todos os refresh tokens e todos os tokens de redefinição do usuário** — o link se
+   torna de uso único e qualquer outra sessão/dispositivo precisa autenticar de novo.
 
 | | |
 |---|---|
@@ -202,9 +208,10 @@ O que a função faz:
 2. Busca o usuário autenticado (`userId` vem do `accessToken`).
 3. Compara `currentPassword` com o `password_hash` atual via Argon2 (`401` se não bater).
 4. Grava o novo `password_hash` (Argon2).
-5. **Deleta todos os refresh tokens do usuário** — qualquer outra sessão/dispositivo logado
-   precisa autenticar de novo. A sessão atual continua valendo até o `accessToken` expirar
-   naturalmente (é stateless, não dá pra revogar na hora).
+5. **Deleta todos os refresh tokens e tokens de redefinição pendentes do usuário** — qualquer
+   outra sessão/dispositivo precisa autenticar de novo e links antigos deixam de funcionar. A
+   sessão atual continua valendo até o `accessToken` expirar naturalmente (é stateless, não dá
+   para revogar na hora).
 
 | | |
 |---|---|
@@ -230,7 +237,7 @@ O que a função faz:
 | | |
 |---|---|
 | Auth | Cookie `accessToken` |
-| Request body | `{ "name": string (min 3) }` |
+| Request body | `{ "name": string (3 a 255 caracteres após `trim`) }` |
 | Sucesso | `204` |
 | `400` | nome vazio ou menor que 3 caracteres |
 | `401` | não autenticado |

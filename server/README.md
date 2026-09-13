@@ -19,8 +19,9 @@ e-mail, com um token de redefinição de uso único.
 | Migrations | Flyway (`src/main/resources/db/migration`) |
 | Auth | JWT (`jjwt`) via cookies HTTP-Only (RNF01) |
 | Senhas | Argon2 (`Argon2PasswordEncoder` + BouncyCastle) (RNF02) |
-| E-mail | Spring Mail (JavaMail) — convite de novo usuário e recuperação de senha |
+| E-mail | Spring Mail (JavaMail) + outbox transacional com retentativas |
 | Validação | Bean Validation (`jakarta.validation`) |
+| Testes de integração | JUnit + Testcontainers com PostgreSQL real |
 
 ## Como rodar
 
@@ -38,6 +39,9 @@ e-mail, com um token de redefinição de uso único.
 3. Para testar convites e recuperação de senha, configure `MAIL_HOST`, `MAIL_PORT`,
    `MAIL_USERNAME`, `MAIL_PASSWORD` e `MAIL_FROM`. Com Mailtrap Email Sandbox, use o host
    `sandbox.smtp.mailtrap.io`, porta `2525` e as credenciais exibidas na aba SMTP do seu Sandbox.
+   Os endpoints gravam o e-mail na outbox na mesma transação dos tokens; um worker o envia em
+   segundo plano e faz até 5 tentativas. Assim, `201`/`204` confirma o enfileiramento, não a
+   entrega pelo servidor SMTP.
 4. Execute a API com Java 17+ e Maven:
 
    ```bash
@@ -50,6 +54,12 @@ e-mail, com um token de redefinição de uso único.
    enviar o primeiro convite.
 
 A API sobe em `http://localhost:8080`.
+
+Para executar todos os testes, inclusive os de integração, mantenha o Docker ativo e rode:
+
+```bash
+mvn verify
+```
 
 
 ## Endpoints (RF01–RF10)
@@ -75,8 +85,9 @@ ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 | RF09 | PATCH | `/me` | Sim | `{ name }` | 204 | 400 nome inválido (< 3 caracteres) |
 | RF10 | GET | `/me` | Sim | — | 200 `{ id, name, email }` | 401 não autenticado |
 
-Trocar a senha (RF08) e redefini-la via e-mail (RF07) invalidam (deletam) todos os refresh tokens
-do usuário, forçando novo login em outras sessões.
+Trocar a senha (RF08) e redefini-la via e-mail (RF07) invalidam todos os refresh tokens e todos os
+tokens de redefinição pendentes do usuário, forçando novo login em outras sessões e impedindo o
+reuso de links antigos.
 
 ## Estrutura do código
 
@@ -84,6 +95,7 @@ Camadas técnicas em `src/main/java/com/rootly/api`: `controller`, `service`, `r
 `entity`, `dto`, `config` (Spring Security + filtro JWT), `exception` (hierarquia de erros +
 `@RestControllerAdvice`).
 
-Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken` — apenas
-o necessário para RF01-10. `Workspace`, coleções, itens, notificações, histórico de atividades e
-arquivos ainda não foram implementados.
+Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken` e
+`EmailOutbox` — apenas o necessário para RF01-10 e para a entrega confiável dos e-mails.
+`Workspace`, coleções, itens, notificações, histórico de atividades e arquivos ainda não foram
+implementados.
