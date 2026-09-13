@@ -50,13 +50,6 @@
       <scope>runtime</scope>
     </dependency>
 
-    <!-- rate limit dos endpoints sensiveis a brute-force/spam (login, cadastro, recuperacao de senha) -->
-    <dependency>
-      <groupId>com.bucket4j</groupId>
-      <artifactId>bucket4j_jdk17-core</artifactId>
-      <version>8.19.0</version>
-    </dependency>
-
     <!-- exigido em runtime pelo Argon2PasswordEncoder do Spring Security -->
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -106,6 +99,11 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
