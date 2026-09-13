@@ -15,8 +15,8 @@ e-mail, com um token de redefinição de uso único.
 |---|---|
 | Framework | Spring Boot 3.5 |
 | Persistência | Spring Data JPA + Hibernate |
-| Banco | PostgreSQL (local, schema-alvo já existente — ver abaixo) |
-| Migrations | Flyway (`baseline-on-migrate` sobre o schema existente + `db/migration` para o que falta) |
+| Banco | PostgreSQL 17 (serviço local via Docker Compose) |
+| Migrations | Flyway (`src/main/resources/db/migration`) |
 | Auth | JWT (`jjwt`) via cookies HTTP-Only (RNF01) |
 | Senhas | Argon2 (`Argon2PasswordEncoder` + BouncyCastle) (RNF02) |
 | E-mail | Spring Mail (JavaMail) — convite de novo usuário e recuperação de senha |
@@ -24,26 +24,30 @@ e-mail, com um token de redefinição de uso único.
 
 ## Como rodar
 
-1. Garanta que existe um banco Postgres local chamado `rootly` com o schema-alvo já criado
-   (`user`, `refresh_token`, `workspace*`, `collection`, `item*`, `notification`,
-   `activity_log`...). O Flyway faz o baseline desse schema existente na primeira execução e, a
-   partir daí, aplica só as migrations incrementais em `src/main/resources/db/migration` — hoje,
-   uma única (`V1`) que cria `user_invite` e `password_reset_token`, as duas tabelas novas do
-   fluxo de convite/recuperação de senha.
-2. Copie `.env.example` para `.env` (`server/.env`, já ignorado pelo git) e preencha
-   `DB_USERNAME`/`DB_PASSWORD` com as credenciais do seu Postgres local e `JWT_SECRET` com um
-   valor aleatório de pelo menos 32 bytes — nenhuma dessas três variáveis tem default em
-   `application.properties` (são segredos, não podem viver no arquivo versionado), então a
-   aplicação falha ao subir se alguma faltar. O `.env` é carregado automaticamente pelo Spring
-   Boot via `spring.config.import` — não precisa exportar as variáveis manualmente.
-3. Ajuste `MAIL_HOST`/`MAIL_PORT`/`MAIL_USERNAME`/`MAIL_PASSWORD`/`MAIL_FROM` e `FRONTEND_URL` no
-   `.env` para o envio de e-mails de convite/recuperação de senha funcionar de verdade (sem isso,
-   o Spring Mail tenta enviar e falha silenciosamente do ponto de vista do cliente — a chamada
-   ainda responde `204`).
-4. Como não existe cadastro público, a migration `V2__insert_admin_user.sql` já semeia um usuário
-   inicial (`admin@gmail.com`) pra você conseguir logar e enviar o primeiro convite sem precisar
-   inserir nada manualmente no banco.
-5. `mvn spring-boot:run`
+1. Inicie o PostgreSQL:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   O Compose cria o banco `rootly`, exposto em `localhost:5432`, com usuário e senha `rootly`.
+2. Copie `.env.example` para `.env` e ajuste as variáveis. Para o banco iniciado pelo Compose,
+   use `DB_USERNAME=rootly` e `DB_PASSWORD=rootly`. Gere um valor aleatório de pelo menos 32 bytes
+   para `JWT_SECRET`; a aplicação não inicia se essa variável estiver ausente. O `.env` é carregado
+   automaticamente pelo Spring Boot, sem precisar exportar as variáveis no terminal.
+3. Para testar convites e recuperação de senha, configure `MAIL_HOST`, `MAIL_PORT`,
+   `MAIL_USERNAME`, `MAIL_PASSWORD` e `MAIL_FROM`. Com Mailtrap Email Sandbox, use o host
+   `sandbox.smtp.mailtrap.io`, porta `2525` e as credenciais exibidas na aba SMTP do seu Sandbox.
+4. Execute a API com Java 17+ e Maven:
+
+   ```bash
+   mvn spring-boot:run
+   ```
+
+   Em um banco vazio, o Flyway cria as tabelas de autenticação, convite e recuperação de senha.
+   A migration `V2` também insere o usuário inicial `admin@gmail.com`. Como não existe cadastro
+   público, solicite a redefinição de senha desse e-mail para definir a primeira senha e então
+   enviar o primeiro convite.
 
 A API sobe em `http://localhost:8080`.
 
@@ -54,7 +58,9 @@ Tabela resumida abaixo; documentação completa de cada endpoint (o que a funç�
 passo, parâmetros, respostas, códigos de erro) em [`docs/API.md`](docs/API.md).
 
 Todos os cookies (`accessToken`, `refreshToken`) são `httpOnly` + `secure` + `sameSite=Strict` +
-`path=/` (RNF01). Rotas autenticadas exigem o cookie `accessToken` válido.
+`path=/` (RNF01). Rotas autenticadas exigem o cookie `accessToken` válido. Como cookies `secure`
+não são enviados pelo navegador em HTTP, os testes autenticados em `http://localhost` exigem HTTPS
+ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|
@@ -79,6 +85,5 @@ Camadas técnicas em `src/main/java/com/rootly/api`: `controller`, `service`, `r
 `@RestControllerAdvice`).
 
 Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken` — apenas
-o necessário para RF01-10. As demais tabelas do schema-alvo (`collection`, `item*`,
-`notification`, `activity_log`) ganham entidade/repositório quando as RFs correspondentes forem
-migradas.
+o necessário para RF01-10. `Workspace`, coleções, itens, notificações, histórico de atividades e
+arquivos ainda não foram implementados.
