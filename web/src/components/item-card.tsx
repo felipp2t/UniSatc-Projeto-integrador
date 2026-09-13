@@ -200,7 +200,6 @@ function normalizeUrl(value: string) {
   return URL_PROTOCOL.test(value) ? value : `https://${value}`
 }
 interface NewItemCardProps {
-  children: React.ReactNode
   error?: string
   folderId?: string
   isCreating?: boolean
@@ -211,6 +210,8 @@ interface NewItemCardProps {
     type: ItemType
     content: File | string
   }) => Promise<void> | void
+  /** Semantic, focusable trigger without nested interactive controls. */
+  trigger: React.ReactElement
   workspaceId: string
 }
 
@@ -329,7 +330,7 @@ function ItemContentControl({
 }
 
 export function NewItemCard({
-  children,
+  trigger,
   workspaceId,
   folderId,
   onCreate,
@@ -380,11 +381,7 @@ export function NewItemCard({
   const displayedError = error ?? internalError
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger
-        render={<button className='contents text-left' type='button' />}
-      >
-        {children}
-      </DialogTrigger>
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Novo item</DialogTitle>

@@ -34,10 +34,11 @@ interface WorkspaceCardProps extends React.ComponentProps<'div'> {
   workspaceHref?: string
 }
 interface NewWorkspaceCardProps {
-  children: React.ReactNode
   error?: string
   isCreating?: boolean
   onCreate: (name: string) => Promise<void> | void
+  /** Semantic, focusable trigger without nested interactive controls. */
+  trigger: React.ReactElement
 }
 export function WorkspaceCard({
   workspace,
@@ -104,10 +105,10 @@ export function WorkspaceCard({
   )
 }
 export function NewWorkspaceCard({
-  children,
   onCreate,
   error: externalError,
   isCreating = false,
+  trigger,
 }: NewWorkspaceCardProps) {
   const [open, setOpen] = useState(false)
   const [internalError, setInternalError] = useState<string>()
@@ -145,11 +146,7 @@ export function NewWorkspaceCard({
   const error = externalError ?? internalError
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger
-        render={<button className='contents text-left' type='button' />}
-      >
-        {children}
-      </DialogTrigger>
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Novo workspace</DialogTitle>

@@ -123,7 +123,6 @@ const folderSchema = z.object({
 })
 
 interface NewFolderCardProps {
-  children: React.ReactNode
   error?: string
   isCreating?: boolean
   onCreate: (input: {
@@ -132,16 +131,18 @@ interface NewFolderCardProps {
     name: string
   }) => Promise<void> | void
   parentId?: string
+  /** Semantic, focusable trigger without nested interactive controls. */
+  trigger: React.ReactElement
   workspaceId: string
 }
 
 export function NewFolderCard({
   workspaceId,
   parentId,
-  children,
   onCreate,
   error,
   isCreating = false,
+  trigger,
 }: NewFolderCardProps) {
   const [open, setOpen] = useState(false)
   const [internalError, setInternalError] = useState<string>()
@@ -173,11 +174,7 @@ export function NewFolderCard({
   const displayedError = error ?? internalError
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger
-        render={<button className='contents text-left' type='button' />}
-      >
-        {children}
-      </DialogTrigger>
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Nova pasta</DialogTitle>
