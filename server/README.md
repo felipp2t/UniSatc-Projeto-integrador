@@ -99,6 +99,7 @@ reuso de links antigos.
 | POST | `/workspaces` | Sim | 201 com o workspace criado | Cria o workspace, o papel `Owner` e o vínculo do criador. |
 | GET | `/workspaces` | Sim | 200 com a lista | Retorna somente workspaces dos quais o usuário é membro. |
 | GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
+| GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
 | PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |
 
 ## Estrutura do código

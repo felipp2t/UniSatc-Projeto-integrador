@@ -43,7 +43,9 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
-                .andExpect(jsonPath("$.paths['/workspaces'].post.summary").value("Cria um workspace"));
+                .andExpect(jsonPath("$.paths['/workspaces'].post.summary").value("Cria um workspace"))
+                .andExpect(jsonPath("$.paths['/workspaces/{workspaceId}/members'].get.summary")
+                        .value("Lista os membros de um workspace"));
     }
 
     private void assertUnauthorized(org.springframework.test.web.servlet.ResultActions result) throws Exception {
