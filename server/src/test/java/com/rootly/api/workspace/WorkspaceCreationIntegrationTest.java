@@ -1,12 +1,14 @@
 package com.rootly.api.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.rootly.api.PostgresIntegrationTest;
 import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
+import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.entity.User;
 import com.rootly.api.entity.Workspace;
 import com.rootly.api.entity.WorkspaceMember;
@@ -106,6 +108,41 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void listsOnlyWorkspacesWhereTheAuthenticatedUserIsAMember() throws Exception {
+        User owner = createUser();
+        User anotherOwner = createUser();
+        createWorkspace(owner, "Workspace do proprietário");
+        createWorkspace(anotherOwner, "Workspace de outro usuário");
+
+        mockMvc.perform(get("/workspaces").cookie(authCookie(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("Workspace do proprietário"))
+                .andExpect(jsonPath("$[0].ownerId").value(owner.getId().toString()));
+    }
+
+    @Test
+    void getsWorkspaceWhenTheAuthenticatedUserIsAMember() throws Exception {
+        User owner = createUser();
+        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace acessível");
+
+        mockMvc.perform(get("/workspaces/{workspaceId}", createdWorkspace.id()).cookie(authCookie(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(createdWorkspace.id().toString()))
+                .andExpect(jsonPath("$.name").value("Workspace acessível"));
+    }
+
+    @Test
+    void doesNotExposeWorkspaceToUsersWhoAreNotMembers() throws Exception {
+        User owner = createUser();
+        User unrelatedUser = createUser();
+        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace privado");
+
+        mockMvc.perform(get("/workspaces/{workspaceId}", createdWorkspace.id()).cookie(authCookie(unrelatedUser)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void updatesOnlyEditableWorkspaceFields() {
         User owner = createUser();
         Workspace workspace = new Workspace();
@@ -172,6 +209,10 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
         user.setEmail(UUID.randomUUID() + "@example.com");
         user.setPasswordHash(passwordEncoder.encode("password123"));
         return userRepository.save(user);
+    }
+
+    private WorkspaceResponse createWorkspace(User owner, String name) {
+        return workspaceService.create(owner.getId(), new CreateWorkspaceRequest(name, null));
     }
 
     private void assertWorkspaceTablesAreEmpty() {

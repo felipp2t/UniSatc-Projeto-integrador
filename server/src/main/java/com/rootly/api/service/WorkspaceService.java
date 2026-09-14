@@ -10,6 +10,7 @@ import com.rootly.api.repository.UserRepository;
 import com.rootly.api.repository.WorkspaceMemberRepository;
 import com.rootly.api.repository.WorkspaceRepository;
 import com.rootly.api.repository.WorkspaceRoleRepository;
+import java.util.List;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,21 @@ public class WorkspaceService {
 
         var ownerRole = workspaceRoleRepository.save(workspaceMapper.toOwnerRole(workspace));
         workspaceMemberRepository.save(workspaceMapper.toMember(owner, workspace, ownerRole));
+
+        return workspaceMapper.toResponse(workspace);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkspaceResponse> list(UUID userId) {
+        return workspaceRepository.findAllByMemberUserId(userId).stream()
+                .map(workspaceMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public WorkspaceResponse get(UUID userId, UUID workspaceId) {
+        Workspace workspace = workspaceRepository.findByIdAndMemberUserId(workspaceId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
 
         return workspaceMapper.toResponse(workspace);
     }
