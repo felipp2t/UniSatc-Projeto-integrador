@@ -1,10 +1,12 @@
 package com.rootly.api.controller;
 
 import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
-import com.rootly.api.dto.workspace.CreateWorkspaceResponse;
+import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.service.WorkspaceService;
 import jakarta.validation.Valid;
 import java.util.UUID;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,19 +17,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/workspaces")
+@RequiredArgsConstructor
 public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
 
-    public WorkspaceController(WorkspaceService workspaceService) {
-        this.workspaceService = workspaceService;
-    }
-
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CreateWorkspaceResponse create(
-            @AuthenticationPrincipal UUID userId,
-            @Valid @RequestBody CreateWorkspaceRequest request) {
-        return new CreateWorkspaceResponse(workspaceService.create(userId, request));
+    public WorkspaceResponse create(@AuthenticationPrincipal UUID userId,
+                                    @Valid @RequestBody CreateWorkspaceRequest request) {
+        return workspaceService.create(userId, request);
     }
+
 }

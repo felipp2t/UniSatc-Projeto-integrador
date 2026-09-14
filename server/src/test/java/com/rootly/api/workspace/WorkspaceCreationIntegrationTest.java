@@ -76,7 +76,11 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.workspaceId").isString());
+                .andExpect(jsonPath("$.id").isString())
+                .andExpect(jsonPath("$.ownerId").value(owner.getId().toString()))
+                .andExpect(jsonPath("$.name").value("Meu Workspace"))
+                .andExpect(jsonPath("$.description").value("Documentação da equipe"))
+                .andExpect(jsonPath("$.createdAt").isNotEmpty());
 
         Workspace workspace = workspaceRepository.findAll().get(0);
         WorkspaceRole role = workspaceRoleRepository.findAll().get(0);

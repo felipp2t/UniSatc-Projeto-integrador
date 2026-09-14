@@ -1,10 +1,9 @@
 package com.rootly.api.service;
 
 import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
+import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.entity.User;
 import com.rootly.api.entity.Workspace;
-import com.rootly.api.entity.WorkspaceMember;
-import com.rootly.api.entity.WorkspaceRole;
 import com.rootly.api.exception.ResourceNotFoundException;
 import com.rootly.api.mapper.WorkspaceMapper;
 import com.rootly.api.repository.UserRepository;
@@ -12,13 +11,14 @@ import com.rootly.api.repository.WorkspaceMemberRepository;
 import com.rootly.api.repository.WorkspaceRepository;
 import com.rootly.api.repository.WorkspaceRoleRepository;
 import java.util.UUID;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class WorkspaceService {
-
-    private static final String OWNER_ROLE_NAME = "Owner";
 
     private final UserRepository userRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -26,39 +26,18 @@ public class WorkspaceService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceMapper workspaceMapper;
 
-    public WorkspaceService(
-            UserRepository userRepository,
-            WorkspaceRepository workspaceRepository,
-            WorkspaceRoleRepository workspaceRoleRepository,
-            WorkspaceMemberRepository workspaceMemberRepository,
-            WorkspaceMapper workspaceMapper) {
-        this.userRepository = userRepository;
-        this.workspaceRepository = workspaceRepository;
-        this.workspaceRoleRepository = workspaceRoleRepository;
-        this.workspaceMemberRepository = workspaceMemberRepository;
-        this.workspaceMapper = workspaceMapper;
-    }
-
     @Transactional
-    public UUID create(UUID ownerId, CreateWorkspaceRequest request) {
+    public WorkspaceResponse create(UUID ownerId, CreateWorkspaceRequest request) {
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         Workspace workspace = workspaceMapper.toEntity(request);
         workspace.setOwner(owner);
-        workspaceRepository.save(workspace);
+        workspaceRepository.saveAndFlush(workspace);
 
-        WorkspaceRole ownerRole = new WorkspaceRole();
-        ownerRole.setWorkspace(workspace);
-        ownerRole.setName(OWNER_ROLE_NAME);
-        workspaceRoleRepository.save(ownerRole);
+        var ownerRole = workspaceRoleRepository.save(workspaceMapper.toOwnerRole(workspace));
+        workspaceMemberRepository.save(workspaceMapper.toMember(owner, workspace, ownerRole));
 
-        WorkspaceMember ownerMember = new WorkspaceMember();
-        ownerMember.setUser(owner);
-        ownerMember.setWorkspace(workspace);
-        ownerMember.setRole(ownerRole);
-        workspaceMemberRepository.save(ownerMember);
-
-        return workspace.getId();
+        return workspaceMapper.toResponse(workspace);
     }
 }
