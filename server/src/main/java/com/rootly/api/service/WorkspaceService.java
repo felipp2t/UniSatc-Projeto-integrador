@@ -6,6 +6,7 @@ import com.rootly.api.entity.Workspace;
 import com.rootly.api.entity.WorkspaceMember;
 import com.rootly.api.entity.WorkspaceRole;
 import com.rootly.api.exception.ResourceNotFoundException;
+import com.rootly.api.mapper.WorkspaceMapper;
 import com.rootly.api.repository.UserRepository;
 import com.rootly.api.repository.WorkspaceMemberRepository;
 import com.rootly.api.repository.WorkspaceRepository;
@@ -23,16 +24,19 @@ public class WorkspaceService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceRoleRepository workspaceRoleRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final WorkspaceMapper workspaceMapper;
 
     public WorkspaceService(
             UserRepository userRepository,
             WorkspaceRepository workspaceRepository,
             WorkspaceRoleRepository workspaceRoleRepository,
-            WorkspaceMemberRepository workspaceMemberRepository) {
+            WorkspaceMemberRepository workspaceMemberRepository,
+            WorkspaceMapper workspaceMapper) {
         this.userRepository = userRepository;
         this.workspaceRepository = workspaceRepository;
         this.workspaceRoleRepository = workspaceRoleRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
+        this.workspaceMapper = workspaceMapper;
     }
 
     @Transactional
@@ -40,10 +44,8 @@ public class WorkspaceService {
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        Workspace workspace = new Workspace();
+        Workspace workspace = workspaceMapper.toEntity(request);
         workspace.setOwner(owner);
-        workspace.setName(request.name());
-        workspace.setDescription(request.description());
         workspaceRepository.save(workspace);
 
         WorkspaceRole ownerRole = new WorkspaceRole();
