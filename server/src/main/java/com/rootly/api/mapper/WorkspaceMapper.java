@@ -1,6 +1,7 @@
 package com.rootly.api.mapper;
 
 import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
+import com.rootly.api.dto.workspace.UpdateWorkspaceRequest;
 import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.entity.User;
 import com.rootly.api.entity.Workspace;
@@ -26,7 +27,7 @@ public interface WorkspaceMapper {
     @Mapping(target = "owner", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    void update(CreateWorkspaceRequest request, @MappingTarget Workspace workspace);
+    void update(UpdateWorkspaceRequest request, @MappingTarget Workspace workspace);
 
     @Mapping(target = "ownerId", source = "owner.id")
     WorkspaceResponse toResponse(Workspace workspace);

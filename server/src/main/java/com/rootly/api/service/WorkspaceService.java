@@ -1,6 +1,7 @@
 package com.rootly.api.service;
 
 import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
+import com.rootly.api.dto.workspace.UpdateWorkspaceRequest;
 import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.entity.User;
 import com.rootly.api.entity.Workspace;
@@ -53,6 +54,17 @@ public class WorkspaceService {
     public WorkspaceResponse get(UUID userId, UUID workspaceId) {
         Workspace workspace = workspaceRepository.findByIdAndMemberUserId(workspaceId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+
+        return workspaceMapper.toResponse(workspace);
+    }
+
+    @Transactional
+    public WorkspaceResponse update(UUID ownerId, UUID workspaceId, UpdateWorkspaceRequest request) {
+        Workspace workspace = workspaceRepository.findByIdAndOwnerId(workspaceId, ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+
+        workspaceMapper.update(request, workspace);
+        workspaceRepository.saveAndFlush(workspace);
 
         return workspaceMapper.toResponse(workspace);
     }

@@ -3,12 +3,14 @@ package com.rootly.api.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.rootly.api.PostgresIntegrationTest;
 import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
 import com.rootly.api.dto.workspace.WorkspaceResponse;
+import com.rootly.api.dto.workspace.UpdateWorkspaceRequest;
 import com.rootly.api.entity.User;
 import com.rootly.api.entity.Workspace;
 import com.rootly.api.entity.WorkspaceMember;
@@ -152,12 +154,55 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
         workspace.setName("Nome anterior");
         workspace.setDescription("Descrição anterior");
 
-        workspaceMapper.update(new CreateWorkspaceRequest("Nome atualizado", "Nova descrição"), workspace);
+        workspaceMapper.update(new UpdateWorkspaceRequest("Nome atualizado", "Nova descrição"), workspace);
 
         assertThat(workspace.getId()).isEqualTo(workspaceId);
         assertThat(workspace.getOwner()).isEqualTo(owner);
         assertThat(workspace.getName()).isEqualTo("Nome atualizado");
         assertThat(workspace.getDescription()).isEqualTo("Nova descrição");
+    }
+
+    @Test
+    void updatesWorkspaceWhenTheAuthenticatedUserIsTheOwner() throws Exception {
+        User owner = createUser();
+        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Nome anterior");
+
+        mockMvc.perform(patch("/workspaces/{workspaceId}", createdWorkspace.id())
+                        .cookie(authCookie(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "  Nome atualizado  ",
+                                  "description": "  Nova descrição  "
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(createdWorkspace.id().toString()))
+                .andExpect(jsonPath("$.name").value("Nome atualizado"))
+                .andExpect(jsonPath("$.description").value("Nova descrição"));
+
+        Workspace updatedWorkspace = workspaceRepository.findById(createdWorkspace.id()).orElseThrow();
+        assertThat(updatedWorkspace.getName()).isEqualTo("Nome atualizado");
+        assertThat(updatedWorkspace.getDescription()).isEqualTo("Nova descrição");
+    }
+
+    @Test
+    void doesNotAllowMembersWhoAreNotOwnersToUpdateWorkspace() throws Exception {
+        User owner = createUser();
+        User member = createUser();
+        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace privado");
+        addMember(member, createdWorkspace.id());
+
+        mockMvc.perform(patch("/workspaces/{workspaceId}", createdWorkspace.id())
+                        .cookie(authCookie(member))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "name": "Tentativa de alteração" }
+                                """))
+                .andExpect(status().isNotFound());
+
+        Workspace unchangedWorkspace = workspaceRepository.findById(createdWorkspace.id()).orElseThrow();
+        assertThat(unchangedWorkspace.getName()).isEqualTo("Workspace privado");
     }
 
     @Test
@@ -213,6 +258,20 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
 
     private WorkspaceResponse createWorkspace(User owner, String name) {
         return workspaceService.create(owner.getId(), new CreateWorkspaceRequest(name, null));
+    }
+
+    private void addMember(User user, UUID workspaceId) {
+        Workspace workspace = workspaceRepository.findById(workspaceId).orElseThrow();
+        WorkspaceRole role = workspaceRoleRepository.findAll().stream()
+                .filter(candidate -> candidate.getWorkspace().getId().equals(workspaceId))
+                .findFirst()
+                .orElseThrow();
+
+        WorkspaceMember member = new WorkspaceMember();
+        member.setUser(user);
+        member.setWorkspace(workspace);
+        member.setRole(role);
+        workspaceMemberRepository.save(member);
     }
 
     private void assertWorkspaceTablesAreEmpty() {
