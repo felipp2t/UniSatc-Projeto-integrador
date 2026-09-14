@@ -26,7 +26,7 @@ public interface WorkspaceControllerDocs {
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "404")})
     WorkspaceResponse get(@Parameter(hidden = true) UUID userId, UUID workspaceId);
 
-    @Operation(summary = "Atualiza um workspace")
+    @Operation(summary = "Substitui os dados de um workspace")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"), @ApiResponse(responseCode = "404")})
     WorkspaceResponse update(
             @Parameter(hidden = true) UUID userId, UUID workspaceId, UpdateWorkspaceRequest request);

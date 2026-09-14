@@ -3,7 +3,7 @@ package com.rootly.api.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -167,7 +167,7 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
         User owner = createUser();
         WorkspaceResponse createdWorkspace = createWorkspace(owner, "Nome anterior");
 
-        mockMvc.perform(patch("/workspaces/{workspaceId}", createdWorkspace.id())
+        mockMvc.perform(put("/workspaces/{workspaceId}", createdWorkspace.id())
                         .cookie(authCookie(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -193,7 +193,7 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
         WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace privado");
         addMember(member, createdWorkspace.id());
 
-        mockMvc.perform(patch("/workspaces/{workspaceId}", createdWorkspace.id())
+        mockMvc.perform(put("/workspaces/{workspaceId}", createdWorkspace.id())
                         .cookie(authCookie(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
