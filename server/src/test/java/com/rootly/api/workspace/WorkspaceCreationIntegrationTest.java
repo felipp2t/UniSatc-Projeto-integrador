@@ -11,6 +11,7 @@ import com.rootly.api.entity.User;
 import com.rootly.api.entity.Workspace;
 import com.rootly.api.entity.WorkspaceMember;
 import com.rootly.api.entity.WorkspaceRole;
+import com.rootly.api.mapper.WorkspaceMapper;
 import com.rootly.api.repository.EmailOutboxRepository;
 import com.rootly.api.repository.PasswordResetTokenRepository;
 import com.rootly.api.repository.RefreshTokenRepository;
@@ -46,6 +47,7 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private UserInviteRepository userInviteRepository;
     @Autowired private WorkspaceService workspaceService;
+    @Autowired private WorkspaceMapper workspaceMapper;
     @Autowired private JwtService jwtService;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private TransactionTemplate transactionTemplate;
@@ -97,6 +99,24 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
         workspaceService.create(owner.getId(), new CreateWorkspaceRequest("Workspace", "   "));
 
         assertThat(workspaceRepository.findAll().get(0).getDescription()).isNull();
+    }
+
+    @Test
+    void updatesOnlyEditableWorkspaceFields() {
+        User owner = createUser();
+        Workspace workspace = new Workspace();
+        UUID workspaceId = UUID.randomUUID();
+        workspace.setId(workspaceId);
+        workspace.setOwner(owner);
+        workspace.setName("Nome anterior");
+        workspace.setDescription("Descrição anterior");
+
+        workspaceMapper.update(new CreateWorkspaceRequest("Nome atualizado", "Nova descrição"), workspace);
+
+        assertThat(workspace.getId()).isEqualTo(workspaceId);
+        assertThat(workspace.getOwner()).isEqualTo(owner);
+        assertThat(workspace.getName()).isEqualTo("Nome atualizado");
+        assertThat(workspace.getDescription()).isEqualTo("Nova descrição");
     }
 
     @Test
