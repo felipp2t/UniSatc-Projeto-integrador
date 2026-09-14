@@ -38,6 +38,14 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
         assertUnauthorized(mockMvc.perform(get("/me").cookie(new Cookie("accessToken", expiredToken))));
     }
 
+    @Test
+    void exposesOpenApiDocumentationWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(jsonPath("$.paths['/workspaces'].post.summary").value("Cria um workspace"));
+    }
+
     private void assertUnauthorized(org.springframework.test.web.servlet.ResultActions result) throws Exception {
         result.andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))

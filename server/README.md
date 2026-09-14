@@ -55,6 +55,9 @@ e-mail, com um token de redefinição de uso único.
 
 A API sobe em `http://localhost:8080`.
 
+A documentação interativa OpenAPI está disponível em `http://localhost:8080/swagger-ui.html`; a
+especificação JSON pode ser acessada em `http://localhost:8080/v3/api-docs`.
+
 Para executar todos os testes, inclusive os de integração, mantenha o Docker ativo e rode:
 
 ```bash

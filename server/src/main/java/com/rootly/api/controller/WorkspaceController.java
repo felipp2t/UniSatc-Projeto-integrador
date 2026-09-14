@@ -1,5 +1,6 @@
 package com.rootly.api.controller;
 
+import com.rootly.api.controller.docs.WorkspaceControllerDocs;
 import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
 import com.rootly.api.dto.workspace.UpdateWorkspaceRequest;
 import com.rootly.api.dto.workspace.WorkspaceResponse;
@@ -23,28 +24,32 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/workspaces")
 @RequiredArgsConstructor
-public class WorkspaceController {
+public class WorkspaceController implements WorkspaceControllerDocs {
 
     private final WorkspaceService workspaceService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Override
     public WorkspaceResponse create(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody CreateWorkspaceRequest request) {
         return workspaceService.create(userId, request);
     }
 
     @GetMapping
+    @Override
     public List<WorkspaceResponse> list(@AuthenticationPrincipal UUID userId) {
         return workspaceService.list(userId);
     }
 
     @GetMapping("/{workspaceId}")
+    @Override
     public WorkspaceResponse get(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId) {
         return workspaceService.get(userId, workspaceId);
     }
 
     @PatchMapping("/{workspaceId}")
+    @Override
     public WorkspaceResponse update(@AuthenticationPrincipal UUID userId,
                                     @PathVariable UUID workspaceId,
                                     @Valid @RequestBody UpdateWorkspaceRequest request) {

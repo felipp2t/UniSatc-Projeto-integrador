@@ -1,5 +1,6 @@
 package com.rootly.api.controller;
 
+import com.rootly.api.controller.docs.InviteControllerDocs;
 import com.rootly.api.dto.invite.InviteUserRequest;
 import com.rootly.api.service.InviteService;
 import jakarta.validation.Valid;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/invites")
-public class InviteController {
+public class InviteController implements InviteControllerDocs {
 
     private final InviteService inviteService;
 
@@ -23,6 +24,7 @@ public class InviteController {
     }
 
     @PostMapping
+    @Override
     public ResponseEntity<Void> invite(
             @AuthenticationPrincipal UUID inviterId,
 
