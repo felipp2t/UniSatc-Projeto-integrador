@@ -1,5 +1,6 @@
 package com.rootly.api.controller;
 
+import com.rootly.api.controller.docs.UserControllerDocs;
 import com.rootly.api.dto.user.ChangePasswordRequest;
 import com.rootly.api.dto.user.UpdateProfileRequest;
 import com.rootly.api.dto.user.UserResponse;
@@ -15,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class UserController {
+public class UserController implements UserControllerDocs {
 
     private final UserService userService;
 
@@ -24,11 +25,13 @@ public class UserController {
     }
 
     @GetMapping("/me")
+    @Override
     public UserResponse getMe(@AuthenticationPrincipal UUID userId) {
         return UserResponse.from(userService.getMe(userId));
     }
 
     @PatchMapping("/me")
+    @Override
     public ResponseEntity<Void> updateProfile(
             @AuthenticationPrincipal UUID userId,
 
@@ -39,6 +42,7 @@ public class UserController {
     }
 
     @PatchMapping("/me/password")
+    @Override
     public ResponseEntity<Void> changePassword(
             @AuthenticationPrincipal UUID userId,
 

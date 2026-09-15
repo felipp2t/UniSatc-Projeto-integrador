@@ -55,6 +55,9 @@ e-mail, com um token de redefinição de uso único.
 
 A API sobe em `http://localhost:8080`.
 
+A documentação interativa OpenAPI está disponível em `http://localhost:8080/swagger-ui.html`; a
+especificação JSON pode ser acessada em `http://localhost:8080/v3/api-docs`.
+
 Para executar todos os testes, inclusive os de integração, mantenha o Docker ativo e rode:
 
 ```bash
@@ -89,13 +92,23 @@ Trocar a senha (RF08) e redefini-la via e-mail (RF07) invalidam todos os refresh
 tokens de redefinição pendentes do usuário, forçando novo login em outras sessões e impedindo o
 reuso de links antigos.
 
+## Workspaces (em andamento)
+
+| Método | Rota | Auth | Sucesso | Regra de acesso |
+|---|---|---|---|---|
+| POST | `/workspaces` | Sim | 201 com o workspace criado | Cria o workspace, o papel `Owner` e o vínculo do criador. |
+| GET | `/workspaces` | Sim | 200 com a lista | Retorna somente workspaces dos quais o usuário é membro. |
+| GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
+| GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
+| PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |
+
 ## Estrutura do código
 
 Camadas técnicas em `src/main/java/com/rootly/api`: `controller`, `service`, `repository`,
 `entity`, `dto`, `config` (Spring Security + filtro JWT), `exception` (hierarquia de erros +
 `@RestControllerAdvice`).
 
-Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken` e
-`EmailOutbox` — apenas o necessário para RF01-10 e para a entrega confiável dos e-mails.
-`Workspace`, coleções, itens, notificações, histórico de atividades e arquivos ainda não foram
-implementados.
+Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken`,
+`EmailOutbox`, `Workspace`, `WorkspaceRole` e `WorkspaceMember`. Coleções, itens, notificações,
+histórico de atividades, arquivos, convites para workspaces e RBAC além do papel inicial de
+proprietário ainda não foram implementados.

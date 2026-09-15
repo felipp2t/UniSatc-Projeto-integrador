@@ -1,5 +1,6 @@
 package com.rootly.api.controller;
 
+import com.rootly.api.controller.docs.AuthControllerDocs;
 import com.rootly.api.dto.auth.ForgotPasswordRequest;
 import com.rootly.api.dto.auth.LoginRequest;
 import com.rootly.api.dto.auth.RegisterRequest;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class AuthController {
+public class AuthController implements AuthControllerDocs {
 
     private final AuthService authService;
 
@@ -37,6 +38,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/login")
+    @Override
     public ResponseEntity<Void> login(@Valid @RequestBody LoginRequest request) {
         TokenPair tokens = authService.login(request);
 
@@ -44,6 +46,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/refresh")
+    @Override
     public ResponseEntity<Void> refresh(HttpServletRequest request) {
         String refreshToken = readCookie(request, "refreshToken")
                 .orElseThrow(() -> new InvalidCredentialsException("Token de atualização inválido"));
@@ -54,6 +57,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/logout")
+    @Override
     public ResponseEntity<Void> logout(HttpServletRequest request) {
         String refreshToken = readCookie(request, "refreshToken")
                 .orElseThrow(() -> new InvalidCredentialsException("Token de atualização inválido"));
@@ -67,6 +71,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/register")
+    @Override
     public ResponseEntity<Void> register(@Valid @RequestBody RegisterRequest request) {
         TokenPair tokens = authService.register(request);
 
@@ -74,6 +79,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/forgot-password")
+    @Override
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
 
@@ -81,6 +87,7 @@ public class AuthController {
     }
 
     @PostMapping("/auth/reset-password")
+    @Override
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
 
