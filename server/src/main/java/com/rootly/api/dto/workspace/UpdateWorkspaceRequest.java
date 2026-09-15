@@ -8,18 +8,11 @@ public record UpdateWorkspaceRequest(
         @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
         String name,
 
+        @Size(max = 2000, message = "Descrição deve ter no máximo 2000 caracteres")
         String description) {
 
     public UpdateWorkspaceRequest {
-        name = name == null ? null : name.trim();
-        description = normalizeDescription(description);
-    }
-
-    private static String normalizeDescription(String description) {
-        if (description == null) {
-            return null;
-        }
-        String normalized = description.trim();
-        return normalized.isEmpty() ? null : normalized;
+        name = WorkspaceTextNormalizer.normalizeName(name);
+        description = WorkspaceTextNormalizer.normalizeDescription(description);
     }
 }

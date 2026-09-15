@@ -5,6 +5,7 @@ import com.rootly.api.dto.workspace.UpdateWorkspaceRequest;
 import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.entity.User;
 import com.rootly.api.entity.Workspace;
+import com.rootly.api.entity.WorkspaceRole;
 import com.rootly.api.exception.ResourceNotFoundException;
 import com.rootly.api.mapper.WorkspaceMapper;
 import com.rootly.api.repository.UserRepository;
@@ -37,7 +38,7 @@ public class WorkspaceService {
         workspace.setOwner(owner);
         workspaceRepository.saveAndFlush(workspace);
 
-        var ownerRole = workspaceRoleRepository.save(workspaceMapper.toOwnerRole(workspace));
+        var ownerRole = workspaceRoleRepository.save(WorkspaceRole.owner(workspace));
         workspaceMemberRepository.save(workspaceMapper.toMember(owner, workspace, ownerRole));
 
         return workspaceMapper.toResponse(workspace);

@@ -16,8 +16,6 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface WorkspaceMapper {
 
-    String OWNER_ROLE_NAME = "Owner";
-
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "owner", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
@@ -32,13 +30,6 @@ public interface WorkspaceMapper {
 
     @Mapping(target = "ownerId", source = "owner.id")
     WorkspaceResponse toResponse(Workspace workspace);
-
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "workspace", source = "workspace")
-    @Mapping(target = "name", constant = OWNER_ROLE_NAME)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "updatedAt", ignore = true)
-    WorkspaceRole toOwnerRole(Workspace workspace);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "user", source = "user")

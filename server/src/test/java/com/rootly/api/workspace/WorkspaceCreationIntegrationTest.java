@@ -7,64 +7,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.rootly.api.PostgresIntegrationTest;
 import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
-import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.dto.workspace.UpdateWorkspaceRequest;
+import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.entity.User;
 import com.rootly.api.entity.Workspace;
 import com.rootly.api.entity.WorkspaceMember;
 import com.rootly.api.entity.WorkspaceRole;
-import com.rootly.api.mapper.WorkspaceMapper;
-import com.rootly.api.repository.EmailOutboxRepository;
-import com.rootly.api.repository.PasswordResetTokenRepository;
-import com.rootly.api.repository.RefreshTokenRepository;
-import com.rootly.api.repository.UserInviteRepository;
-import com.rootly.api.repository.UserRepository;
-import com.rootly.api.repository.WorkspaceMemberRepository;
-import com.rootly.api.repository.WorkspaceRepository;
-import com.rootly.api.repository.WorkspaceRoleRepository;
-import com.rootly.api.service.JwtService;
-import com.rootly.api.service.WorkspaceService;
-import jakarta.servlet.http.Cookie;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.support.TransactionTemplate;
 
-@AutoConfigureMockMvc
-class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
-
-    @Autowired private MockMvc mockMvc;
-    @Autowired private UserRepository userRepository;
-    @Autowired private WorkspaceRepository workspaceRepository;
-    @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
-    @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
-    @Autowired private EmailOutboxRepository emailOutboxRepository;
-    @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
-    @Autowired private RefreshTokenRepository refreshTokenRepository;
-    @Autowired private UserInviteRepository userInviteRepository;
-    @Autowired private WorkspaceService workspaceService;
-    @Autowired private WorkspaceMapper workspaceMapper;
-    @Autowired private JwtService jwtService;
-    @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private TransactionTemplate transactionTemplate;
-
-    @BeforeEach
-    void setUp() {
-        cleanDatabase();
-    }
-
-    @AfterEach
-    void tearDown() {
-        cleanDatabase();
-    }
+class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Test
     void createsWorkspaceOwnerRoleAndOwnerMembership() throws Exception {
@@ -242,52 +196,5 @@ class WorkspaceCreationIntegrationTest extends PostgresIntegrationTest {
         });
 
         assertWorkspaceTablesAreEmpty();
-    }
-
-    private Cookie authCookie(User user) {
-        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId()));
-    }
-
-    private User createUser() {
-        User user = new User();
-        user.setName("Test User");
-        user.setEmail(UUID.randomUUID() + "@example.com");
-        user.setPasswordHash(passwordEncoder.encode("password123"));
-        return userRepository.save(user);
-    }
-
-    private WorkspaceResponse createWorkspace(User owner, String name) {
-        return workspaceService.create(owner.getId(), new CreateWorkspaceRequest(name, null));
-    }
-
-    private void addMember(User user, UUID workspaceId) {
-        Workspace workspace = workspaceRepository.findById(workspaceId).orElseThrow();
-        WorkspaceRole role = workspaceRoleRepository.findAll().stream()
-                .filter(candidate -> candidate.getWorkspace().getId().equals(workspaceId))
-                .findFirst()
-                .orElseThrow();
-
-        WorkspaceMember member = new WorkspaceMember();
-        member.setUser(user);
-        member.setWorkspace(workspace);
-        member.setRole(role);
-        workspaceMemberRepository.save(member);
-    }
-
-    private void assertWorkspaceTablesAreEmpty() {
-        assertThat(workspaceMemberRepository.findAll()).isEmpty();
-        assertThat(workspaceRoleRepository.findAll()).isEmpty();
-        assertThat(workspaceRepository.findAll()).isEmpty();
-    }
-
-    private void cleanDatabase() {
-        workspaceMemberRepository.deleteAll();
-        workspaceRoleRepository.deleteAll();
-        workspaceRepository.deleteAll();
-        emailOutboxRepository.deleteAll();
-        passwordResetTokenRepository.deleteAll();
-        refreshTokenRepository.deleteAll();
-        userInviteRepository.deleteAll();
-        userRepository.deleteAll();
     }
 }

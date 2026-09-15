@@ -25,6 +25,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 @EqualsAndHashCode(of = "id")
 public class WorkspaceRole {
 
+    public static final String OWNER_ROLE_NAME = "Owner";
+
     @Id
     @GeneratedValue
     private UUID id;
@@ -43,4 +45,11 @@ public class WorkspaceRole {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
+
+    public static WorkspaceRole owner(Workspace workspace) {
+        WorkspaceRole role = new WorkspaceRole();
+        role.setWorkspace(workspace);
+        role.setName(OWNER_ROLE_NAME);
+        return role;
+    }
 }
