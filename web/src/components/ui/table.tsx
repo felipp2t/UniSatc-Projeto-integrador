@@ -3,6 +3,7 @@ import type {
   TableHTMLAttributes,
   ThHTMLAttributes,
 } from 'react'
+import { cn } from 'cn'
 
 export function Table({
   className,
@@ -11,9 +12,7 @@ export function Table({
   return (
     <div className='relative w-full overflow-auto'>
       <table
-        className={['w-full caption-bottom text-xs', className]
-          .filter(Boolean)
-          .join(' ')}
+        className={cn('w-full caption-bottom text-xs', className)}
         {...props}
       />
     </div>
@@ -28,9 +27,7 @@ export function TableCaption({
 }: HTMLAttributes<HTMLTableCaptionElement>) {
   return (
     <caption
-      className={['mt-4 text-muted-foreground text-xs', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn('mt-4 text-muted-foreground text-xs', className)}
       {...props}
     />
   )
@@ -44,12 +41,10 @@ export function TableRow({
 }: HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={[
+      className={cn(
         'border-border border-b transition-colors hover:bg-muted/50',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )
@@ -61,12 +56,10 @@ export function TableHead({
 }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={[
+      className={cn(
         'h-10 px-3 text-left font-mono text-[10px] text-muted-foreground uppercase tracking-wide',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       scope={scope}
       {...props}
     />
@@ -78,9 +71,7 @@ export function TableCell({
 }: HTMLAttributes<HTMLTableCellElement>) {
   return (
     <td
-      className={['p-3 align-middle text-foreground', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn('p-3 align-middle text-foreground', className)}
       {...props}
     />
   )

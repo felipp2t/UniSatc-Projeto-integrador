@@ -1,4 +1,5 @@
 import type { HTMLAttributes } from 'react'
+import { cn } from 'cn'
 
 export function Skeleton({
   className,
@@ -6,9 +7,10 @@ export function Skeleton({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={['animate-pulse rounded-sm bg-muted-foreground/15', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn(
+        'animate-pulse rounded-sm bg-muted-foreground/15',
+        className
+      )}
       {...props}
     />
   )

@@ -1,6 +1,7 @@
 import { CaretDownIcon, CheckIcon } from '@phosphor-icons/react'
 import { Select as SelectPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
+import { cn } from 'cn'
 
 export const Select = SelectPrimitive.Root
 export const SelectGroup = SelectPrimitive.Group
@@ -14,12 +15,10 @@ export function SelectTrigger({
 }: ComponentProps<typeof SelectPrimitive.Trigger>) {
   return (
     <SelectPrimitive.Trigger
-      className={[
+      className={cn(
         'flex h-9 w-full items-center justify-between rounded-sm border border-input bg-background px-3 font-mono text-foreground text-xs outline-none focus:ring-2 focus:ring-ring data-placeholder:text-muted-foreground',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     >
       {children}
@@ -38,12 +37,10 @@ export function SelectContent({
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
-        className={[
+        className={cn(
           'z-50 min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md',
-          className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
+          className
+        )}
         {...props}
       >
         <SelectPrimitive.Viewport className='p-0.5'>
@@ -61,12 +58,10 @@ export function SelectItem({
 }: ComponentProps<typeof SelectPrimitive.Item>) {
   return (
     <SelectPrimitive.Item
-      className={[
+      className={cn(
         'relative flex cursor-pointer select-none items-center rounded-sm py-2 pr-8 pl-2 font-mono text-xs outline-none focus:bg-primary/10 focus:text-primary data-disabled:pointer-events-none data-disabled:opacity-50',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

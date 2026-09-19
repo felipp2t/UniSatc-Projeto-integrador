@@ -1,5 +1,6 @@
 import { Tabs as TabsPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
+import { cn } from 'cn'
 
 export const Tabs = TabsPrimitive.Root
 
@@ -9,12 +10,10 @@ export function TabsList({
 }: ComponentProps<typeof TabsPrimitive.List>) {
   return (
     <TabsPrimitive.List
-      className={[
+      className={cn(
         'inline-flex h-9 items-center gap-1 rounded-sm bg-muted p-1',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )
@@ -26,12 +25,10 @@ export function TabsTrigger({
 }: ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
-      className={[
+      className={cn(
         'inline-flex items-center justify-center rounded-sm px-3 py-1.5 font-mono text-muted-foreground text-xs uppercase outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )
@@ -43,12 +40,10 @@ export function TabsContent({
 }: ComponentProps<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content
-      className={[
+      className={cn(
         'mt-2 outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )

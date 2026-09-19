@@ -1,4 +1,5 @@
 import type { HTMLAttributes } from 'react'
+import { cn } from 'cn'
 
 export interface SeparatorProps extends HTMLAttributes<HTMLHRElement> {
   decorative?: boolean
@@ -12,13 +13,11 @@ export function Separator({
   ...props
 }: SeparatorProps) {
   const isHorizontal = orientation === 'horizontal'
-  const classes = [
+  const classes = cn(
     'shrink-0 bg-border',
     isHorizontal ? 'h-px w-full' : 'h-full w-px',
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
+    className
+  )
 
   return (
     <hr

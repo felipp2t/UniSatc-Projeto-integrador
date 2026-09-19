@@ -1,4 +1,5 @@
 import type { HTMLAttributes } from 'react'
+import { cn } from 'cn'
 
 export function Badge({
   className,
@@ -17,13 +18,11 @@ export function Badge({
 
   return (
     <div
-      className={[
+      className={cn(
         'inline-flex items-center rounded-sm border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide',
         variants[variant],
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )

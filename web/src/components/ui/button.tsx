@@ -1,5 +1,6 @@
 import { CircleNotchIcon } from '@phosphor-icons/react'
 import type { ButtonHTMLAttributes } from 'react'
+import { cn } from 'cn'
 
 const buttonVariants = {
   default: 'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -38,16 +39,14 @@ export function Button({
   size = 'default',
   ...props
 }: ButtonProps) {
-  const classes = [
-    'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-sm font-mono text-xs font-medium uppercase tracking-wide transition-colors',
+  const classes = cn(
+    'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-sm font-medium font-mono text-xs uppercase tracking-wide transition-colors',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     'disabled:pointer-events-none disabled:opacity-50',
     buttonVariants[variant],
     buttonSizes[size],
-    className,
-  ]
-    .filter(Boolean)
-    .join(' ')
+    className
+  )
 
   return (
     <button
@@ -58,7 +57,11 @@ export function Button({
       {...props}
     >
       {!!loading && (
-        <CircleNotchIcon aria-hidden='true' className='animate-spin' size={14} />
+        <CircleNotchIcon
+          aria-hidden='true'
+          className='animate-spin'
+          size={14}
+        />
       )}
       {children}
     </button>

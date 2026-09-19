@@ -1,4 +1,5 @@
 import type { HTMLAttributes, LabelHTMLAttributes, ReactNode } from 'react'
+import { cn } from 'cn'
 
 interface FieldProps extends HTMLAttributes<HTMLDivElement> {
   orientation?: 'horizontal' | 'vertical'
@@ -11,15 +12,13 @@ export function Field({
 }: FieldProps) {
   return (
     <div
-      className={[
+      className={cn(
         'group/field flex w-full gap-1.5',
         orientation === 'horizontal'
           ? 'flex-row items-center'
           : 'flex-col *:w-full',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )
@@ -32,12 +31,10 @@ export function FieldLabel({
   return (
     // biome-ignore lint/a11y/noLabelWithoutControl: The control association is supplied through htmlFor.
     <label
-      className={[
+      className={cn(
         'flex w-fit items-center gap-2 font-medium font-mono text-xs leading-snug',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )
@@ -48,12 +45,7 @@ export function FieldContent({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div
-      className={['flex flex-1 flex-col gap-1', className]
-        .filter(Boolean)
-        .join(' ')}
-      {...props}
-    />
+    <div className={cn('flex flex-1 flex-col gap-1', className)} {...props} />
   )
 }
 
@@ -62,12 +54,7 @@ export function FieldDescription({
   ...props
 }: HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p
-      className={['text-muted-foreground text-xs', className]
-        .filter(Boolean)
-        .join(' ')}
-      {...props}
-    />
+    <p className={cn('text-muted-foreground text-xs', className)} {...props} />
   )
 }
 
@@ -90,9 +77,7 @@ export function FieldError({
 
   return (
     <div
-      className={['text-destructive text-xs', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn('text-destructive text-xs', className)}
       role='alert'
       {...props}
     >

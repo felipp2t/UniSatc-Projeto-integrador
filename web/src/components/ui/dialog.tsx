@@ -1,6 +1,7 @@
 import { XIcon } from '@phosphor-icons/react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
+import { cn } from 'cn'
 import { Button } from './button'
 
 export const Dialog = DialogPrimitive.Root
@@ -14,9 +15,7 @@ export function DialogOverlay({
 }: ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
-      className={['fixed inset-0 z-50 bg-black/70', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn('fixed inset-0 z-50 bg-black/70', className)}
       {...props}
     />
   )
@@ -34,12 +33,10 @@ export function DialogContent({
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        className={[
+        className={cn(
           'fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-md border border-border bg-card p-6 text-foreground shadow-lg outline-none',
-          className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
+          className
+        )}
         {...props}
       >
         {children}
@@ -61,20 +58,13 @@ export function DialogContent({
 }
 
 export function DialogHeader({ className, ...props }: ComponentProps<'div'>) {
-  return (
-    <div
-      className={['flex flex-col gap-1.5', className].filter(Boolean).join(' ')}
-      {...props}
-    />
-  )
+  return <div className={cn('flex flex-col gap-1.5', className)} {...props} />
 }
 
 export function DialogFooter({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
-      className={['flex items-center justify-end gap-2', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn('flex items-center justify-end gap-2', className)}
       {...props}
     />
   )
@@ -86,9 +76,7 @@ export function DialogTitle({
 }: ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
-      className={['font-bold font-mono text-sm', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn('font-bold font-mono text-sm', className)}
       {...props}
     />
   )
@@ -100,9 +88,7 @@ export function DialogDescription({
 }: ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      className={['font-mono text-muted-foreground text-xs', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn('font-mono text-muted-foreground text-xs', className)}
       {...props}
     />
   )

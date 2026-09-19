@@ -1,6 +1,7 @@
 import { CaretRightIcon, CheckIcon } from '@phosphor-icons/react'
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
+import { cn } from 'cn'
 
 export const DropdownMenu = DropdownMenuPrimitive.Root
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
@@ -14,13 +15,11 @@ export function DropdownMenuContent({
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
-        className={[
+        className={cn(
           'z-50 min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=open]:animate-in',
-          className,
-        ]
-          .filter(Boolean)
-          .join(' ')}
+          className
+        )}
         sideOffset={sideOffset}
         {...props}
       />
@@ -34,12 +33,10 @@ export function DropdownMenuItem({
 }: ComponentProps<typeof DropdownMenuPrimitive.Item>) {
   return (
     <DropdownMenuPrimitive.Item
-      className={[
+      className={cn(
         'relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2.5 py-2 font-mono text-xs uppercase outline-none transition-colors focus:bg-primary/10 focus:text-primary data-disabled:pointer-events-none data-disabled:opacity-50',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )
@@ -52,12 +49,10 @@ export function DropdownMenuCheckboxItem({
 }: ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
   return (
     <DropdownMenuPrimitive.CheckboxItem
-      className={[
+      className={cn(
         'relative flex cursor-pointer select-none items-center gap-2 py-2 pr-2.5 pl-7 font-mono text-xs uppercase outline-none focus:bg-primary/10 focus:text-primary data-[state=checked]:text-primary',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     >
       <span className='absolute left-2 flex size-3.5 items-center justify-center'>
@@ -76,12 +71,10 @@ export function DropdownMenuLabel({
 }: ComponentProps<typeof DropdownMenuPrimitive.Label>) {
   return (
     <DropdownMenuPrimitive.Label
-      className={[
+      className={cn(
         'px-2 py-1.5 font-bold font-mono text-[10px] text-muted-foreground uppercase tracking-wide',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )
@@ -93,9 +86,7 @@ export function DropdownMenuSeparator({
 }: ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
   return (
     <DropdownMenuPrimitive.Separator
-      className={['-mx-1 my-1 h-px bg-border', className]
-        .filter(Boolean)
-        .join(' ')}
+      className={cn('-mx-1 my-1 h-px bg-border', className)}
       {...props}
     />
   )
@@ -108,12 +99,10 @@ export function DropdownMenuSubTrigger({
 }: ComponentProps<typeof DropdownMenuPrimitive.SubTrigger>) {
   return (
     <DropdownMenuPrimitive.SubTrigger
-      className={[
+      className={cn(
         'flex cursor-pointer select-none items-center gap-2 px-2.5 py-2 font-mono text-xs uppercase outline-none focus:bg-primary/10 focus:text-primary',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     >
       {children}
@@ -128,12 +117,10 @@ export function DropdownMenuSubContent({
 }: ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
   return (
     <DropdownMenuPrimitive.SubContent
-      className={[
+      className={cn(
         'z-50 min-w-32 overflow-hidden border border-border bg-card p-1 text-foreground shadow-lg',
-        className,
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        className
+      )}
       {...props}
     />
   )
