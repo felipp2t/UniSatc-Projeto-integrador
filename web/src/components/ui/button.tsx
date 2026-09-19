@@ -1,3 +1,4 @@
+import { CircleNotchIcon } from '@phosphor-icons/react'
 import type { ButtonHTMLAttributes } from 'react'
 
 const buttonVariants = {
@@ -28,7 +29,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({
+  children,
   className,
+  disabled,
   loading = false,
   type = 'button',
   variant = 'default',
@@ -50,13 +53,14 @@ export function Button({
     <button
       aria-busy={loading || undefined}
       className={classes}
-      disabled={loading || props.disabled}
+      disabled={loading || disabled}
       type={type}
       {...props}
     >
-      {!!loading && <span aria-hidden='true'>...</span>}
-      {props.children}
-      {!!loading && <span className='sr-only'>Loading</span>}
+      {!!loading && (
+        <CircleNotchIcon aria-hidden='true' className='animate-spin' size={14} />
+      )}
+      {children}
     </button>
   )
 }

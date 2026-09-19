@@ -57,7 +57,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { appToast, Toaster } from '@/components/ui/toast'
+import { appToast } from '@/components/ui/toast'
 
 export const Route = createFileRoute('/components')({
   component: ComponentsPage,
@@ -197,7 +197,6 @@ function ComponentsPage() {
           <Button onClick={showToast} variant='outline'>
             Show toast
           </Button>
-          <Toaster />
         </div>
       </Section>
 

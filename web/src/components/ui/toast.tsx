@@ -6,7 +6,11 @@ import {
 
 export const appToast = toast
 
-export function Toaster({ toastOptions, ...props }: SonnerProps) {
+export function Toaster({
+  toastOptions,
+  visibleToasts = 5,
+  ...props
+}: SonnerProps) {
   return (
     <Sonner
       closeButton
@@ -22,7 +26,7 @@ export function Toaster({ toastOptions, ...props }: SonnerProps) {
         },
         ...toastOptions,
       }}
-      visibleToasts={Number.POSITIVE_INFINITY}
+      visibleToasts={visibleToasts}
       {...props}
     />
   )
