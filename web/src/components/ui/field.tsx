@@ -1,5 +1,5 @@
-import type { HTMLAttributes, LabelHTMLAttributes, ReactNode } from 'react'
 import { cn } from 'cn'
+import type { HTMLAttributes, LabelHTMLAttributes, ReactNode } from 'react'
 
 interface FieldProps extends HTMLAttributes<HTMLDivElement> {
   orientation?: 'horizontal' | 'vertical'

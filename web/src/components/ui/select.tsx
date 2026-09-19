@@ -1,7 +1,7 @@
 import { CaretDownIcon, CheckIcon } from '@phosphor-icons/react'
+import { cn } from 'cn'
 import { Select as SelectPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
-import { cn } from 'cn'
 
 export const Select = SelectPrimitive.Root
 export const SelectGroup = SelectPrimitive.Group

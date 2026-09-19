@@ -1,7 +1,7 @@
 import { XIcon } from '@phosphor-icons/react'
+import { cn } from 'cn'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
-import { cn } from 'cn'
 import { Button } from './button'
 
 export const Dialog = DialogPrimitive.Root

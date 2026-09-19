@@ -1,9 +1,9 @@
+import { cn } from 'cn'
 import type {
   HTMLAttributes,
   TableHTMLAttributes,
   ThHTMLAttributes,
 } from 'react'
-import { cn } from 'cn'
 
 export function Table({
   className,

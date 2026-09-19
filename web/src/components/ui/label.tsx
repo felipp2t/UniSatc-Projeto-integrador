@@ -1,5 +1,5 @@
-import type { LabelHTMLAttributes } from 'react'
 import { cn } from 'cn'
+import type { LabelHTMLAttributes } from 'react'
 
 export function Label({
   className,

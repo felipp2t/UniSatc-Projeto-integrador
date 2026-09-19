@@ -1,5 +1,5 @@
-import type { HTMLAttributes } from 'react'
 import { cn } from 'cn'
+import type { HTMLAttributes } from 'react'
 
 export interface SeparatorProps extends HTMLAttributes<HTMLHRElement> {
   decorative?: boolean

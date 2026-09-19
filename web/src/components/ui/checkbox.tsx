@@ -1,7 +1,7 @@
 import { CheckIcon } from '@phosphor-icons/react'
+import { cn } from 'cn'
 import { Checkbox as CheckboxPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
-import { cn } from 'cn'
 
 export function Checkbox({
   className,

@@ -1,6 +1,6 @@
 import { CircleNotchIcon } from '@phosphor-icons/react'
-import type { ButtonHTMLAttributes } from 'react'
 import { cn } from 'cn'
+import type { ButtonHTMLAttributes } from 'react'
 
 const buttonVariants = {
   default: 'bg-primary text-primary-foreground hover:bg-primary/90',

@@ -1,7 +1,7 @@
 import { CaretRightIcon, CheckIcon } from '@phosphor-icons/react'
+import { cn } from 'cn'
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
-import { cn } from 'cn'
 
 export const DropdownMenu = DropdownMenuPrimitive.Root
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
