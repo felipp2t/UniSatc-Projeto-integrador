@@ -1,5 +1,5 @@
 import { FolderIcon, TrashIcon } from '@phosphor-icons/react'
-import { useForm, useStore } from '@tanstack/react-form'
+import { useForm, useSelector } from '@tanstack/react-form'
 import { cn } from 'cn'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
@@ -160,12 +160,12 @@ export function NewFolderCard({
       }),
     },
   })
-  const formSubmitting = useStore(form.store, (state) => state.isSubmitting)
+  const formSubmitting = useSelector(form.store, (state) => state.isSubmitting)
   const submitting = isCreating || formSubmitting
   const displayedError = error ?? internalError
   const closeDialog = useCallback(() => setOpen(false), [])
   const submit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+    (event: React.SubmitEvent<HTMLFormElement>) => {
       event.preventDefault()
       form.handleSubmit().catch(() => undefined)
     },

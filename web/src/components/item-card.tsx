@@ -1,5 +1,5 @@
 import { ArchiveIcon, FileIcon, TrashIcon } from '@phosphor-icons/react'
-import { useForm, useStore } from '@tanstack/react-form'
+import { useForm, useSelector } from '@tanstack/react-form'
 import { cn } from 'cn'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
@@ -327,7 +327,9 @@ export function NewItemCard({
 }: NewItemCardProps) {
   const [open, setOpen] = useState(false)
   const [internalError, setInternalError] = useState<string>()
+
   const formId = useId()
+
   const form = useForm({
     defaultValues: {
       content: '' as File | string,
@@ -336,6 +338,7 @@ export function NewItemCard({
     },
     onSubmit: async ({ value, formApi }) => {
       setInternalError(undefined)
+
       try {
         await onCreate({
           content:
@@ -348,6 +351,7 @@ export function NewItemCard({
           workspaceId,
         })
         formApi.reset()
+
         setOpen(false)
       } catch (cause) {
         setInternalError(errorMessage(cause))
@@ -355,18 +359,20 @@ export function NewItemCard({
     },
     validators: { onSubmit: itemSchema },
   })
-  const formSubmitting = useStore(form.store, (state) => state.isSubmitting)
+
+  const formSubmitting = useSelector(form.store, (state) => state.isSubmitting)
   const submitting = isCreating || formSubmitting
-  const selectedType = useStore(form.store, (state) => state.values.type)
+  const selectedType = useSelector(form.store, (state) => state.values.type)
   const displayedError = error ?? internalError
   const closeDialog = useCallback(() => setOpen(false), [])
   const submit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+    (event: React.SubmitEvent<HTMLFormElement>) => {
       event.preventDefault()
       form.handleSubmit().catch(() => undefined)
     },
     [form]
   )
+
   return (
     <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>

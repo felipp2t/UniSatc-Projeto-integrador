@@ -1,4 +1,4 @@
-import { useForm, useStore } from '@tanstack/react-form'
+import { useForm, useSelector } from '@tanstack/react-form'
 import { cn } from 'cn'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
@@ -137,9 +137,9 @@ export function NewWorkspaceCard({
       }),
     },
   })
-  const submitting = useStore(form.store, (state) => state.isSubmitting)
+  const submitting = useSelector(form.store, (state) => state.isSubmitting)
   const submit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+    (event: React.SubmitEvent<HTMLFormElement>) => {
       event.preventDefault()
       form.handleSubmit().catch(() => undefined)
     },
