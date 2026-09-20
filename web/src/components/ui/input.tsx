@@ -1,9 +1,24 @@
 import { cn } from 'cn'
 import type { InputHTMLAttributes } from 'react'
+import { useCallback } from 'react'
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {}
+export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  onValueChange?: (value: string) => void
+}
 
-export function Input({ className, type = 'text', ...props }: InputProps) {
+export function Input({
+  className,
+  onValueChange,
+  type = 'text',
+  ...props
+}: InputProps) {
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onValueChange?.(event.target.value)
+      props.onChange?.(event)
+    },
+    [onValueChange, props.onChange]
+  )
   const classes = cn(
     'flex h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 py-1 font-mono text-foreground text-xs shadow-xs transition-colors',
     'placeholder:text-muted-foreground',
@@ -13,5 +28,7 @@ export function Input({ className, type = 'text', ...props }: InputProps) {
     className
   )
 
-  return <input className={classes} type={type} {...props} />
+  return (
+    <input className={classes} type={type} {...props} onChange={handleChange} />
+  )
 }
