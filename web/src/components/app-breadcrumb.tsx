@@ -28,9 +28,8 @@ interface AppBreadcrumbProps {
 }
 
 export function AppBreadcrumb({ items, maxVisibleItems }: AppBreadcrumbProps) {
-  const shouldCollapse =
-    maxVisibleItems !== undefined && items.length > maxVisibleItems
   const visibleLimit = Math.max(maxVisibleItems ?? items.length, 3)
+  const shouldCollapse = items.length > visibleLimit
   const middleItems = items.slice(1, -1)
   const visibleMiddleCount = visibleLimit - 2
   const hiddenItems = shouldCollapse

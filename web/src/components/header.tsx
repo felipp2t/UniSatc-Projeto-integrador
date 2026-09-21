@@ -64,6 +64,7 @@ export function Header({
   }, [onLogout])
   const openLogoutDialog = useCallback(() => setLogoutDialogOpen(true), [])
   const closeLogoutDialog = useCallback(() => setLogoutDialogOpen(false), [])
+  const hasAccountActions = accountTo || onAccountSettings || onLogout
 
   return (
     <header className={cnHeader(className)} {...props}>
@@ -84,58 +85,62 @@ export function Header({
             onOpen={onOpenNotification}
           />
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                aria-label={`Abrir menu de ${userName}`}
-                className='rounded-full'
-                size='icon'
-                variant='ghost'
-              >
-                <UserCircleIcon aria-hidden='true' size={18} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end' className='w-56'>
-              <div className='flex flex-col gap-0.5 px-2 py-1.5'>
-                <span className='font-mono font-semibold text-foreground text-sm'>
-                  {userName}
-                </span>
-                <span className='text-muted-foreground text-xs'>
-                  {userEmail}
-                </span>
-              </div>
-              <DropdownMenuSeparator />
-              {accountTo ? (
-                <DropdownMenuItem asChild>
-                  <Link
-                    className='flex w-full items-center gap-2'
-                    to={accountTo}
+          {hasAccountActions ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  aria-label={`Abrir menu de ${userName}`}
+                  className='rounded-full'
+                  size='icon'
+                  variant='ghost'
+                >
+                  <UserCircleIcon aria-hidden='true' size={18} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end' className='w-56'>
+                <div className='flex flex-col gap-0.5 px-2 py-1.5'>
+                  <span className='font-mono font-semibold text-foreground text-sm'>
+                    {userName}
+                  </span>
+                  <span className='text-muted-foreground text-xs'>
+                    {userEmail}
+                  </span>
+                </div>
+                <DropdownMenuSeparator />
+                {accountTo ? (
+                  <DropdownMenuItem asChild>
+                    <Link
+                      className='flex w-full items-center gap-2'
+                      to={accountTo}
+                    >
+                      <GearIcon aria-hidden='true' size={14} />
+                      Configurações da conta
+                    </Link>
+                  </DropdownMenuItem>
+                ) : onAccountSettings ? (
+                  <DropdownMenuItem asChild>
+                    <button
+                      className='flex w-full items-center gap-2'
+                      onClick={onAccountSettings}
+                      type='button'
+                    >
+                      <GearIcon aria-hidden='true' size={14} />
+                      Configurações da conta
+                    </button>
+                  </DropdownMenuItem>
+                ) : null}
+                {onLogout ? (
+                  <DropdownMenuItem
+                    onSelect={openLogoutDialog}
+                    variant='destructive'
                   >
-                    <GearIcon aria-hidden='true' size={14} />
-                    Configurações da conta
-                  </Link>
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem asChild>
-                  <button
-                    className='flex w-full items-center gap-2'
-                    onClick={onAccountSettings}
-                    type='button'
-                  >
-                    <GearIcon aria-hidden='true' size={14} />
-                    Configurações da conta
-                  </button>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onSelect={openLogoutDialog}
-                variant='destructive'
-              >
-                <SignOutIcon aria-hidden='true' size={14} />
-                Sair da conta
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <SignOutIcon aria-hidden='true' size={14} />
+                    Sair da conta
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
       </div>
 
