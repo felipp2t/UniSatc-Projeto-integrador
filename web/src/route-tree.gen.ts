@@ -9,68 +9,93 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './pages/__root'
-import { Route as IndexRouteImport } from './pages/index'
-import { Route as ComponentsRouteImport } from './pages/components'
+import { Route as ShellLayoutRouteImport } from './pages/_shell/layout'
+import { Route as ShellIndexRouteImport } from './pages/_shell/index'
+import { Route as ShellComponentsRouteImport } from './pages/_shell/components'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ShellLayoutRoute = ShellLayoutRouteImport.update({
+  id: '/_shell',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ComponentsRoute = ComponentsRouteImport.update({
+const ShellIndexRoute = ShellIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ShellLayoutRoute,
+} as any)
+const ShellComponentsRoute = ShellComponentsRouteImport.update({
   id: '/components',
   path: '/components',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => ShellLayoutRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/components': typeof ComponentsRoute
+  '/': typeof ShellIndexRoute
+  '/components': typeof ShellComponentsRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/components': typeof ComponentsRoute
+  '/components': typeof ShellComponentsRoute
+  '/': typeof ShellIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/components': typeof ComponentsRoute
+  '/_shell': typeof ShellLayoutRouteWithChildren
+  '/_shell/components': typeof ShellComponentsRoute
+  '/_shell/': typeof ShellIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths: '/' | '/components'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/components'
-  id: '__root__' | '/' | '/components'
+  to: '/components' | '/'
+  id: '__root__' | '/_shell' | '/_shell/components' | '/_shell/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  ComponentsRoute: typeof ComponentsRoute
+  ShellLayoutRoute: typeof ShellLayoutRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_shell': {
+      id: '/_shell'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof ShellLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/components': {
-      id: '/components'
+    '/_shell/': {
+      id: '/_shell/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof ShellIndexRouteImport
+      parentRoute: typeof ShellLayoutRoute
+    }
+    '/_shell/components': {
+      id: '/_shell/components'
       path: '/components'
       fullPath: '/components'
-      preLoaderRoute: typeof ComponentsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof ShellComponentsRouteImport
+      parentRoute: typeof ShellLayoutRoute
     }
   }
 }
 
+interface ShellLayoutRouteChildren {
+  ShellComponentsRoute: typeof ShellComponentsRoute
+  ShellIndexRoute: typeof ShellIndexRoute
+}
+
+const ShellLayoutRouteChildren: ShellLayoutRouteChildren = {
+  ShellComponentsRoute: ShellComponentsRoute,
+  ShellIndexRoute: ShellIndexRoute,
+}
+
+const ShellLayoutRouteWithChildren = ShellLayoutRoute._addFileChildren(
+  ShellLayoutRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  ComponentsRoute: ComponentsRoute,
+  ShellLayoutRoute: ShellLayoutRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
