@@ -35,9 +35,9 @@ export function SecretInput({
         variant='ghost'
       >
         {visible ? (
-          <EyeSlashIcon aria-hidden='true' />
+          <EyeSlashIcon aria-hidden='true' size={16} />
         ) : (
-          <EyeIcon aria-hidden='true' />
+          <EyeIcon aria-hidden='true' size={16} />
         )}
       </Button>
     </div>

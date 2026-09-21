@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './pages/__root'
 import { Route as ShellLayoutRouteImport } from './pages/_shell/layout'
+import { Route as SessionRouteImport } from './pages/session'
 import { Route as ShellIndexRouteImport } from './pages/_shell/index'
 import { Route as ShellComponentsRouteImport } from './pages/_shell/components'
 
 const ShellLayoutRoute = ShellLayoutRouteImport.update({
   id: '/_shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionRoute = SessionRouteImport.update({
+  id: '/session',
+  path: '/session',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShellIndexRoute = ShellIndexRouteImport.update({
@@ -30,28 +36,32 @@ const ShellComponentsRoute = ShellComponentsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof ShellIndexRoute
+  '/session': typeof SessionRoute
   '/components': typeof ShellComponentsRoute
 }
 export interface FileRoutesByTo {
+  '/session': typeof SessionRoute
   '/components': typeof ShellComponentsRoute
   '/': typeof ShellIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_shell': typeof ShellLayoutRouteWithChildren
+  '/session': typeof SessionRoute
   '/_shell/components': typeof ShellComponentsRoute
   '/_shell/': typeof ShellIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/components'
+  fullPaths: '/' | '/session' | '/components'
   fileRoutesByTo: FileRoutesByTo
-  to: '/components' | '/'
-  id: '__root__' | '/_shell' | '/_shell/components' | '/_shell/'
+  to: '/session' | '/components' | '/'
+  id: '__root__' | '/_shell' | '/session' | '/_shell/components' | '/_shell/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   ShellLayoutRoute: typeof ShellLayoutRouteWithChildren
+  SessionRoute: typeof SessionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -61,6 +71,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ShellLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/session': {
+      id: '/session'
+      path: '/session'
+      fullPath: '/session'
+      preLoaderRoute: typeof SessionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shell/': {
@@ -96,6 +113,7 @@ const ShellLayoutRouteWithChildren = ShellLayoutRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   ShellLayoutRoute: ShellLayoutRouteWithChildren,
+  SessionRoute: SessionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
