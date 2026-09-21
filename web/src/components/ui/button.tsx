@@ -40,9 +40,9 @@ export function Button({
   ...props
 }: ButtonProps) {
   const classes = cn(
-    'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-sm font-medium font-mono text-xs uppercase tracking-wide transition-colors',
+    'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-sm font-medium font-mono text-xs uppercase tracking-wide transition-colors',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-    'disabled:pointer-events-none disabled:opacity-50',
+    'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
     buttonVariants[variant],
     buttonSizes[size],
     className

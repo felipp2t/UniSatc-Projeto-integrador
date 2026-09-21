@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
+import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -59,7 +60,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { appToast } from '@/components/ui/toast'
 
-export const Route = createFileRoute('/components')({
+export const Route = createFileRoute('/_shell/components')({
   component: ComponentsPage,
   head: () => ({ meta: [{ title: 'Components · web' }] }),
 })
@@ -96,6 +97,9 @@ function ComponentsPage() {
 
   return (
     <main className='mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-12 px-6 py-12'>
+      <AppBreadcrumb
+        items={[{ label: 'Início', to: '/' }, { label: 'Componentes' }]}
+      />
       <header className='flex flex-col gap-3 border-border border-b pb-8'>
         <p className='font-mono text-primary text-xs uppercase tracking-[0.2em]'>
           Rootly · UI inventory

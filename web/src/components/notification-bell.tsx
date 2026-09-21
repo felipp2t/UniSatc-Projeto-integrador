@@ -36,10 +36,10 @@ export function NotificationBell({
   onOpen,
 }: NotificationBellProps) {
   return (
-    <Popover>
+    <Popover modal>
       <PopoverTrigger asChild>
         <Button aria-label='Notificações' size='icon' variant='ghost'>
-          <BellIcon aria-hidden='true' />
+          <BellIcon aria-hidden='true' size={18} />
         </Button>
       </PopoverTrigger>
       <PopoverContent>
