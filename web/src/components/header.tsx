@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import type { AppRoute } from '@/lib/navigation'
+import type { AppRoute } from '@/types/navigation'
 
 interface HeaderProps extends React.ComponentProps<'header'> {
   accountTo?: AppRoute

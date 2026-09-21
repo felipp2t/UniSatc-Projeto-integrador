@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import type { AppRoute } from '@/lib/navigation'
+import type { AppRoute } from '@/types/navigation'
 
 export interface AppBreadcrumbItem {
   label: string
