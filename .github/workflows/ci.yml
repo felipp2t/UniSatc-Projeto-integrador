@@ -31,6 +31,9 @@ jobs:
   frontend-build:
     name: frontend-build
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8080
+      VITE_WS_URL: ws://localhost:8080
     steps:
       - uses: actions/checkout@v4
       - id: check

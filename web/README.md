@@ -1,78 +1,52 @@
-# React + TypeScript + Vite
+# Rootly Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend do Rootly, construído com React, TypeScript e Vite.
 
-Currently, two official plugins are available:
+## Desenvolvimento
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Instale as dependências e copie o exemplo de variáveis de ambiente:
 
-## React Compiler
-
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+pnpm install
+cp .env.example .env
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+No Windows PowerShell, use `Copy-Item .env.example .env` no lugar de `cp`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Variáveis de ambiente
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `VITE_API_URL` | Sim | URL base da API HTTP. Deve usar `http://` ou `https://`. |
+| `VITE_WS_URL` | Não | URL do WebSocket. Quando definida, deve usar `ws://` ou `wss://`. |
 
+`VITE_WS_URL` é opcional enquanto o cliente WebSocket não estiver implementado. Uma variável
+ausente ou vazia não impede a inicialização; valores preenchidos com protocolo inválido causam
+falha de configuração antes da renderização da aplicação.
+
+Todas as variáveis com prefixo `VITE_` são públicas e ficam embutidas no bundle do navegador.
+Nunca coloque senhas, tokens, chaves privadas ou outras credenciais nelas.
+
+## Build
+
+O build de produção é executado com:
+
+```bash
+pnpm build
+```
+
+Para visualizar o bundle localmente:
+
+```bash
+pnpm preview
+```
+
+Ao iniciar a aplicação, a configuração de ambiente é validada antes da renderização. A aplicação
+exige `VITE_API_URL` e valida os protocolos das URLs configuradas.
+
+## Qualidade
+
+```bash
+pnpm run check
 ```
