@@ -42,6 +42,35 @@ export function installAuthInterceptor(
   client: AxiosInstance = apiClient,
   options: AuthInterceptorOptions = {}
 ) {
+  let refreshPromise: Promise<boolean> | undefined
+
+  const refreshSession = (failedRequest: ApiError) => {
+    if (!refreshPromise) {
+      refreshPromise = Promise.resolve()
+        .then(() => options.refresh?.(failedRequest) ?? false)
+        .then(
+          (refreshed) => {
+            if (!refreshed) {
+              options.onSessionExpired?.()
+            }
+            return refreshed
+          },
+          (refreshError) => {
+            const apiError = toApiError(refreshError)
+            if (apiError.isUnauthorized) {
+              options.onSessionExpired?.()
+            }
+            throw apiError
+          }
+        )
+        .finally(() => {
+          refreshPromise = undefined
+        })
+    }
+
+    return refreshPromise
+  }
+
   return client.interceptors.response.use(
     (response) => response,
     async (error: unknown) => {
@@ -60,9 +89,8 @@ export function installAuthInterceptor(
       config.authRetry = true
 
       try {
-        const refreshed = await options.refresh(apiError)
+        const refreshed = await refreshSession(apiError)
         if (!refreshed) {
-          options.onSessionExpired?.()
           return Promise.reject(apiError)
         }
 
@@ -76,7 +104,6 @@ export function installAuthInterceptor(
           return Promise.reject(retryApiError)
         }
       } catch (refreshError) {
-        options.onSessionExpired?.()
         return Promise.reject(toApiError(refreshError))
       }
     }

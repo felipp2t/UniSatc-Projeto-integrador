@@ -9,93 +9,206 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './pages/__root'
-import { Route as ShellLayoutRouteImport } from './pages/_shell/layout'
-import { Route as ShellIndexRouteImport } from './pages/_shell/index'
-import { Route as ShellComponentsRouteImport } from './pages/_shell/components'
+import { Route as ProtectedLayoutRouteImport } from './pages/_protected/layout'
+import { Route as EsqueciSenhaRouteImport } from './pages/esqueci-senha'
+import { Route as LoginRouteImport } from './pages/login'
+import { Route as RedefinirSenhaRouteImport } from './pages/redefinir-senha'
+import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
+import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
+import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
+import { Route as ConviteTokenRouteImport } from './pages/convite/$token'
 
-const ShellLayoutRoute = ShellLayoutRouteImport.update({
-  id: '/_shell',
+const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
+  id: '/_protected',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShellIndexRoute = ShellIndexRouteImport.update({
+const EsqueciSenhaRoute = EsqueciSenhaRouteImport.update({
+  id: '/esqueci-senha',
+  path: '/esqueci-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProtectedIndexRoute = ProtectedIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => ShellLayoutRoute,
+  getParentRoute: () => ProtectedLayoutRoute,
 } as any)
-const ShellComponentsRoute = ShellComponentsRouteImport.update({
+const ProtectedSplatRoute = ProtectedSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
+const ProtectedComponentsRoute = ProtectedComponentsRouteImport.update({
   id: '/components',
   path: '/components',
-  getParentRoute: () => ShellLayoutRoute,
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
+const ConviteTokenRoute = ConviteTokenRouteImport.update({
+  id: '/convite/$token',
+  path: '/convite/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof ShellIndexRoute
-  '/components': typeof ShellComponentsRoute
+  '/': typeof ProtectedIndexRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
+  '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/$': typeof ProtectedSplatRoute
+  '/components': typeof ProtectedComponentsRoute
+  '/convite/$token': typeof ConviteTokenRoute
 }
 export interface FileRoutesByTo {
-  '/components': typeof ShellComponentsRoute
-  '/': typeof ShellIndexRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
+  '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/$': typeof ProtectedSplatRoute
+  '/components': typeof ProtectedComponentsRoute
+  '/convite/$token': typeof ConviteTokenRoute
+  '/': typeof ProtectedIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/_shell': typeof ShellLayoutRouteWithChildren
-  '/_shell/components': typeof ShellComponentsRoute
-  '/_shell/': typeof ShellIndexRoute
+  '/_protected': typeof ProtectedLayoutRouteWithChildren
+  '/esqueci-senha': typeof EsqueciSenhaRoute
+  '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/_protected/$': typeof ProtectedSplatRoute
+  '/_protected/components': typeof ProtectedComponentsRoute
+  '/convite/$token': typeof ConviteTokenRoute
+  '/_protected/': typeof ProtectedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/components'
+  fullPaths:
+    | '/'
+    | '/esqueci-senha'
+    | '/login'
+    | '/redefinir-senha'
+    | '/$'
+    | '/components'
+    | '/convite/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/components' | '/'
-  id: '__root__' | '/_shell' | '/_shell/components' | '/_shell/'
+  to:
+    | '/esqueci-senha'
+    | '/login'
+    | '/redefinir-senha'
+    | '/$'
+    | '/components'
+    | '/convite/$token'
+    | '/'
+  id:
+    | '__root__'
+    | '/_protected'
+    | '/esqueci-senha'
+    | '/login'
+    | '/redefinir-senha'
+    | '/_protected/$'
+    | '/_protected/components'
+    | '/convite/$token'
+    | '/_protected/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  ShellLayoutRoute: typeof ShellLayoutRouteWithChildren
+  ProtectedLayoutRoute: typeof ProtectedLayoutRouteWithChildren
+  EsqueciSenhaRoute: typeof EsqueciSenhaRoute
+  LoginRoute: typeof LoginRoute
+  RedefinirSenhaRoute: typeof RedefinirSenhaRoute
+  ConviteTokenRoute: typeof ConviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_shell': {
-      id: '/_shell'
+    '/_protected': {
+      id: '/_protected'
       path: ''
       fullPath: '/'
-      preLoaderRoute: typeof ShellLayoutRouteImport
+      preLoaderRoute: typeof ProtectedLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_shell/': {
-      id: '/_shell/'
+    '/esqueci-senha': {
+      id: '/esqueci-senha'
+      path: '/esqueci-senha'
+      fullPath: '/esqueci-senha'
+      preLoaderRoute: typeof EsqueciSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_protected/': {
+      id: '/_protected/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof ShellIndexRouteImport
-      parentRoute: typeof ShellLayoutRoute
+      preLoaderRoute: typeof ProtectedIndexRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_shell/components': {
-      id: '/_shell/components'
+    '/_protected/$': {
+      id: '/_protected/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof ProtectedSplatRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
+    '/_protected/components': {
+      id: '/_protected/components'
       path: '/components'
       fullPath: '/components'
-      preLoaderRoute: typeof ShellComponentsRouteImport
-      parentRoute: typeof ShellLayoutRoute
+      preLoaderRoute: typeof ProtectedComponentsRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
+    '/convite/$token': {
+      id: '/convite/$token'
+      path: '/convite/$token'
+      fullPath: '/convite/$token'
+      preLoaderRoute: typeof ConviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
-interface ShellLayoutRouteChildren {
-  ShellComponentsRoute: typeof ShellComponentsRoute
-  ShellIndexRoute: typeof ShellIndexRoute
+interface ProtectedLayoutRouteChildren {
+  ProtectedSplatRoute: typeof ProtectedSplatRoute
+  ProtectedComponentsRoute: typeof ProtectedComponentsRoute
+  ProtectedIndexRoute: typeof ProtectedIndexRoute
 }
 
-const ShellLayoutRouteChildren: ShellLayoutRouteChildren = {
-  ShellComponentsRoute: ShellComponentsRoute,
-  ShellIndexRoute: ShellIndexRoute,
+const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
+  ProtectedSplatRoute: ProtectedSplatRoute,
+  ProtectedComponentsRoute: ProtectedComponentsRoute,
+  ProtectedIndexRoute: ProtectedIndexRoute,
 }
 
-const ShellLayoutRouteWithChildren = ShellLayoutRoute._addFileChildren(
-  ShellLayoutRouteChildren,
+const ProtectedLayoutRouteWithChildren = ProtectedLayoutRoute._addFileChildren(
+  ProtectedLayoutRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
-  ShellLayoutRoute: ShellLayoutRouteWithChildren,
+  ProtectedLayoutRoute: ProtectedLayoutRouteWithChildren,
+  EsqueciSenhaRoute: EsqueciSenhaRoute,
+  LoginRoute: LoginRoute,
+  RedefinirSenhaRoute: RedefinirSenhaRoute,
+  ConviteTokenRoute: ConviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

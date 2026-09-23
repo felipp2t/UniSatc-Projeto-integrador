@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { NotFoundPage } from '@/components/not-found-page'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -60,9 +61,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { appToast } from '@/components/ui/toast'
 
-export const Route = createFileRoute('/_shell/components')({
+export const Route = createFileRoute('/_protected/components')({
   component: ComponentsPage,
   head: () => ({ meta: [{ title: 'Components · web' }] }),
+  notFoundComponent: NotFoundPage,
 })
 
 function Section({
