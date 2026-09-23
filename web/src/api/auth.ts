@@ -4,6 +4,7 @@ import { apiClient } from './client'
 import { type ApiError, toApiError } from './errors'
 
 declare module 'axios' {
+  // biome-ignore lint/suspicious/noExplicitAny: match AxiosRequestConfig's generic defaults for declaration merging.
   interface AxiosRequestConfig<D = any, P = any> {
     authRetry?: boolean
   }
@@ -45,7 +46,7 @@ export function installAuthInterceptor(
     (response) => response,
     async (error: unknown) => {
       const apiError = toApiError(error)
-      const config = apiError.config
+      const { config } = apiError
 
       if (
         !(apiError.isUnauthorized && config) ||
