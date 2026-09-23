@@ -56,6 +56,10 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         working-directory: web
         run: pnpm run check
+      - name: Test
+        if: steps.check.outputs.exists == 'true'
+        working-directory: web
+        run: pnpm test
       - name: Typecheck & build
         if: steps.check.outputs.exists == 'true'
         working-directory: web
