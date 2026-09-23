@@ -9,14 +9,17 @@
     "dev": "vite",
     "fix": "ultracite fix",
     "format": "biome format --write .",
+    "generate:api-types": "openapi-typescript http://localhost:8080/v3/api-docs -o src/api/generated/schema.d.ts",
     "lint": "biome lint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-router": "1.170.32",
+    "axios": "^1.20.0",
     "cn": "0.3.0",
     "radix-ui": "^1.6.7",
     "react": "^19.2.8",
@@ -37,9 +40,11 @@
     "@vitejs/plugin-react": "^6.1.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "knip": "6.34.0",
+    "openapi-typescript": "^7.13.0",
     "typescript": "~6.0.2",
     "ultracite": "7.10.7",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.1"
   },
   "packageManager": "pnpm@11.10.0"
 }

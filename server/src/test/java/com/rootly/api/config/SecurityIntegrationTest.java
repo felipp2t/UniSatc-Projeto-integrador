@@ -1,7 +1,9 @@
 package com.rootly.api.config;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +48,16 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
                 .andExpect(jsonPath("$.paths['/workspaces'].post.summary").value("Cria um workspace"))
                 .andExpect(jsonPath("$.paths['/workspaces/{workspaceId}/members'].get.summary")
                         .value("Lista os membros de um workspace"));
+    }
+
+    @Test
+    void allowsConfiguredFrontendOriginWithCredentials() throws Exception {
+        mockMvc.perform(options("/me")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
     }
 
     private void assertUnauthorized(org.springframework.test.web.servlet.ResultActions result) throws Exception {

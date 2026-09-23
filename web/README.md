@@ -42,11 +42,23 @@ Para visualizar o bundle localmente:
 pnpm preview
 ```
 
-Ao iniciar a aplicação, a configuração de ambiente é validada antes da renderização. A aplicação
+O módulo de configuração valida as variáveis quando é carregado pelo cliente da API. A aplicação
 exige `VITE_API_URL` e valida os protocolos das URLs configuradas.
+
+## Tipos da API
+
+Com o backend executando em `http://localhost:8080`, gere novamente os tipos do OpenAPI com:
+
+```bash
+pnpm generate:api-types
+```
+
+O comando atualiza `src/api/generated/schema.d.ts`. Esse arquivo é gerado automaticamente e não
+deve ser editado manualmente.
 
 ## Qualidade
 
 ```bash
 pnpm run check
+pnpm test
 ```
