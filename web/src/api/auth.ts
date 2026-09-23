@@ -1,10 +1,12 @@
-import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
+import type { AxiosInstance } from 'axios'
 
 import { apiClient } from './client'
 import { type ApiError, toApiError } from './errors'
 
-type AuthRequestConfig = InternalAxiosRequestConfig & {
-  authRetry?: boolean
+declare module 'axios' {
+  interface AxiosRequestConfig<D = any, P = any> {
+    authRetry?: boolean
+  }
 }
 
 export interface AuthInterceptorOptions {
@@ -43,7 +45,7 @@ export function installAuthInterceptor(
     (response) => response,
     async (error: unknown) => {
       const apiError = toApiError(error)
-      const config = apiError.config as AuthRequestConfig | undefined
+      const config = apiError.config
 
       if (
         !(apiError.isUnauthorized && config) ||
