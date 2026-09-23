@@ -25,6 +25,7 @@ export const AUTH_ENDPOINTS_WITHOUT_REFRESH = [
 ] as const
 
 const AUTH_URL_SUFFIX_SEPARATOR = /[?#]/
+
 export function shouldSkipAuthRefresh(url?: string) {
   if (!url) {
     return false
