@@ -21,12 +21,14 @@ export const AUTH_ENDPOINTS_WITHOUT_REFRESH = [
   '/auth/reset-password',
 ] as const
 
+const AUTH_URL_SUFFIX_SEPARATOR = /[?#]/
+
 export function shouldSkipAuthRefresh(url?: string) {
   if (!url) {
     return false
   }
 
-  const [path] = url.split(/[?#]/)
+  const [path] = url.split(AUTH_URL_SUFFIX_SEPARATOR)
 
   return AUTH_ENDPOINTS_WITHOUT_REFRESH.some((endpoint) =>
     path.endsWith(endpoint)
