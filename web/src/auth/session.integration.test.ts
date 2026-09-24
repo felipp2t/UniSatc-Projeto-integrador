@@ -96,6 +96,44 @@ describe('session and auth interceptor integration', () => {
     }
   })
 
+  it('navigates to login when an authenticated session expires asynchronously', async () => {
+    const previousAdapter = apiClient.defaults.adapter
+    const session = createSessionService()
+    const navigateToLogin = vi.fn()
+    session.setNavigateToLogin(navigateToLogin)
+    const adapter = vi.fn((config: InternalAxiosRequestConfig) => {
+      if (config.url === '/me') {
+        return Promise.resolve({
+          config,
+          data: { email: 'user@example.com', id: 'user-id', name: 'User' },
+          headers: {},
+          status: 200,
+          statusText: 'OK',
+        })
+      }
+
+      return Promise.reject(unauthorized(config))
+    })
+    apiClient.defaults.adapter = adapter
+
+    try {
+      await session.initialize()
+      expect(session.status).toBe('authenticated')
+
+      await expect(apiClient.get('/protected')).rejects.toMatchObject({
+        status: 401,
+      })
+
+      expect(session.status).toBe('unauthenticated')
+      expect(session.user).toBeUndefined()
+      expect(navigateToLogin).toHaveBeenCalledOnce()
+      expect(adapter).toHaveBeenCalledTimes(3)
+    } finally {
+      session.dispose()
+      apiClient.defaults.adapter = previousAdapter
+    }
+  })
+
   it('does not expire on a transient refresh failure', async () => {
     const previousAdapter = apiClient.defaults.adapter
     const session = createSessionService()

@@ -3,6 +3,8 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  isNotFound,
+  isRedirect,
 } from '@tanstack/react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
@@ -69,8 +71,10 @@ async function loadRouter(
   try {
     router.updateLatestLocation()
     await router.load({ sync: true })
-  } catch {
-    // Redirects and notFound errors are asserted through router state below.
+  } catch (error) {
+    if (!(isRedirect(error) || isNotFound(error))) {
+      throw error
+    }
   }
 }
 
