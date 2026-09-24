@@ -255,4 +255,191 @@ describe('auth interceptor contract', () => {
     expect(onSessionExpired).toHaveBeenCalledOnce()
     client.interceptors.response.eject(interceptorId)
   })
+
+  it('does not expire the session when refresh fails transiently', async () => {
+    const client = axios.create()
+    const onSessionExpired = vi.fn()
+    const refresh = vi.fn().mockRejectedValue(new ApiError('Indisponível', 503))
+    const config = {
+      headers: {},
+      method: 'get',
+      url: '/me',
+    } as InternalAxiosRequestConfig
+    const adapter = vi.fn().mockRejectedValue(
+      new axios.AxiosError(
+        'Unauthorized',
+        'ERR_BAD_REQUEST',
+        config,
+        undefined,
+        {
+          config,
+          data: { message: 'Não autorizado', status: 401 },
+          headers: {},
+          status: 401,
+          statusText: 'Unauthorized',
+        }
+      )
+    )
+
+    client.defaults.adapter = adapter
+    client.interceptors.response.use(undefined, (error) =>
+      Promise.reject(toApiError(error))
+    )
+    const interceptorId = installAuthInterceptor(client, {
+      onSessionExpired,
+      refresh,
+    })
+
+    await expect(client.get('/me')).rejects.toMatchObject({ status: 503 })
+    expect(onSessionExpired).not.toHaveBeenCalled()
+    client.interceptors.response.eject(interceptorId)
+  })
+
+  it('expires the session when refresh is unauthorized', async () => {
+    const client = axios.create()
+    const onSessionExpired = vi.fn()
+    const refresh = vi
+      .fn()
+      .mockRejectedValue(new ApiError('Não autorizado', 401))
+    const config = {
+      headers: {},
+      method: 'get',
+      url: '/me',
+    } as InternalAxiosRequestConfig
+    const adapter = vi.fn().mockRejectedValue(
+      new axios.AxiosError(
+        'Unauthorized',
+        'ERR_BAD_REQUEST',
+        config,
+        undefined,
+        {
+          config,
+          data: { message: 'Não autorizado', status: 401 },
+          headers: {},
+          status: 401,
+          statusText: 'Unauthorized',
+        }
+      )
+    )
+
+    client.defaults.adapter = adapter
+    client.interceptors.response.use(undefined, (error) =>
+      Promise.reject(toApiError(error))
+    )
+    const interceptorId = installAuthInterceptor(client, {
+      onSessionExpired,
+      refresh,
+    })
+
+    await expect(client.get('/me')).rejects.toMatchObject({ status: 401 })
+    expect(onSessionExpired).toHaveBeenCalledOnce()
+    client.interceptors.response.eject(interceptorId)
+  })
+
+  it('shares one refresh promise between concurrent unauthorized requests', async () => {
+    const client = axios.create()
+    let resolveRefresh: ((value: boolean) => void) | undefined
+    const refresh = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveRefresh = resolve
+        })
+    )
+    const unauthorized = (config: InternalAxiosRequestConfig) =>
+      new axios.AxiosError(
+        'Unauthorized',
+        'ERR_BAD_REQUEST',
+        config,
+        undefined,
+        {
+          config,
+          data: { message: 'Não autorizado', status: 401 },
+          headers: {},
+          status: 401,
+          statusText: 'Unauthorized',
+        }
+      )
+    const adapter = vi.fn((config: InternalAxiosRequestConfig) => {
+      if (adapter.mock.calls.length <= 2) {
+        return Promise.reject(unauthorized(config))
+      }
+
+      return Promise.resolve({
+        config,
+        data: { id: 'user-id' },
+        headers: {},
+        status: 200,
+        statusText: 'OK',
+      })
+    })
+
+    client.defaults.adapter = adapter
+    client.interceptors.response.use(undefined, (error) =>
+      Promise.reject(toApiError(error))
+    )
+    const interceptorId = installAuthInterceptor(client, { refresh })
+
+    const first = client.get('/first')
+    const second = client.get('/second')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(refresh).toHaveBeenCalledOnce()
+    resolveRefresh?.(true)
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+    expect(adapter).toHaveBeenCalledTimes(4)
+    client.interceptors.response.eject(interceptorId)
+  })
+
+  it('clears a failed refresh cycle before a later request', async () => {
+    const client = axios.create()
+    const refresh = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+    const onSessionExpired = vi.fn()
+    const adapter = vi.fn((requestConfig: InternalAxiosRequestConfig) => {
+      if (adapter.mock.calls.length <= 2) {
+        return Promise.reject(
+          new axios.AxiosError(
+            'Unauthorized',
+            'ERR_BAD_REQUEST',
+            requestConfig,
+            undefined,
+            {
+              config: requestConfig,
+              data: { message: 'Não autorizado', status: 401 },
+              headers: {},
+              status: 401,
+              statusText: 'Unauthorized',
+            }
+          )
+        )
+      }
+
+      return Promise.resolve({
+        config: requestConfig,
+        data: { id: 'user-id' },
+        headers: {},
+        status: 200,
+        statusText: 'OK',
+      })
+    })
+
+    client.defaults.adapter = adapter
+    client.interceptors.response.use(undefined, (error) =>
+      Promise.reject(toApiError(error))
+    )
+    const interceptorId = installAuthInterceptor(client, {
+      onSessionExpired,
+      refresh,
+    })
+
+    await expect(client.get('/me')).rejects.toMatchObject({ status: 401 })
+    await expect(client.get('/me')).resolves.toMatchObject({ status: 200 })
+
+    expect(refresh).toHaveBeenCalledTimes(2)
+    expect(onSessionExpired).toHaveBeenCalledOnce()
+    client.interceptors.response.eject(interceptorId)
+  })
 })

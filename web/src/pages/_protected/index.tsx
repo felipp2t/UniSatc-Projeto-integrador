@@ -1,11 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { NotFoundPage } from '@/components/not-found-page'
 
-export const Route = createFileRoute('/_shell/')({
+export const Route = createFileRoute('/_protected/')({
   component: HomePage,
   head: () => ({
     meta: [{ title: 'web' }],
   }),
+  notFoundComponent: NotFoundPage,
 })
 
 function HomePage() {

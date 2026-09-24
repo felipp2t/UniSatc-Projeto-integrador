@@ -1,9 +1,15 @@
-import { createRootRoute, HeadContent, Outlet } from '@tanstack/react-router'
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Outlet,
+} from '@tanstack/react-router'
+import { NotFoundPage } from '@/components/not-found-page'
 import { Toaster } from '@/components/ui/toast'
+import type { RouterContext } from '@/router-context'
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootComponent,
-  notFoundComponent: NotFoundComponent,
+  notFoundComponent: NotFoundPage,
 })
 
 function RootComponent() {
@@ -13,18 +19,5 @@ function RootComponent() {
       <Outlet />
       <Toaster />
     </>
-  )
-}
-
-function NotFoundComponent() {
-  return (
-    <div className='flex min-h-svh items-center justify-center'>
-      <div className='text-center'>
-        <h1 className='font-bold text-6xl'>404</h1>
-        <p className='mt-4 text-muted-foreground text-xl'>
-          Página não encontrada
-        </p>
-      </div>
-    </div>
   )
 }
