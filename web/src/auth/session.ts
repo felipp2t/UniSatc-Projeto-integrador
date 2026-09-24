@@ -39,7 +39,7 @@ class SessionServiceImpl implements SessionService {
     })
   }
 
-  initialize(force = false) {
+  initialize(force = false): Promise<void> {
     if (force && !this.initializing) {
       this.initialization = undefined
       this.status = 'loading'
@@ -51,7 +51,7 @@ class SessionServiceImpl implements SessionService {
     }
 
     this.initializing = true
-    this.initialization = userApi
+    const initialization = userApi
       .getMe()
       .then(({ data }) => {
         this.user = data
@@ -75,7 +75,8 @@ class SessionServiceImpl implements SessionService {
         this.initializing = false
       })
 
-    return this.initialization
+    this.initialization = initialization
+    return initialization
   }
 
   setNavigateToLogin(navigate: () => void) {
