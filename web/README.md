@@ -1,6 +1,6 @@
-# Rootly Web
+# Vaulty Web
 
-Frontend do Rootly, construído com React, TypeScript e Vite.
+Frontend do Vaulty, construído com React, TypeScript e Vite.
 
 ## Desenvolvimento
 

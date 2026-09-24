@@ -73,7 +73,7 @@ export function Header({
           className='shrink-0 font-bold font-mono text-lg text-primary tracking-widest'
           to='/'
         >
-          ROOTLY
+          VAULTY
         </Link>
 
         <div className='flex-1' />
