@@ -63,6 +63,7 @@ class SessionServiceImpl implements SessionService {
         if (apiError.isUnauthorized) {
           this.user = undefined
           this.status = 'unauthenticated'
+          this.initialization = undefined
           return
         }
 
@@ -89,6 +90,7 @@ class SessionServiceImpl implements SessionService {
     this.expirationHandled = true
     this.user = undefined
     this.status = 'unauthenticated'
+    this.initialization = undefined
     if (!this.initializing) {
       this.navigateToLogin?.()
     }
