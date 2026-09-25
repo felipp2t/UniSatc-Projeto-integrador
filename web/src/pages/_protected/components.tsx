@@ -104,7 +104,7 @@ function ComponentsPage() {
       />
       <header className='flex flex-col gap-3 border-border border-b pb-8'>
         <p className='font-mono text-primary text-xs uppercase tracking-[0.2em]'>
-          Rootly · UI inventory
+          Vaulty · UI inventory
         </p>
         <h1 className='font-bold font-display text-4xl tracking-tight'>
           Components
