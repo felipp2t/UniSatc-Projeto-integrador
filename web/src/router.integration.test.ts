@@ -17,6 +17,12 @@ import { Route as ProtectedSplatRoute } from './pages/_protected/$'
 import { routeTree } from './route-tree.gen'
 import type { RouterContext } from './router-context'
 
+// Guard integration tests do not need to preload the login page UI.
+vi.mock('./pages/login', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./pages/login')>()
+  return { ...actual, Route: actual.Route.update({ component: () => null }) }
+})
+
 vi.stubGlobal('window', {
   location: { origin: 'http://localhost' },
   origin: 'http://localhost',
