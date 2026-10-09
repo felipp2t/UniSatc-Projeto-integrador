@@ -1,0 +1,111 @@
+package com.vaulty.api.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.vaulty.api.PostgresIntegrationTest;
+import com.vaulty.api.dto.auth.RegisterRequest;
+import com.vaulty.api.dto.auth.ResetPasswordRequest;
+import com.vaulty.api.entity.PasswordResetToken;
+import com.vaulty.api.entity.RefreshToken;
+import com.vaulty.api.entity.User;
+import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.exception.InvalidCredentialsException;
+import com.vaulty.api.exception.InvalidInviteException;
+import com.vaulty.api.repository.EmailOutboxRepository;
+import com.vaulty.api.repository.PasswordResetTokenRepository;
+import com.vaulty.api.repository.RefreshTokenRepository;
+import com.vaulty.api.repository.UserInviteRepository;
+import com.vaulty.api.repository.UserRepository;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+class ExpiredAuthDataCleanupIntegrationTest extends PostgresIntegrationTest {
+
+    @Autowired private UserRepository userRepository;
+    @Autowired private RefreshTokenRepository refreshTokenRepository;
+    @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
+    @Autowired private UserInviteRepository userInviteRepository;
+    @Autowired private EmailOutboxRepository emailOutboxRepository;
+    @Autowired private ExpiredAuthDataCleanupService cleanupService;
+    @Autowired private AuthService authService;
+    @Autowired private PasswordEncoder passwordEncoder;
+
+    @BeforeEach
+    void cleanDatabase() {
+        emailOutboxRepository.deleteAll();
+        passwordResetTokenRepository.deleteAll();
+        refreshTokenRepository.deleteAll();
+        userInviteRepository.deleteAll();
+        userRepository.deleteAll();
+    }
+
+    @Test
+    void rejectionDoesNotPretendToDeleteAndMaintenanceRemovesOnlyExpiredRecords() {
+        User user = createUser();
+        PasswordResetToken expiredReset = reset(user, "expired", OffsetDateTime.now().minusMinutes(1));
+        reset(user, "valid", OffsetDateTime.now().plusHours(1));
+        RefreshToken expiredRefresh = refresh(user, "expired-refresh", OffsetDateTime.now().minusMinutes(1));
+        refresh(user, "valid-refresh", OffsetDateTime.now().plusHours(1));
+        UserInvite expiredInvite = invite(user, "expired@example.com", OffsetDateTime.now().minusMinutes(1));
+        invite(user, "valid@example.com", OffsetDateTime.now().plusHours(1));
+
+        assertThatThrownBy(() -> authService.resetPassword(
+                        new ResetPasswordRequest(expiredReset.getToken(), "new-password", "new-password")))
+                .isInstanceOf(InvalidCredentialsException.class);
+        assertThat(passwordResetTokenRepository.findByToken("expired")).isPresent();
+
+        assertThatThrownBy(() -> authService.refreshToken(expiredRefresh.getToken()))
+                .isInstanceOf(InvalidCredentialsException.class);
+        assertThat(refreshTokenRepository.findByToken("expired-refresh")).isPresent();
+
+        assertThatThrownBy(() -> authService.register(new RegisterRequest(
+                        expiredInvite.getEmail(), expiredInvite.getToken(), "New User", "password123", "password123")))
+                .isInstanceOf(InvalidInviteException.class);
+        assertThat(userInviteRepository.findByEmailAndToken(expiredInvite.getEmail(), expiredInvite.getToken()))
+                .isPresent();
+
+        cleanupService.cleanup();
+
+        assertThat(passwordResetTokenRepository.findAll()).extracting(PasswordResetToken::getToken).containsExactly("valid");
+        assertThat(refreshTokenRepository.findAll()).extracting(RefreshToken::getToken).containsExactly("valid-refresh");
+        assertThat(userInviteRepository.findAll()).extracting(UserInvite::getEmail).containsExactly("valid@example.com");
+    }
+
+    private User createUser() {
+        User user = new User();
+        user.setName("Test User");
+        user.setEmail("user@example.com");
+        user.setPasswordHash(passwordEncoder.encode("password123"));
+        return userRepository.save(user);
+    }
+
+    private PasswordResetToken reset(User user, String token, OffsetDateTime expiresAt) {
+        PasswordResetToken value = new PasswordResetToken();
+        value.setToken(token);
+        value.setUser(user);
+        value.setExpiresAt(expiresAt);
+        return passwordResetTokenRepository.save(value);
+    }
+
+    private RefreshToken refresh(User user, String token, OffsetDateTime expiresAt) {
+        RefreshToken value = new RefreshToken();
+        value.setToken(token);
+        value.setUser(user);
+        value.setExpiresAt(expiresAt);
+        return refreshTokenRepository.save(value);
+    }
+
+    private UserInvite invite(User user, String email, OffsetDateTime expiresAt) {
+        UserInvite value = new UserInvite();
+        value.setEmail(email);
+        value.setToken(UUID.randomUUID().toString());
+        value.setInvitedBy(user);
+        value.setExpiresAt(expiresAt);
+        return userInviteRepository.save(value);
+    }
+}

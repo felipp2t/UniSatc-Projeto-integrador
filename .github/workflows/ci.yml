@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: check
-        run: echo "exists=$(test -f backend/pom.xml && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        run: echo "exists=$(test -f server/pom.xml && echo true || echo false)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         if: steps.check.outputs.exists == 'true'
         with:
@@ -22,37 +22,48 @@ jobs:
           cache: maven
       - name: Build & test
         if: steps.check.outputs.exists == 'true'
-        working-directory: backend
+        working-directory: server
         run: mvn -B verify
-      - name: Skip (backend/pom.xml not found yet)
+      - name: Skip (server/pom.xml not found yet)
         if: steps.check.outputs.exists == 'false'
-        run: echo "backend/pom.xml not found yet, skipping"
+        run: echo "server/pom.xml not found yet, skipping"
 
   frontend-build:
     name: frontend-build
     runs-on: ubuntu-latest
+    env:
+      VITE_API_URL: http://localhost:8080
+      VITE_WS_URL: ws://localhost:8080
     steps:
       - uses: actions/checkout@v4
       - id: check
-        run: echo "exists=$(test -f frontend/package.json && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        run: echo "exists=$(test -f web/package.json && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@v4
+        if: steps.check.outputs.exists == 'true'
+        with:
+          package_json_file: web/package.json
       - uses: actions/setup-node@v4
         if: steps.check.outputs.exists == 'true'
         with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
       - name: Install
         if: steps.check.outputs.exists == 'true'
-        working-directory: frontend
-        run: npm ci
+        working-directory: web
+        run: pnpm install --frozen-lockfile
       - name: Lint
         if: steps.check.outputs.exists == 'true'
-        working-directory: frontend
-        run: npm run lint --if-present
-      - name: Build
+        working-directory: web
+        run: pnpm run check
+      - name: Test
         if: steps.check.outputs.exists == 'true'
-        working-directory: frontend
-        run: npm run build --if-present
-      - name: Skip (frontend/package.json not found yet)
+        working-directory: web
+        run: pnpm test
+      - name: Typecheck & build
+        if: steps.check.outputs.exists == 'true'
+        working-directory: web
+        run: pnpm run build
+      - name: Skip (web/package.json not found yet)
         if: steps.check.outputs.exists == 'false'
-        run: echo "frontend/package.json not found yet, skipping"
+        run: echo "web/package.json not found yet, skipping"
