@@ -85,6 +85,7 @@ export function AppBreadcrumb({ items, maxVisibleItems }: AppBreadcrumbProps) {
             />
           )
         })}
+        {visibleItems.length > 0 ? <BreadcrumbSeparator /> : null}
       </BreadcrumbList>
     </Breadcrumb>
   )

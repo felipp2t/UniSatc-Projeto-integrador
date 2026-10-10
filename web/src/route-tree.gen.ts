@@ -16,6 +16,7 @@ import { Route as RedefinirSenhaRouteImport } from './pages/redefinir-senha'
 import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
 import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
 import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
+import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
 import { Route as ConviteTokenRouteImport } from './pages/convite/$token'
 
 const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
@@ -52,6 +53,11 @@ const ProtectedComponentsRoute = ProtectedComponentsRouteImport.update({
   path: '/components',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
+const ProtectedConfiguracoesRoute = ProtectedConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
 const ConviteTokenRoute = ConviteTokenRouteImport.update({
   id: '/convite/$token',
   path: '/convite/$token',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
   '/components': typeof ProtectedComponentsRoute
+  '/configuracoes': typeof ProtectedConfiguracoesRoute
   '/convite/$token': typeof ConviteTokenRoute
 }
 export interface FileRoutesByTo {
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
   '/components': typeof ProtectedComponentsRoute
+  '/configuracoes': typeof ProtectedConfiguracoesRoute
   '/convite/$token': typeof ConviteTokenRoute
   '/': typeof ProtectedIndexRoute
 }
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/_protected/$': typeof ProtectedSplatRoute
   '/_protected/components': typeof ProtectedComponentsRoute
+  '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
   '/convite/$token': typeof ConviteTokenRoute
   '/_protected/': typeof ProtectedIndexRoute
 }
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/$'
     | '/components'
+    | '/configuracoes'
     | '/convite/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/$'
     | '/components'
+    | '/configuracoes'
     | '/convite/$token'
     | '/'
   id:
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/_protected/$'
     | '/_protected/components'
+    | '/_protected/configuracoes'
     | '/convite/$token'
     | '/_protected/'
   fileRoutesById: FileRoutesById
@@ -177,6 +189,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedComponentsRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
+    '/_protected/configuracoes': {
+      id: '/_protected/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ProtectedConfiguracoesRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
     '/convite/$token': {
       id: '/convite/$token'
       path: '/convite/$token'
@@ -190,12 +209,14 @@ declare module '@tanstack/react-router' {
 interface ProtectedLayoutRouteChildren {
   ProtectedSplatRoute: typeof ProtectedSplatRoute
   ProtectedComponentsRoute: typeof ProtectedComponentsRoute
+  ProtectedConfiguracoesRoute: typeof ProtectedConfiguracoesRoute
   ProtectedIndexRoute: typeof ProtectedIndexRoute
 }
 
 const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
   ProtectedSplatRoute: ProtectedSplatRoute,
   ProtectedComponentsRoute: ProtectedComponentsRoute,
+  ProtectedConfiguracoesRoute: ProtectedConfiguracoesRoute,
   ProtectedIndexRoute: ProtectedIndexRoute,
 }
 

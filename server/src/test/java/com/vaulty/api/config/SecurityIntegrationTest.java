@@ -2,6 +2,7 @@ package com.vaulty.api.config;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -27,6 +28,20 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     @Test
     void returnsDocumentedJsonForMissingToken() throws Exception {
         assertUnauthorized(mockMvc.perform(get("/me")));
+    }
+
+    @Test
+    void requiresAuthenticationToChangePassword() throws Exception {
+        mockMvc.perform(patch("/me/password")
+                        .contentType("application/json")
+                        .content("""
+                                {"currentPassword":"old-password","newPassword":"new-password","confirmPassword":"new-password"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.path").value("/me/password"));
     }
 
     @Test
