@@ -27,6 +27,8 @@ public class WorkspaceRole {
 
     public static final String OWNER_ROLE_NAME = "Owner";
 
+    public static final String MEMBER_ROLE_NAME = "Member";
+
     @Id
     @GeneratedValue
     private UUID id;
@@ -50,6 +52,13 @@ public class WorkspaceRole {
         WorkspaceRole role = new WorkspaceRole();
         role.setWorkspace(workspace);
         role.setName(OWNER_ROLE_NAME);
+        return role;
+    }
+
+    public static WorkspaceRole member(Workspace workspace) {
+        WorkspaceRole role = new WorkspaceRole();
+        role.setWorkspace(workspace);
+        role.setName(MEMBER_ROLE_NAME);
         return role;
     }
 }

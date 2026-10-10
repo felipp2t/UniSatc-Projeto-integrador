@@ -56,7 +56,7 @@ class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void persistsEmailWithInviteAndSendsOnlyThroughTheProcessor() {
-        User inviter = createUser();
+        User inviter = admin();
 
         inviteService.inviteUser(inviter.getId(), new InviteUserRequest("guest@example.com"));
 
@@ -83,7 +83,7 @@ class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void rollsBackInviteAndOutboxTogether() {
-        User inviter = createUser();
+        User inviter = admin();
 
         transactionTemplate.executeWithoutResult(status -> {
             inviteService.inviteUser(inviter.getId(), new InviteUserRequest("guest@example.com"));
@@ -97,7 +97,7 @@ class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void schedulesRetryWhenSmtpFails() {
-        User inviter = createUser();
+        User inviter = admin();
         inviteService.inviteUser(inviter.getId(), new InviteUserRequest("guest@example.com"));
         doThrow(new MailSendException("SMTP unavailable"))
                 .when(mailSender)
@@ -118,5 +118,9 @@ class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
         user.setEmail(UUID.randomUUID() + "@example.com");
         user.setPasswordHash(passwordEncoder.encode("password123"));
         return userRepository.save(user);
+    }
+
+    private User admin() {
+        return userRepository.findByEmail("admin@gmail.com").orElseThrow();
     }
 }

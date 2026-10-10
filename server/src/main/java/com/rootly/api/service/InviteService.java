@@ -12,13 +12,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// restringir o convite a administradores fica para quando o sistema de papeis existir
 @Service
 public class InviteService {
 
     private final UserInviteRepository userInviteRepository;
 
     private final UserRepository userRepository;
+
+    private final WorkspaceService workspaceService;
 
     private final EmailOutboxService emailOutboxService;
 
@@ -29,18 +30,23 @@ public class InviteService {
 
             UserRepository userRepository,
 
+            WorkspaceService workspaceService,
+
             EmailOutboxService emailOutboxService,
 
             @Value("${invite.expiration-ms}")
             long inviteExpirationMs) {
         this.userInviteRepository = userInviteRepository;
         this.userRepository = userRepository;
+        this.workspaceService = workspaceService;
         this.emailOutboxService = emailOutboxService;
         this.inviteExpirationMs = inviteExpirationMs;
     }
 
     @Transactional
     public void inviteUser(UUID inviterId, InviteUserRequest request) {
+        workspaceService.requireOwner(inviterId);
+
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new ConflictException("E-mail já possui uma conta");
         }

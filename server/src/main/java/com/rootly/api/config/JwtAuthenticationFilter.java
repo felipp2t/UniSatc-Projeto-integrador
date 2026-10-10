@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -33,9 +35,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             FilterChain filterChain)
             throws ServletException, IOException {
-        extractAccessTokenCookie(request)
-                .flatMap(jwtService::validateAndGetUserId)
-                .ifPresent(this::authenticate);
+        Optional<String> token = extractAccessTokenCookie(request);
+
+        token.flatMap(jwtService::validateAndGetUserId)
+                .ifPresent(userId -> authenticate(userId, token.flatMap(jwtService::extractRole).orElse(null)));
 
         filterChain.doFilter(request, response);
     }
@@ -51,8 +54,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .findFirst();
     }
 
-    private void authenticate(UUID userId) {
-        var authentication = new UsernamePasswordAuthenticationToken(userId, null, List.of());
+    private void authenticate(UUID userId, String role) {
+        List<GrantedAuthority> authorities = role == null ? List.of() : List.of(new SimpleGrantedAuthority(role));
+        var authentication = new UsernamePasswordAuthenticationToken(userId, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

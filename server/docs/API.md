@@ -22,36 +22,43 @@ Convenções gerais:
 - Convites e recuperações usam uma outbox transacional: token e e-mail são gravados juntos, mas o
   SMTP é chamado por um worker após o commit. Falhas de envio são tentadas novamente até 5 vezes;
   por isso, a resposta HTTP confirma que o e-mail foi enfileirado, não que já foi entregue.
-- Não existe cadastro público: uma conta só nasce quando alguém já autenticado envia um convite
-  (RF01) e o convidado conclui o cadastro com o token recebido por e-mail (RF02). Hoje qualquer
-  usuário autenticado pode convidar; restringir isso a administradores é trabalho futuro (quando
-  a dashboard e o sistema de papéis existirem).
+- Não existe cadastro público: uma conta só nasce quando o dono do workspace envia um convite
+  (RF01) e o convidado conclui o cadastro com o token recebido por e-mail (RF02), entrando no
+  workspace único da empresa com o papel `Member` (acesso inicial, sem RBAC granular ainda).
+- **Início do RNF04** (autorização por permissão no próprio token): o `accessToken` carrega uma
+  claim `role` com o nome do papel do usuário no workspace (`Owner` ou `Member`, por enquanto —
+  ainda não existem papéis customizados nem permissões granulares por recurso/ação). A claim é
+  calculada a cada emissão/renovação de token (login, registro, refresh), nunca lida do banco a
+  cada requisição. `JwtAuthenticationFilter` expõe isso como uma `GrantedAuthority` do Spring
+  Security, pronta para checagens futuras (`hasAuthority(...)`) quando RBAC granular existir.
 
 ---
 
 ## RF01 — Convite de novo usuário
 
-**`POST /invites`** — autenticado (cookie `accessToken`).
+**`POST /invites`** — autenticado (cookie `accessToken`), **somente o dono do workspace**.
 
 Envia um convite por e-mail (JavaMail) para um endereço ainda não cadastrado, contendo um link
 para a tela de cadastro do frontend com `email` e `token` na query string.
 
 O que a função faz, em ordem:
-1. Confere que não existe usuário com esse `email` (senão `409`).
-2. Apaga qualquer convite anterior pendente para o mesmo `email` (reenviar substitui o convite
+1. Confere que quem está chamando é o dono do workspace único (senão `403`).
+2. Confere que não existe usuário com esse `email` (senão `409`).
+3. Apaga qualquer convite anterior pendente para o mesmo `email` (reenviar substitui o convite
    antigo).
-3. Cria um `UserInvite` com um token opaco (`UUID.randomUUID()`), associado a quem convidou
+4. Cria um `UserInvite` com um token opaco (`UUID.randomUUID()`), associado a quem convidou
    (`invited_by_user_id`) e com validade de 7 dias (`invite.expiration-ms`).
-4. Grava na outbox o e-mail com o link `${FRONTEND_URL}/cadastro?email=...&token=...`; o worker
+5. Grava na outbox o e-mail com o link `${FRONTEND_URL}/cadastro?email=...&token=...`; o worker
    envia após o commit e aplica retentativas em falhas temporárias.
 
 | | |
 |---|---|
-| Auth | Cookie `accessToken` |
+| Auth | Cookie `accessToken`, apenas o dono do workspace |
 | Request body | `{ "email": string }` |
 | Sucesso | `201`, corpo vazio |
 | `400` | e-mail inválido/ausente |
 | `401` | não autenticado |
+| `403` | autenticado, mas não é o dono do workspace |
 | `409` | já existe uma conta com esse e-mail |
 
 ---
@@ -70,8 +77,10 @@ O que a função faz, em ordem:
    A manutenção agendada remove convites expirados fora da transação da requisição.
 4. Confere que ainda não existe usuário com esse `email` (senão `409`).
 5. Cria o `User` com `name`, `email` e `password_hash` (Argon2) a partir da senha enviada.
-6. Apaga o convite (uso único).
-7. Gera um access token (JWT) e um refresh token (persistido em `refresh_token`), devolvidos como
+6. Vincula o novo usuário ao workspace único com o papel `Member` (acesso inicial, ainda sem
+   RBAC granular) — na mesma transação da criação da conta.
+7. Apaga o convite (uso único).
+8. Gera um access token (JWT) e um refresh token (persistido em `refresh_token`), devolvidos como
    cookies — o usuário já entra logado, sem precisar chamar `/auth/login` em seguida.
 
 | | |

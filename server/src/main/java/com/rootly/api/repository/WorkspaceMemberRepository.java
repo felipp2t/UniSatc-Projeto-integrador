@@ -2,12 +2,21 @@ package com.rootly.api.repository;
 
 import com.rootly.api.entity.WorkspaceMember;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember, UUID> {
+
+    @Query("""
+            select member from WorkspaceMember member
+            join fetch member.role
+            join fetch member.workspace
+            where member.user.id = :userId
+            """)
+    Optional<WorkspaceMember> findByUserId(@Param("userId") UUID userId);
 
     @Query("""
             select sibling

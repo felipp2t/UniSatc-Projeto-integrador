@@ -1,13 +1,11 @@
 # Rootly API (Java/Spring Boot)
 
-Port em Java/Spring Boot do backend do [Rootly](../../rootly). Sistema sem cadastro público —
-contas só nascem quando alguém já autenticado convida um e-mail; o convite chega por e-mail
-(JavaMail) com um link que libera a tela de cadastro. Senha esquecida também é resolvida por
-e-mail, com um token de redefinição de uso único.
-
-> Hoje qualquer usuário autenticado pode enviar convites. Restringir isso a administradores /
-> usuários de maior autoridade é um trabalho futuro, quando o sistema de papéis e a dashboard
-> existirem.
+Port em Java/Spring Boot do backend do [Rootly](../../rootly). Cada instalação representa uma
+única empresa, com um workspace único — sem cadastro público: contas só nascem quando o **dono
+do workspace** convida um e-mail; o convite chega por e-mail (JavaMail) com um link que libera a
+tela de cadastro, e o aceite já vincula a conta ao workspace com o papel `Member` (acesso
+inicial, ainda sem RBAC granular). Senha esquecida também é resolvida por e-mail, com um token
+de redefinição de uso único.
 
 ## Stack
 
@@ -77,7 +75,7 @@ ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|
-| RF01 | POST | `/invites` | Sim | `{ email }` | 201 | 400 e-mail inválido, 401 não autenticado, 409 e-mail já cadastrado |
+| RF01 | POST | `/invites` | Sim, só o dono | `{ email }` | 201 | 400 e-mail inválido, 401 não autenticado, 403 não é o dono, 409 e-mail já cadastrado |
 | RF02 | POST | `/auth/register` | Não | `{ email, token, name, password, confirmPassword }` | 200, seta cookies | 400 senhas não conferem, 404 convite não encontrado, 409 convite expirado ou e-mail já cadastrado |
 | RF03 | POST | `/auth/login` | Não | `{ email, password }` | 200, seta cookies | 401 credenciais inválidas |
 | RF04 | POST | `/auth/refresh` | Cookie `refreshToken` | — | 200, roda os cookies | 401 refresh token inválido/expirado |

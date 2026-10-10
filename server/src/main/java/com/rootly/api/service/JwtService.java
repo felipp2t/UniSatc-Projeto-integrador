@@ -30,14 +30,23 @@ public class JwtService {
     }
 
     public String generateAccessToken(UUID userId) {
+        return generateAccessToken(userId, null);
+    }
+
+    // role fica nula pra quem ainda nao tem papel no workspace (nao deveria acontecer em uso normal)
+    public String generateAccessToken(UUID userId, String role) {
         Instant now = Instant.now();
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(userId.toString())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)))
-                .signWith(key)
-                .compact();
+                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)));
+
+        if (role != null) {
+            builder.claim("role", role);
+        }
+
+        return builder.signWith(key).compact();
     }
 
     public int getAccessTokenExpirationSeconds() {
@@ -55,6 +64,22 @@ public class JwtService {
                     .getSubject();
 
             return Optional.of(UUID.fromString(subject));
+        } catch (JwtException | IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+    }
+
+    // vazio se o token for invalido ou nao tiver a claim role
+    public Optional<String> extractRole(String token) {
+        try {
+            String role = Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload()
+                    .get("role", String.class);
+
+            return Optional.ofNullable(role);
         } catch (JwtException | IllegalArgumentException ex) {
             return Optional.empty();
         }
