@@ -1,6 +1,6 @@
-# Rootly API (Java/Spring Boot)
+# Vaulty API (Java/Spring Boot)
 
-Port em Java/Spring Boot do backend do [Rootly](../../rootly). Cada instalação representa uma
+Port em Java/Spring Boot do backend do [Vaulty](../../vaulty). Cada instalação representa uma
 única empresa, com um workspace único — sem cadastro público: contas só nascem quando o **dono
 do workspace** convida um e-mail; o convite chega por e-mail (JavaMail) com um link que libera a
 tela de cadastro, e o aceite já vincula a conta ao workspace com o papel `Member` (acesso
@@ -29,9 +29,9 @@ de redefinição de uso único.
    docker compose up -d
    ```
 
-   O Compose cria o banco `rootly`, exposto em `localhost:5432`, com usuário e senha `rootly`.
+   O Compose cria o banco `vaulty`, exposto em `localhost:5432`, com usuário e senha `vaulty`.
 2. Copie `.env.example` para `.env` e ajuste as variáveis. Para o banco iniciado pelo Compose,
-   use `DB_USERNAME=rootly` e `DB_PASSWORD=rootly`. Gere um valor aleatório de pelo menos 32 bytes
+   use `DB_USERNAME=vaulty` e `DB_PASSWORD=vaulty`. Gere um valor aleatório de pelo menos 32 bytes
    para `JWT_SECRET`; a aplicação não inicia se essa variável estiver ausente. O `.env` é carregado
    automaticamente pelo Spring Boot, sem precisar exportar as variáveis no terminal.
 3. Para testar convites e recuperação de senha, configure `MAIL_HOST`, `MAIL_PORT`,
@@ -107,7 +107,7 @@ segunda linha impossível, inclusive sob concorrência.
 
 ## Estrutura do código
 
-Camadas técnicas em `src/main/java/com/rootly/api`: `controller`, `service`, `repository`,
+Camadas técnicas em `src/main/java/com/vaulty/api`: `controller`, `service`, `repository`,
 `entity`, `dto`, `config` (Spring Security + filtro JWT), `exception` (hierarquia de erros +
 `@RestControllerAdvice`).
 

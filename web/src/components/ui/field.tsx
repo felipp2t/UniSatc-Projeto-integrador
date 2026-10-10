@@ -2,16 +2,20 @@ import { cn } from 'cn'
 import type { HTMLAttributes, LabelHTMLAttributes, ReactNode } from 'react'
 
 interface FieldProps extends HTMLAttributes<HTMLDivElement> {
+  invalid?: boolean
   orientation?: 'horizontal' | 'vertical'
 }
 
 export function Field({
   className,
+  invalid = false,
   orientation = 'vertical',
+  'aria-invalid': ariaInvalid,
   ...props
 }: FieldProps) {
   return (
     <div
+      aria-invalid={ariaInvalid ?? (invalid || undefined)}
       className={cn(
         'group/field flex w-full gap-1.5',
         orientation === 'horizontal'
@@ -22,6 +26,13 @@ export function Field({
       {...props}
     />
   )
+}
+
+export function FieldGroup({
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('flex flex-col gap-4', className)} {...props} />
 }
 
 export function FieldLabel({

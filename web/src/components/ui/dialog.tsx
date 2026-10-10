@@ -44,11 +44,11 @@ export function DialogContent({
           <DialogPrimitive.Close asChild>
             <Button
               aria-label='Close'
-              className='absolute top-3 right-3 text-muted-foreground hover:text-foreground'
+              className='absolute top-3 right-3 size-7 text-muted-foreground hover:text-foreground'
               size='icon'
               variant='ghost'
             >
-              <XIcon size={14} />
+              <XIcon size={12} />
             </Button>
           </DialogPrimitive.Close>
         )}
