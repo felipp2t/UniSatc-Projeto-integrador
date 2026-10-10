@@ -41,7 +41,7 @@ class ExpiredAuthDataCleanupIntegrationTest extends PostgresIntegrationTest {
         passwordResetTokenRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userInviteRepository.deleteAll();
-        userRepository.deleteAll();
+        userRepository.deleteAllByEmailNot("admin@gmail.com");
     }
 
     @Test

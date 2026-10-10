@@ -1,6 +1,5 @@
 package com.rootly.api.controller.docs;
 
-import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
 import com.rootly.api.dto.workspace.UpdateWorkspaceRequest;
 import com.rootly.api.dto.workspace.WorkspaceResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,10 +12,6 @@ import java.util.UUID;
 
 @Tag(name = "Workspaces")
 public interface WorkspaceControllerDocs {
-
-    @Operation(summary = "Cria um workspace")
-    @ApiResponses({@ApiResponse(responseCode = "201"), @ApiResponse(responseCode = "400")})
-    WorkspaceResponse create(@Parameter(hidden = true) UUID userId, CreateWorkspaceRequest request);
 
     @Operation(summary = "Lista os workspaces do usuário")
     @ApiResponse(responseCode = "200")

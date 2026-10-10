@@ -92,12 +92,17 @@ Trocar a senha (RF08) e redefini-la via e-mail (RF07) invalidam todos os refresh
 tokens de redefinição pendentes do usuário, forçando novo login em outras sessões e impedindo o
 reuso de links antigos.
 
-## Workspaces (em andamento)
+## Workspace (em andamento)
+
+Cada instalação representa uma única empresa e tem **exatamente um workspace**, provisionado uma
+vez pela migration `V5__enforce_workspace_singleton.sql` junto com o papel `Owner` e o vínculo do
+admin inicial (seedado em `V2`). Não existe criação nem seleção de workspaces em tempo de
+execução — a tabela `workspace` tem uma coluna `singleton` com `CHECK`/`UNIQUE` que torna uma
+segunda linha impossível, inclusive sob concorrência.
 
 | Método | Rota | Auth | Sucesso | Regra de acesso |
 |---|---|---|---|---|
-| POST | `/workspaces` | Sim | 201 com o workspace criado | Cria o workspace, o papel `Owner` e o vínculo do criador. |
-| GET | `/workspaces` | Sim | 200 com a lista | Retorna somente workspaces dos quais o usuário é membro. |
+| GET | `/workspaces` | Sim | 200 com a lista (0 ou 1 item) | Retorna o workspace único, se o usuário for membro. |
 | GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
 | GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
 | PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |

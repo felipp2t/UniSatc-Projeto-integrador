@@ -1,7 +1,6 @@
 package com.rootly.api.controller;
 
 import com.rootly.api.controller.docs.WorkspaceControllerDocs;
-import com.rootly.api.dto.workspace.CreateWorkspaceRequest;
 import com.rootly.api.dto.workspace.UpdateWorkspaceRequest;
 import com.rootly.api.dto.workspace.WorkspaceResponse;
 import com.rootly.api.service.WorkspaceService;
@@ -10,15 +9,12 @@ import java.util.List;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -27,14 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkspaceController implements WorkspaceControllerDocs {
 
     private final WorkspaceService workspaceService;
-
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    @Override
-    public WorkspaceResponse create(@AuthenticationPrincipal UUID userId,
-                                    @Valid @RequestBody CreateWorkspaceRequest request) {
-        return workspaceService.create(userId, request);
-    }
 
     @GetMapping
     @Override
