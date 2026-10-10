@@ -56,7 +56,9 @@ export function Header({
       setLogoutDialogOpen(false)
     } catch (error) {
       setLogoutError(
-        error instanceof Error ? error.message : 'Não foi possível sair.'
+        error instanceof Error && error.message
+          ? error.message
+          : 'Não foi possível sair.'
       )
     } finally {
       setLoggingOut(false)
@@ -154,7 +156,9 @@ export function Header({
             </DialogDescription>
           </DialogHeader>
           {logoutError ? (
-            <p className='text-destructive text-xs'>{logoutError}</p>
+            <p className='text-destructive text-xs' role='alert'>
+              {logoutError}
+            </p>
           ) : null}
           <DialogFooter>
             <Button

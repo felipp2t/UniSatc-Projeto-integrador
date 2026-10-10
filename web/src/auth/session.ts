@@ -14,6 +14,7 @@ export interface SessionService {
   dispose: () => void
   handleSessionExpired: () => void
   initialize: (force?: boolean) => Promise<void>
+  logout: () => Promise<void>
   setNavigateToLogin: (navigate: () => void) => void
   readonly status: SessionStatus
   readonly user: UserResponse | undefined
@@ -28,6 +29,7 @@ class SessionServiceImpl implements SessionService {
   private readonly interceptorId: number
   private expirationHandled: boolean | undefined
   private initializing: boolean | undefined
+  private initializationId = 0
 
   constructor() {
     this.interceptorId = installAuthInterceptor(apiClient, {
@@ -51,14 +53,24 @@ class SessionServiceImpl implements SessionService {
     }
 
     this.initializing = true
+    this.initializationId += 1
+    const { initializationId } = this
     const initialization = userApi
       .getMe()
       .then(({ data }) => {
+        if (initializationId !== this.initializationId) {
+          return
+        }
+
         this.user = data
         this.status = 'authenticated'
         this.expirationHandled = false
       })
       .catch((error: unknown) => {
+        if (initializationId !== this.initializationId) {
+          return
+        }
+
         const apiError = toApiError(error)
         if (apiError.isUnauthorized) {
           this.user = undefined
@@ -72,11 +84,25 @@ class SessionServiceImpl implements SessionService {
         throw error
       })
       .finally(() => {
-        this.initializing = false
+        if (initializationId === this.initializationId) {
+          this.initializing = false
+        }
       })
 
     this.initialization = initialization
     return initialization
+  }
+
+  async logout() {
+    try {
+      await authApi.logout()
+    } catch (error) {
+      if (!toApiError(error).isUnauthorized) {
+        throw error
+      }
+    }
+
+    this.resetSession()
   }
 
   setNavigateToLogin(navigate: () => void) {
@@ -88,13 +114,21 @@ class SessionServiceImpl implements SessionService {
       return
     }
 
-    this.expirationHandled = true
-    this.user = undefined
-    this.status = 'unauthenticated'
-    this.initialization = undefined
-    if (!this.initializing) {
+    const wasInitializing = this.initializing
+    this.resetSession()
+
+    if (!wasInitializing) {
       this.navigateToLogin?.()
     }
+  }
+
+  private resetSession() {
+    this.initializationId += 1
+    this.initialization = undefined
+    this.initializing = false
+    this.user = undefined
+    this.status = 'unauthenticated'
+    this.expirationHandled = true
   }
 
   dispose() {

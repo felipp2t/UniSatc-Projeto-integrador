@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
 
-const { getMe, refresh } = vi.hoisted(() => ({
+const { getMe, logout, refresh } = vi.hoisted(() => ({
   getMe: vi.fn(),
+  logout: vi.fn(),
   refresh: vi.fn(),
 }))
 
 vi.mock('@/api/endpoints', () => ({
-  authApi: { refresh },
+  authApi: { logout, refresh },
   userApi: { getMe },
 }))
 
@@ -15,6 +16,7 @@ import { createSessionService } from './session'
 
 afterEach(() => {
   getMe.mockReset()
+  logout.mockReset()
   refresh.mockReset()
 })
 
@@ -42,6 +44,70 @@ describe('session service', () => {
     expect(getMe).toHaveBeenCalledTimes(2)
     expect(session.status).toBe('authenticated')
     expect(session.user).toEqual(secondUser)
+    session.dispose()
+  })
+
+  it('stays unauthenticated when a pending user request resolves after expiration', async () => {
+    const session = createSessionService()
+    let resolveGetMe!: (value: {
+      data: { email: string; id: string; name: string }
+    }) => void
+    getMe.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGetMe = resolve
+        })
+    )
+
+    const initialization = session.initialize()
+    session.handleSessionExpired()
+    resolveGetMe({
+      data: { email: 'user@example.com', id: 'user-id', name: 'User' },
+    })
+    await initialization
+
+    expect(session.status).toBe('unauthenticated')
+    expect(session.user).toBeUndefined()
+    session.dispose()
+  })
+
+  it('does not navigate to login when expiration happens during initialization', async () => {
+    const session = createSessionService()
+    const navigateToLogin = vi.fn()
+    session.setNavigateToLogin(navigateToLogin)
+    let resolveGetMe!: (value: {
+      data: { email: string; id: string; name: string }
+    }) => void
+    getMe.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGetMe = resolve
+        })
+    )
+
+    const initialization = session.initialize()
+    session.handleSessionExpired()
+    resolveGetMe({
+      data: { email: 'user@example.com', id: 'user-id', name: 'User' },
+    })
+    await initialization
+
+    expect(navigateToLogin).not.toHaveBeenCalled()
+    session.dispose()
+  })
+
+  it('navigates to login when expiration happens after initialization', async () => {
+    const session = createSessionService()
+    const navigateToLogin = vi.fn()
+    session.setNavigateToLogin(navigateToLogin)
+    getMe.mockResolvedValue({
+      data: { email: 'user@example.com', id: 'user-id', name: 'User' },
+    })
+
+    await session.initialize()
+    session.handleSessionExpired()
+
+    expect(navigateToLogin).toHaveBeenCalledOnce()
     session.dispose()
   })
 
@@ -96,6 +162,75 @@ describe('session service', () => {
     expect(getMe).toHaveBeenCalledTimes(2)
     expect(session.status).toBe('authenticated')
     expect(session.user).toEqual(user)
+    session.dispose()
+  })
+
+  it('logs out and clears the authenticated user after the API succeeds', async () => {
+    const session = createSessionService()
+    const user = { email: 'user@example.com', id: 'user-id', name: 'User' }
+    getMe.mockResolvedValue({ data: user })
+    logout.mockResolvedValue(undefined)
+    await session.initialize()
+
+    await session.logout()
+
+    expect(logout).toHaveBeenCalledOnce()
+    expect(session.status).toBe('unauthenticated')
+    expect(session.user).toBeUndefined()
+    session.dispose()
+  })
+
+  it('keeps the session when logout fails with a transient error', async () => {
+    const session = createSessionService()
+    const user = { email: 'user@example.com', id: 'user-id', name: 'User' }
+    const error = new ApiError('Serviço indisponível', 503)
+    getMe.mockResolvedValue({ data: user })
+    logout.mockRejectedValue(error)
+    await session.initialize()
+
+    await expect(session.logout()).rejects.toBe(error)
+
+    expect(session.status).toBe('authenticated')
+    expect(session.user).toEqual(user)
+    session.dispose()
+  })
+
+  it('clears the local session when logout reports unauthorized', async () => {
+    const session = createSessionService()
+    const user = { email: 'user@example.com', id: 'user-id', name: 'User' }
+    getMe.mockResolvedValue({ data: user })
+    logout.mockRejectedValue(new ApiError('Não autorizado', 401))
+    await session.initialize()
+
+    await expect(session.logout()).resolves.toBeUndefined()
+
+    expect(session.status).toBe('unauthenticated')
+    expect(session.user).toBeUndefined()
+    session.dispose()
+  })
+
+  it('does not restore a user when initialization finishes after logout', async () => {
+    const session = createSessionService()
+    let resolveGetMe!: (value: {
+      data: { email: string; id: string; name: string }
+    }) => void
+    getMe.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGetMe = resolve
+        })
+    )
+    logout.mockResolvedValue(undefined)
+
+    const initialization = session.initialize()
+    await session.logout()
+    resolveGetMe({
+      data: { email: 'user@example.com', id: 'user-id', name: 'User' },
+    })
+    await initialization
+
+    expect(session.status).toBe('unauthenticated')
+    expect(session.user).toBeUndefined()
     session.dispose()
   })
 })

@@ -38,6 +38,7 @@ function createSession(
     initialize: vi.fn(() =>
       initializeError ? Promise.reject(initializeError) : Promise.resolve()
     ),
+    logout: vi.fn(),
     setNavigateToLogin: vi.fn(),
     status,
     user:
