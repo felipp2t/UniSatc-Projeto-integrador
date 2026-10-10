@@ -164,6 +164,57 @@ describe('auth interceptor contract', () => {
     client.interceptors.response.eject(interceptorId)
   })
 
+  it('does not refresh or expire the session for an incorrect current password response', async () => {
+    const client = axios.create()
+    const onSessionExpired = vi.fn()
+    const refresh = vi.fn().mockResolvedValue(true)
+    const config = {
+      headers: {},
+      method: 'patch',
+      url: '/me/password',
+    } as InternalAxiosRequestConfig
+    const adapter = vi.fn().mockRejectedValue(
+      new axios.AxiosError(
+        'Request failed',
+        'ERR_BAD_REQUEST',
+        config,
+        undefined,
+        {
+          config,
+          data: { message: 'Senha atual incorreta', status: 400 },
+          headers: {},
+          status: 400,
+          statusText: 'Bad Request',
+        }
+      )
+    )
+
+    client.defaults.adapter = adapter
+    client.interceptors.response.use(undefined, (error) =>
+      Promise.reject(toApiError(error))
+    )
+    const interceptorId = installAuthInterceptor(client, {
+      onSessionExpired,
+      refresh,
+    })
+
+    await expect(
+      client.patch('/me/password', {
+        confirmPassword: 'new-password',
+        currentPassword: 'wrong-password',
+        newPassword: 'new-password',
+      })
+    ).rejects.toMatchObject({
+      message: 'Senha atual incorreta',
+      status: 400,
+    })
+
+    expect(adapter).toHaveBeenCalledOnce()
+    expect(refresh).not.toHaveBeenCalled()
+    expect(onSessionExpired).not.toHaveBeenCalled()
+    client.interceptors.response.eject(interceptorId)
+  })
+
   it('notifies expiration and does not loop when the retry is also unauthorized', async () => {
     const client = axios.create()
     const onSessionExpired = vi.fn()
