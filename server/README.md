@@ -1,13 +1,11 @@
 # Vaulty API (Java/Spring Boot)
 
-Port em Java/Spring Boot do backend do [Vaulty](../../vaulty). Sistema sem cadastro público —
-contas só nascem quando alguém já autenticado convida um e-mail; o convite chega por e-mail
-(JavaMail) com um link que libera a tela de cadastro. Senha esquecida também é resolvida por
-e-mail, com um token de redefinição de uso único.
-
-> Hoje qualquer usuário autenticado pode enviar convites. Restringir isso a administradores /
-> usuários de maior autoridade é um trabalho futuro, quando o sistema de papéis e a dashboard
-> existirem.
+Port em Java/Spring Boot do backend do [Vaulty](../../vaulty). Cada instalação representa uma
+única empresa, com um workspace único — sem cadastro público: contas só nascem quando o **dono
+do workspace** convida um e-mail; o convite chega por e-mail (JavaMail) com um link que libera a
+tela de cadastro, e o aceite já vincula a conta ao workspace com o papel `Member` (acesso
+inicial, ainda sem RBAC granular). Senha esquecida também é resolvida por e-mail, com um token
+de redefinição de uso único.
 
 ## Stack
 
@@ -77,7 +75,7 @@ ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|
-| RF01 | POST | `/invites` | Sim | `{ email }` | 201 | 400 e-mail inválido, 401 não autenticado, 409 e-mail já cadastrado |
+| RF01 | POST | `/invites` | Sim, só o dono | `{ email }` | 201 | 400 e-mail inválido, 401 não autenticado, 403 não é o dono, 409 e-mail já cadastrado |
 | RF02 | POST | `/auth/register` | Não | `{ email, token, name, password, confirmPassword }` | 200, seta cookies | 400 senhas não conferem, 404 convite não encontrado, 409 convite expirado ou e-mail já cadastrado |
 | RF03 | POST | `/auth/login` | Não | `{ email, password }` | 200, seta cookies | 401 credenciais inválidas |
 | RF04 | POST | `/auth/refresh` | Cookie `refreshToken` | — | 200, roda os cookies | 401 refresh token inválido/expirado |
@@ -92,12 +90,19 @@ Trocar a senha (RF08) e redefini-la via e-mail (RF07) invalidam todos os refresh
 tokens de redefinição pendentes do usuário, forçando novo login em outras sessões e impedindo o
 reuso de links antigos.
 
-## Workspaces (em andamento)
+## Workspace (em andamento)
+
+Cada instalação representa uma única empresa e tem **exatamente um workspace**, provisionado uma
+vez pela migration `V5__enforce_workspace_singleton.sql`. Em instalações vazias, ela cria o
+workspace e o vínculo `Owner` do admin inicial (seedado em `V2`). Em upgrades, preserva o
+workspace e seu proprietário, garantindo seu papel e vínculo `Owner`. A migration `V6`
+garante o papel `Member` no workspace existente. Não existe criação nem seleção de workspaces
+em tempo de execução — a tabela `workspace` tem uma coluna `singleton` com `CHECK`/`UNIQUE` que torna uma
+segunda linha impossível, inclusive sob concorrência.
 
 | Método | Rota | Auth | Sucesso | Regra de acesso |
 |---|---|---|---|---|
-| POST | `/workspaces` | Sim | 201 com o workspace criado | Cria o workspace, o papel `Owner` e o vínculo do criador. |
-| GET | `/workspaces` | Sim | 200 com a lista | Retorna somente workspaces dos quais o usuário é membro. |
+| GET | `/workspaces` | Sim | 200 com a lista (0 ou 1 item) | Retorna o workspace único, se o usuário for membro. |
 | GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
 | GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
 | PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |

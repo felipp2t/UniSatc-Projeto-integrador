@@ -14,7 +14,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     @Test
     void ownerListsMembersWithUserAndRoleData() throws Exception {
         User owner = createUser("Proprietário");
-        WorkspaceResponse workspace = createWorkspace(owner);
+        WorkspaceResponse workspace = configureWorkspace(owner);
 
         mockMvc.perform(get("/workspaces/{workspaceId}/members", workspace.id()).cookie(authCookie(owner)))
                 .andExpect(status().isOk())
@@ -31,7 +31,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     void nonOwnerMemberCanListWorkspaceMembers() throws Exception {
         User owner = createUser("Proprietário");
         User member = createUser("Membro");
-        WorkspaceResponse workspace = createWorkspace(owner);
+        WorkspaceResponse workspace = configureWorkspace(owner);
         addMember(member, workspace.id());
 
         mockMvc.perform(get("/workspaces/{workspaceId}/members", workspace.id()).cookie(authCookie(member)))
@@ -43,7 +43,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     void userWithoutMembershipCannotListWorkspaceMembers() throws Exception {
         User owner = createUser("Proprietário");
         User unrelatedUser = createUser("Usuário externo");
-        WorkspaceResponse workspace = createWorkspace(owner);
+        WorkspaceResponse workspace = configureWorkspace(owner);
 
         mockMvc.perform(get("/workspaces/{workspaceId}/members", workspace.id())
                         .cookie(authCookie(unrelatedUser)))

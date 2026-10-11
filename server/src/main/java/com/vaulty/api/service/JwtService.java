@@ -29,32 +29,42 @@ public class JwtService {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
     }
 
-    public String generateAccessToken(UUID userId) {
+    // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
+    public String generateAccessToken(UUID userId, String role) {
         Instant now = Instant.now();
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(userId.toString())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)))
-                .signWith(key)
-                .compact();
+                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)));
+
+        if (role != null) {
+            builder.claim("role", role);
+        }
+
+        return builder.signWith(key).compact();
     }
 
     public int getAccessTokenExpirationSeconds() {
         return (int) (accessTokenExpirationMs / 1000);
     }
 
-    // vazio se o token for invalido, malformado ou expirado
-    public Optional<UUID> validateAndGetUserId(String token) {
+    public record AccessTokenClaims(UUID userId, String role) {}
+
+    // Tokens antigos sem role continuam autenticados, mas não recebem authorities.
+    public Optional<AccessTokenClaims> validateAccessToken(String token) {
         try {
-            String subject = Jwts.parser()
+            var claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token)
-                    .getPayload()
-                    .getSubject();
-
-            return Optional.of(UUID.fromString(subject));
+                    .getPayload();
+            String subject = claims.getSubject();
+            String role = claims.get("role", String.class);
+            if (subject == null || (role != null && role.isBlank())) {
+                return Optional.empty();
+            }
+            return Optional.of(new AccessTokenClaims(UUID.fromString(subject), role));
         } catch (JwtException | IllegalArgumentException ex) {
             return Optional.empty();
         }

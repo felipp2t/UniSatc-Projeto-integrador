@@ -1,14 +1,13 @@
 package com.vaulty.api.service;
 
-import com.vaulty.api.dto.workspace.CreateWorkspaceRequest;
 import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceRole;
+import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.mapper.WorkspaceMapper;
-import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
@@ -23,25 +22,34 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WorkspaceService {
 
-    private final UserRepository userRepository;
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceRoleRepository workspaceRoleRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceMapper workspaceMapper;
 
     @Transactional
-    public WorkspaceResponse create(UUID ownerId, CreateWorkspaceRequest request) {
-        User owner = userRepository.findById(ownerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+    public void addAsMember(User user) {
+        Workspace workspace = singleton();
+        WorkspaceRole memberRole = workspaceRoleRepository
+                .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
+                .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
 
-        Workspace workspace = workspaceMapper.toEntity(request);
-        workspace.setOwner(owner);
-        workspaceRepository.saveAndFlush(workspace);
+        workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
+    }
 
-        var ownerRole = workspaceRoleRepository.save(WorkspaceRole.owner(workspace));
-        workspaceMemberRepository.save(workspaceMapper.toMember(owner, workspace, ownerRole));
+    @Transactional(readOnly = true)
+    public void requireOwner(UUID userId) {
+        if (!singleton().getOwner().getId().equals(userId)) {
+            throw new ForbiddenException("Apenas o dono do workspace pode executar esta ação");
+        }
+    }
 
-        return workspaceMapper.toResponse(workspace);
+    // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
+    @Transactional(readOnly = true)
+    public String getRoleName(UUID userId) {
+        return workspaceMemberRepository.findByUserId(userId)
+                .map(member -> member.getRole().getName())
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -68,5 +76,10 @@ public class WorkspaceService {
         workspaceRepository.saveAndFlush(workspace);
 
         return workspaceMapper.toResponse(workspace);
+    }
+
+    private Workspace singleton() {
+        return workspaceRepository.findSingleton()
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
     }
 }

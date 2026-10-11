@@ -1,74 +1,70 @@
 package com.vaulty.api.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.vaulty.api.dto.workspace.CreateWorkspaceRequest;
 import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.Workspace;
-import com.vaulty.api.entity.WorkspaceMember;
-import com.vaulty.api.entity.WorkspaceRole;
-import java.util.UUID;
+import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 
 class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Test
-    void createsWorkspaceOwnerRoleAndOwnerMembership() throws Exception {
+    void rejectsASecondWorkspaceAtTheDatabaseLevel() {
+        User owner = createUser();
+        configureWorkspace(owner);
+
+        Workspace second = new Workspace();
+        second.setOwner(owner);
+        second.setName("Segundo workspace");
+
+        assertThatThrownBy(() -> workspaceRepository.saveAndFlush(second))
+                .isInstanceOfAny(DataIntegrityViolationException.class, PersistenceException.class)
+                .hasMessageContaining("uq_workspace_singleton");
+    }
+
+    @Test
+    void rejectsSingletonFalseEvenAsTheOnlyRow() {
+        User owner = createUser();
+        jdbcTemplate.update("DELETE FROM workspace");
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        """
+                        INSERT INTO workspace (id, owner_id, name, singleton)
+                        VALUES (gen_random_uuid(), ?, 'Workspace', false)
+                        """,
+                        owner.getId()))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_workspace_singleton");
+    }
+
+    @Test
+    void doesNotOfferWorkspaceCreationThroughTheApi() throws Exception {
         User owner = createUser();
 
         mockMvc.perform(post("/workspaces")
                         .cookie(authCookie(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "name": "  Meu Workspace  ",
-                                  "description": "  Documentação da equipe  "
-                                }
+                                { "name": "Workspace" }
                                 """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isString())
-                .andExpect(jsonPath("$.ownerId").value(owner.getId().toString()))
-                .andExpect(jsonPath("$.name").value("Meu Workspace"))
-                .andExpect(jsonPath("$.description").value("Documentação da equipe"))
-                .andExpect(jsonPath("$.createdAt").isNotEmpty());
-
-        Workspace workspace = workspaceRepository.findAll().get(0);
-        WorkspaceRole role = workspaceRoleRepository.findAll().get(0);
-        WorkspaceMember member = workspaceMemberRepository.findAll().get(0);
-
-        assertThat(workspace.getName()).isEqualTo("Meu Workspace");
-        assertThat(workspace.getDescription()).isEqualTo("Documentação da equipe");
-        assertThat(workspace.getOwner().getId()).isEqualTo(owner.getId());
-        assertThat(role.getName()).isEqualTo("Owner");
-        assertThat(role.getWorkspace().getId()).isEqualTo(workspace.getId());
-        assertThat(member.getUser().getId()).isEqualTo(owner.getId());
-        assertThat(member.getWorkspace().getId()).isEqualTo(workspace.getId());
-        assertThat(member.getRole().getId()).isEqualTo(role.getId());
-    }
-
-    @Test
-    void convertsBlankDescriptionToNull() {
-        User owner = createUser();
-
-        workspaceService.create(owner.getId(), new CreateWorkspaceRequest("Workspace", "   "));
-
-        assertThat(workspaceRepository.findAll().get(0).getDescription()).isNull();
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
     void listsOnlyWorkspacesWhereTheAuthenticatedUserIsAMember() throws Exception {
         User owner = createUser();
-        User anotherOwner = createUser();
-        createWorkspace(owner, "Workspace do proprietário");
-        createWorkspace(anotherOwner, "Workspace de outro usuário");
+        configureWorkspace(owner, "Workspace do proprietário");
 
         mockMvc.perform(get("/workspaces").cookie(authCookie(owner)))
                 .andExpect(status().isOk())
@@ -80,7 +76,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     @Test
     void getsWorkspaceWhenTheAuthenticatedUserIsAMember() throws Exception {
         User owner = createUser();
-        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace acessível");
+        WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Workspace acessível");
 
         mockMvc.perform(get("/workspaces/{workspaceId}", createdWorkspace.id()).cookie(authCookie(owner)))
                 .andExpect(status().isOk())
@@ -92,7 +88,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     void doesNotExposeWorkspaceToUsersWhoAreNotMembers() throws Exception {
         User owner = createUser();
         User unrelatedUser = createUser();
-        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace privado");
+        WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Workspace privado");
 
         mockMvc.perform(get("/workspaces/{workspaceId}", createdWorkspace.id()).cookie(authCookie(unrelatedUser)))
                 .andExpect(status().isNotFound());
@@ -102,15 +98,12 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     void updatesOnlyEditableWorkspaceFields() {
         User owner = createUser();
         Workspace workspace = new Workspace();
-        UUID workspaceId = UUID.randomUUID();
-        workspace.setId(workspaceId);
         workspace.setOwner(owner);
         workspace.setName("Nome anterior");
         workspace.setDescription("Descrição anterior");
 
         workspaceMapper.update(new UpdateWorkspaceRequest("Nome atualizado", "Nova descrição"), workspace);
 
-        assertThat(workspace.getId()).isEqualTo(workspaceId);
         assertThat(workspace.getOwner()).isEqualTo(owner);
         assertThat(workspace.getName()).isEqualTo("Nome atualizado");
         assertThat(workspace.getDescription()).isEqualTo("Nova descrição");
@@ -119,7 +112,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     @Test
     void updatesWorkspaceWhenTheAuthenticatedUserIsTheOwner() throws Exception {
         User owner = createUser();
-        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Nome anterior");
+        WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Nome anterior");
 
         mockMvc.perform(put("/workspaces/{workspaceId}", createdWorkspace.id())
                         .cookie(authCookie(owner))
@@ -144,7 +137,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     void doesNotAllowMembersWhoAreNotOwnersToUpdateWorkspace() throws Exception {
         User owner = createUser();
         User member = createUser();
-        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace privado");
+        WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Workspace privado");
         addMember(member, createdWorkspace.id());
 
         mockMvc.perform(put("/workspaces/{workspaceId}", createdWorkspace.id())
@@ -157,44 +150,5 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
 
         Workspace unchangedWorkspace = workspaceRepository.findById(createdWorkspace.id()).orElseThrow();
         assertThat(unchangedWorkspace.getName()).isEqualTo("Workspace privado");
-    }
-
-    @Test
-    void rejectsInvalidNameWithoutPersistingAnything() throws Exception {
-        User owner = createUser();
-
-        mockMvc.perform(post("/workspaces")
-                        .cookie(authCookie(owner))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                { "name": "  a  " }
-                                """))
-                .andExpect(status().isBadRequest());
-
-        assertWorkspaceTablesAreEmpty();
-    }
-
-    @Test
-    void rejectsUnauthenticatedCreation() throws Exception {
-        mockMvc.perform(post("/workspaces")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                { "name": "Workspace" }
-                                """))
-                .andExpect(status().isUnauthorized());
-
-        assertWorkspaceTablesAreEmpty();
-    }
-
-    @Test
-    void participatesInTheCallerTransactionSoTheAggregateRollsBackTogether() {
-        User owner = createUser();
-
-        transactionTemplate.executeWithoutResult(status -> {
-            workspaceService.create(owner.getId(), new CreateWorkspaceRequest("Workspace", null));
-            status.setRollbackOnly();
-        });
-
-        assertWorkspaceTablesAreEmpty();
     }
 }

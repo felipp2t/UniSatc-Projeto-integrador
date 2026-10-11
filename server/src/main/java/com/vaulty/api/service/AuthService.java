@@ -45,6 +45,8 @@ public class AuthService {
 
     private final CredentialService credentialService;
 
+    private final WorkspaceService workspaceService;
+
     private final long refreshTokenExpirationMs;
 
     private final long passwordResetExpirationMs;
@@ -66,6 +68,8 @@ public class AuthService {
 
             CredentialService credentialService,
 
+            WorkspaceService workspaceService,
+
             @Value("${jwt.refresh-token-expiration-ms}")
             long refreshTokenExpirationMs,
 
@@ -79,6 +83,7 @@ public class AuthService {
         this.jwtService = jwtService;
         this.emailOutboxService = emailOutboxService;
         this.credentialService = credentialService;
+        this.workspaceService = workspaceService;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
         this.passwordResetExpirationMs = passwordResetExpirationMs;
     }
@@ -140,6 +145,8 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         userRepository.save(user);
 
+        workspaceService.addAsMember(user);
+
         userInviteRepository.delete(invite);
 
         return issueTokenPair(user.getId());
@@ -187,7 +194,8 @@ public class AuthService {
         refreshToken.setExpiresAt(OffsetDateTime.now().plus(Duration.ofMillis(refreshTokenExpirationMs)));
         refreshTokenRepository.save(refreshToken);
 
-        String accessToken = jwtService.generateAccessToken(userId);
+        String role = workspaceService.getRoleName(userId);
+        String accessToken = jwtService.generateAccessToken(userId, role);
 
         return new TokenPair(accessToken, refreshToken.getToken());
     }

@@ -40,4 +40,7 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, UUID> {
             """)
     Optional<Workspace> findByIdAndOwnerId(
             @Param("workspaceId") UUID workspaceId, @Param("ownerId") UUID ownerId);
+
+    @Query("select workspace from Workspace workspace join fetch workspace.owner")
+    Optional<Workspace> findSingleton();
 }
