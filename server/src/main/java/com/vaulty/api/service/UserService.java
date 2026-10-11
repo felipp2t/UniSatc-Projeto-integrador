@@ -3,7 +3,6 @@ package com.vaulty.api.service;
 import com.vaulty.api.dto.user.ChangePasswordRequest;
 import com.vaulty.api.dto.user.UpdateProfileRequest;
 import com.vaulty.api.entity.User;
-import com.vaulty.api.exception.InvalidCredentialsException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ValidationException;
 import com.vaulty.api.repository.UserRepository;
@@ -53,7 +52,7 @@ public class UserService {
         User user = getMe(userId);
 
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-            throw new InvalidCredentialsException("Senha atual incorreta");
+            throw new ValidationException("Senha atual incorreta");
         }
 
         credentialService.updatePassword(userId, request.newPassword());
