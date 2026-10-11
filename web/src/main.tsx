@@ -7,6 +7,7 @@ import { createSessionService } from './auth/session'
 import './globals.css'
 import { createQueryClient } from './api/query-client'
 import { sanitizeInternalRedirect } from './auth/redirect'
+import { RouteError, RoutePending } from './components/route-error'
 import { routeTree } from './route-tree.gen'
 
 const session = createSessionService()
@@ -18,6 +19,10 @@ const router = createRouter({
     queryClient,
     session,
   },
+  defaultErrorComponent: RouteError,
+  defaultPendingComponent: RoutePending,
+  defaultPendingMinMs: 500,
+  defaultPendingMs: 1000,
   defaultPreload: 'intent',
   defaultPreloadDelay: 500,
   routeTree,
