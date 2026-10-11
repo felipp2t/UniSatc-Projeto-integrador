@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
 import {
   Field,
   FieldContent,
@@ -40,6 +41,8 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LoadingState } from '@/components/ui/loading-state'
+import { OfflineState } from '@/components/ui/offline-state'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
@@ -199,6 +202,15 @@ function ComponentsPage() {
           description='Create your first workspace to get started.'
           title='Nothing here yet'
         />
+        <EmptyState
+          description='A versão compacta cabe em listas e cards.'
+          title='Empty compacto'
+          variant='compact'
+        />
+        <LoadingState />
+        <ErrorState error={new Error('Falha inesperada')} />
+        <ErrorState message='Falha ao salvar.' variant='compact' />
+        <OfflineState />
         <div className='flex flex-wrap items-center gap-3'>
           <Button onClick={showToast} variant='outline'>
             Show toast
