@@ -57,6 +57,7 @@ export function FolderCard({
   const handleDeleteClick = useCallback(() => {
     handleDelete().catch(() => undefined)
   }, [handleDelete])
+  const displayedError = error ?? internalError
   return (
     <div
       className={cn(
@@ -95,6 +96,9 @@ export function FolderCard({
                 permanentemente.
               </DialogDescription>
             </DialogHeader>
+            {displayedError ? (
+              <ErrorState message={displayedError} variant='compact' />
+            ) : null}
             <DialogFooter>
               <Button onClick={closeDialog} type='button' variant='outline'>
                 Cancelar
@@ -110,8 +114,8 @@ export function FolderCard({
           </DialogContent>
         </Dialog>
       ) : null}
-      {(error ?? internalError) ? (
-        <ErrorState message={error ?? internalError} variant='compact' />
+      {displayedError && !open ? (
+        <ErrorState message={displayedError} variant='compact' />
       ) : null}
     </div>
   )

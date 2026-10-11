@@ -10,12 +10,19 @@ import { WorkspaceCard } from './workspace-card'
 
 const rejected = () => Promise.reject(new Error('Falha na operação'))
 
-async function openFolderDeleteDialog(onDelete: () => Promise<void>) {
+async function openFolderDeleteDialog({
+  error,
+  onDelete,
+}: {
+  error?: string
+  onDelete: () => Promise<void>
+}) {
   const user = userEvent.setup({
     pointerEventsCheck: PointerEventsCheckLevel.Never,
   })
   render(
     <FolderCard
+      error={error}
       folderId='folder-1'
       itemCount={0}
       name='Folder'
@@ -47,11 +54,47 @@ describe('card operation errors', () => {
   })
 
   it('shows folder delete errors as alerts', async () => {
-    const { dialog, user } = await openFolderDeleteDialog(rejected)
+    const { dialog, user } = await openFolderDeleteDialog({
+      onDelete: rejected,
+    })
     await user.click(within(dialog).getByRole('button', { name: 'Excluir' }))
-    expect(
-      await screen.findByRole('alert', { hidden: true })
-    ).toHaveTextContent('Falha na operação')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Falha na operação'
+    )
+    expect(screen.getAllByRole('alert', { hidden: true })).toHaveLength(1)
+  })
+
+  it('moves a folder error to the card after cancelling', async () => {
+    const { dialog, user } = await openFolderDeleteDialog({
+      onDelete: rejected,
+    })
+    await user.click(within(dialog).getByRole('button', { name: 'Excluir' }))
+    await within(dialog).findByRole('alert')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Falha na operação'
+    )
+  })
+
+  it('shows prop errors inside the open folder dialog without duplication', async () => {
+    const { dialog } = await openFolderDeleteDialog({
+      error: 'Erro externo',
+      onDelete: vi.fn(),
+    })
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Erro externo'
+    )
+    expect(screen.getAllByRole('alert', { hidden: true })).toHaveLength(1)
+  })
+
+  it('closes the folder dialog after a successful deletion', async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined)
+    const { dialog, user } = await openFolderDeleteDialog({ onDelete })
+    await user.click(within(dialog).getByRole('button', { name: 'Excluir' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(onDelete).toHaveBeenCalledWith('folder-1')
+    expect(screen.queryByRole('alert', { hidden: true })).toBeNull()
   })
 
   it('shows item delete errors as alerts', async () => {
