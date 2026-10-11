@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { ErrorState } from '@/components/ui/error-state'
 import {
   Field,
   FieldError,
@@ -110,7 +111,7 @@ export function FolderCard({
         </Dialog>
       ) : null}
       {(error ?? internalError) ? (
-        <p className='text-destructive text-xs'>{error ?? internalError}</p>
+        <ErrorState message={error ?? internalError} variant='compact' />
       ) : null}
     </div>
   )
