@@ -64,7 +64,7 @@ class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
         createRefreshToken(user, "active-refresh-token", OffsetDateTime.now().plusHours(1));
 
         mockMvc.perform(patch("/me/password")
-                        .cookie(new Cookie("accessToken", jwtService.generateAccessToken(user.getId())))
+                        .cookie(new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), null)))
                         .contentType("application/json")
                         .content("""
                                 {"currentPassword":"wrong-password","newPassword":"new-password","confirmPassword":"new-password"}
