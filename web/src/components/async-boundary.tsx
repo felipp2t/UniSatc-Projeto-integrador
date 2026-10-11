@@ -1,4 +1,4 @@
-import type { QueryObserverResult, UseQueryResult } from '@tanstack/react-query'
+import type { UseQueryResult } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { EmptyState } from './ui/empty-state'
 import { ErrorState } from './ui/error-state'
@@ -53,8 +53,3 @@ export function AsyncBoundary<TData, TError = Error>({
     return <ErrorState error={query.error} onRetry={handleRetry} />
   return loading ?? <LoadingState />
 }
-
-export type AsyncBoundaryQuery<TData, TError = Error> = QueryObserverResult<
-  TData,
-  TError
->

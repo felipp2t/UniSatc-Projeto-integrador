@@ -10,7 +10,7 @@ import {
 import type { ReactElement } from 'react'
 import { registerTestQueryClient } from './query-client-registry'
 
-export function createTestQueryClient() {
+function createTestQueryClient() {
   return registerTestQueryClient(
     new QueryClient({
       defaultOptions: {

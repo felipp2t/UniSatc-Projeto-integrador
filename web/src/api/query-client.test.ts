@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { onlineManager, QueryClient } from '@tanstack/react-query'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './errors'
 import { retryQuery } from './query-client'
+
+afterEach(() => onlineManager.setOnline(true))
 
 describe('retryQuery', () => {
   it('retries network errors and server errors at most twice', () => {
@@ -28,5 +31,23 @@ describe('retryQuery', () => {
       )
     ).toBe(false)
     expect(retryQuery(0, new Error('bug'))).toBe(false)
+  })
+
+  it('runs mutations immediately while offline and rejects through mutateAsync', async () => {
+    onlineManager.setOnline(false)
+    const mutationFn = vi.fn().mockRejectedValue(new Error('offline'))
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { networkMode: 'always', retry: false } },
+    })
+    const mutation = queryClient.getMutationCache().build(queryClient, {
+      mutationFn,
+      networkMode: 'always',
+      retry: false,
+    })
+
+    await expect(mutation.execute(undefined)).rejects.toThrow('offline')
+    expect(mutationFn).toHaveBeenCalledTimes(1)
+    expect(mutation.state.isPaused).toBe(false)
+    queryClient.clear()
   })
 })

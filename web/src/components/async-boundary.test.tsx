@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
 import { AsyncBoundary } from './async-boundary'
 import { ErrorState } from './ui/error-state'
+import { LoadingState } from './ui/loading-state'
+import { OfflineState } from './ui/offline-state'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -43,7 +45,7 @@ describe('AsyncBoundary', () => {
     renderWithProviders(<QueryView queryFn={itemQuery} />, {
       queryClient,
     })
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await screen.findByRole('status')).toHaveTextContent(
       'Você está offline'
     )
   })
@@ -74,16 +76,21 @@ describe('AsyncBoundary', () => {
     expect(queryFn).toHaveBeenCalledTimes(2)
   })
 
-  it('renders classified error messages and accessible loading state', () => {
-    render(
-      <>
-        <ErrorState error={{}} />
-        <div>
-          <span aria-busy='true'>Loading</span>
-        </div>
-      </>
+  it('renders the real loading state accessibly', () => {
+    render(<LoadingState />)
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByText('Carregando...')).toBeInTheDocument()
+  })
+
+  it('renders the offline state accessibly', () => {
+    render(<OfflineState />)
+    expect(screen.getByRole('status')).toHaveTextContent('Você está offline')
+  })
+
+  it('renders classified error messages', () => {
+    render(<ErrorState error={new Error('Falha inesperada')} />)
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Não foi possível concluir a operação.'
     )
-    expect(screen.getByRole('alert')).toBeInTheDocument()
-    expect(screen.getByText('Loading')).toHaveAttribute('aria-busy', 'true')
   })
 })

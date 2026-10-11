@@ -7,11 +7,13 @@ import { createSessionService } from './auth/session'
 import './globals.css'
 import { createQueryClient } from './api/query-client'
 import { sanitizeInternalRedirect } from './auth/redirect'
-import { RouteError, RoutePending } from './components/route-error'
+import { syncOnlineStatus } from './hooks/use-online-status'
 import { routeTree } from './route-tree.gen'
+import { routerDefaults } from './router-defaults'
 
 const session = createSessionService()
 const queryClient = createQueryClient()
+syncOnlineStatus()
 
 const router = createRouter({
   context: {
@@ -19,10 +21,7 @@ const router = createRouter({
     queryClient,
     session,
   },
-  defaultErrorComponent: RouteError,
-  defaultPendingComponent: RoutePending,
-  defaultPendingMinMs: 500,
-  defaultPendingMs: 1000,
+  ...routerDefaults,
   defaultPreload: 'intent',
   defaultPreloadDelay: 500,
   routeTree,

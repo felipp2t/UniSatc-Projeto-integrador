@@ -7,3 +7,9 @@ const getSnapshot = () => onlineManager.isOnline() ?? true
 export function useOnlineStatus() {
   return useSyncExternalStore(subscribe, getSnapshot, () => true)
 }
+
+export function syncOnlineStatus() {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    onlineManager.setOnline(false)
+  }
+}

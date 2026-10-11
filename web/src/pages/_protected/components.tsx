@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
+import { ApiError } from '@/api/errors'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { NotFoundPage } from '@/components/not-found-page'
 import { Badge } from '@/components/ui/badge'
@@ -209,6 +210,15 @@ function ComponentsPage() {
         />
         <LoadingState />
         <ErrorState error={new Error('Falha inesperada')} />
+        <ErrorState
+          error={
+            new ApiError('offline', undefined, undefined, undefined, {
+              networkError: true,
+            })
+          }
+        />
+        <ErrorState error={new ApiError('Não encontrado', 404)} />
+        <ErrorState error={new ApiError('Servidor indisponível', 503)} />
         <ErrorState message='Falha ao salvar.' variant='compact' />
         <OfflineState />
         <div className='flex flex-wrap items-center gap-3'>

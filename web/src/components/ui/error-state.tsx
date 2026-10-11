@@ -15,6 +15,9 @@ function getErrorMessage(error: unknown) {
   if (apiError.isNotFound) return 'O conteúdo solicitado não foi encontrado.'
   if (apiError.isServerError) return 'O servidor está indisponível no momento.'
   if (apiError.isUnauthorized) return 'Sua sessão não está autorizada.'
+  if (apiError.status === undefined) {
+    return 'Não foi possível concluir a operação.'
+  }
   return apiError.message || 'Não foi possível concluir a operação.'
 }
 
@@ -24,6 +27,10 @@ export function ErrorState({
   onRetry,
   variant = 'page',
 }: ErrorStateProps) {
+  const apiError = toApiError(error)
+  const isUnknownError =
+    !message && apiError.status === undefined && !apiError.isNetworkError
+
   const handleRetry = useCallback(() => {
     if (onRetry) {
       Promise.resolve(onRetry()).catch(() => undefined)
@@ -43,6 +50,12 @@ export function ErrorState({
       <p className='text-destructive text-sm'>
         {message ?? getErrorMessage(error)}
       </p>
+      {isUnknownError && import.meta.env.DEV ? (
+        <details className='text-muted-foreground text-xs'>
+          <summary>Detalhes técnicos</summary>
+          <small>{apiError.message}</small>
+        </details>
+      ) : null}
       {onRetry ? (
         <Button onClick={handleRetry} size='sm' variant='outline'>
           Tentar novamente
