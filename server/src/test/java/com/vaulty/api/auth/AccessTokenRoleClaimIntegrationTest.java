@@ -10,16 +10,18 @@ import com.vaulty.api.entity.UserInvite;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
+import com.vaulty.api.repository.WorkspaceMemberRepository;
+import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
 
 @AutoConfigureMockMvc
 class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
@@ -31,12 +33,8 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
     @Autowired private UserRepository userRepository;
     @Autowired private UserInviteRepository userInviteRepository;
     @Autowired private JwtService jwtService;
-
-    @AfterEach
-    void cleanUp() {
-        userInviteRepository.deleteAll();
-        userRepository.deleteAllByEmailNot(ADMIN_EMAIL);
-    }
+    @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
+    @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
 
     @Test
     void loginAsOwnerEmbedsTheOwnerRoleInTheAccessToken() throws Exception {
@@ -50,7 +48,8 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
 
         String accessToken = result.getResponse().getCookie("accessToken").getValue();
 
-        assertThat(jwtService.extractRole(accessToken)).contains(WorkspaceRole.OWNER_ROLE_NAME);
+        assertThat(jwtService.validateAccessToken(accessToken).map(JwtService.AccessTokenClaims::role))
+                .contains(WorkspaceRole.OWNER_ROLE_NAME);
     }
 
     @Test
@@ -73,7 +72,32 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
 
         String accessToken = result.getResponse().getCookie("accessToken").getValue();
 
-        assertThat(jwtService.extractRole(accessToken)).contains(WorkspaceRole.MEMBER_ROLE_NAME);
+        assertThat(jwtService.validateAccessToken(accessToken).map(JwtService.AccessTokenClaims::role))
+                .contains(WorkspaceRole.MEMBER_ROLE_NAME);
+    }
+
+    @Test
+    @Transactional
+    void refreshRecalculatesTheRoleFromTheCurrentMembership() throws Exception {
+        MvcResult login = mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "password": "%s" }
+                                """.formatted(ADMIN_EMAIL, ADMIN_PASSWORD)))
+                .andExpect(status().isOk()).andReturn();
+        User owner = userRepository.findByEmail(ADMIN_EMAIL).orElseThrow();
+        var membership = workspaceMemberRepository.findByUserId(owner.getId()).orElseThrow();
+        var memberRole = workspaceRoleRepository.findByWorkspaceIdAndName(
+                membership.getWorkspace().getId(), WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
+        membership.setRole(memberRole);
+        workspaceMemberRepository.saveAndFlush(membership);
+
+        MvcResult refresh = mockMvc.perform(post("/auth/refresh")
+                        .cookie(login.getResponse().getCookie("refreshToken")))
+                .andExpect(status().isOk()).andReturn();
+        String accessToken = refresh.getResponse().getCookie("accessToken").getValue();
+        assertThat(jwtService.validateAccessToken(accessToken).map(JwtService.AccessTokenClaims::role))
+                .contains(WorkspaceRole.MEMBER_ROLE_NAME);
     }
 
     private UserInvite createInvite(String email) {

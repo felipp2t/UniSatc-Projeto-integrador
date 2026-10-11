@@ -31,6 +31,8 @@ Convenções gerais:
   calculada a cada emissão/renovação de token (login, registro, refresh), nunca lida do banco a
   cada requisição. `JwtAuthenticationFilter` expõe isso como uma `GrantedAuthority` do Spring
   Security, pronta para checagens futuras (`hasAuthority(...)`) quando RBAC granular existir.
+  Identidade e papel são extraídos de uma única validação do JWT. Tokens antigos sem `role`
+  continuam autenticados, mas não recebem authorities.
 
 ---
 

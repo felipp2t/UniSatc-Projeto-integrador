@@ -36,7 +36,7 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void returnsDocumentedJsonForExpiredToken() throws Exception {
-        String expiredToken = jwtService.generateAccessToken(UUID.randomUUID());
+        String expiredToken = jwtService.generateAccessToken(UUID.randomUUID(), null);
         assertUnauthorized(mockMvc.perform(get("/me").cookie(new Cookie("accessToken", expiredToken))));
     }
 

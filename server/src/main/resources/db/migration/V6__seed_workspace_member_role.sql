@@ -1,2 +1,3 @@
 INSERT INTO workspace_role (id, workspace_id, name)
-VALUES ('44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'Member');
+SELECT gen_random_uuid(), id, 'Member' FROM workspace
+ON CONFLICT (workspace_id, name) DO NOTHING;

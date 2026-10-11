@@ -10,15 +10,15 @@ ALTER TABLE workspace ADD CONSTRAINT ck_workspace_singleton CHECK (singleton = T
 ALTER TABLE workspace ADD CONSTRAINT uq_workspace_singleton UNIQUE (singleton);
 
 INSERT INTO workspace (id, owner_id, name)
-VALUES ('11111111-1111-1111-1111-111111111111', 'afd23ecc-4abb-4e2b-b985-3aaa8637a839', 'Vaulty');
+SELECT gen_random_uuid(), 'afd23ecc-4abb-4e2b-b985-3aaa8637a839', 'Vaulty'
+WHERE NOT EXISTS (SELECT 1 FROM workspace);
 
 INSERT INTO workspace_role (id, workspace_id, name)
-VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Owner');
+SELECT gen_random_uuid(), id, 'Owner' FROM workspace
+ON CONFLICT (workspace_id, name) DO NOTHING;
 
 INSERT INTO workspace_member (id, user_id, workspace_id, role_id)
-VALUES (
-    '33333333-3333-3333-3333-333333333333',
-    'afd23ecc-4abb-4e2b-b985-3aaa8637a839',
-    '11111111-1111-1111-1111-111111111111',
-    '22222222-2222-2222-2222-222222222222'
-);
+SELECT gen_random_uuid(), workspace.owner_id, workspace.id, role.id
+FROM workspace
+JOIN workspace_role role ON role.workspace_id = workspace.id AND role.name = 'Owner'
+ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = EXCLUDED.role_id;

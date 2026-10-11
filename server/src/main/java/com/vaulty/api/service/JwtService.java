@@ -29,11 +29,7 @@ public class JwtService {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
     }
 
-    public String generateAccessToken(UUID userId) {
-        return generateAccessToken(userId, null);
-    }
-
-    // role fica nula pra quem ainda nao tem papel no workspace (nao deveria acontecer em uso normal)
+    // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
     public String generateAccessToken(UUID userId, String role) {
         Instant now = Instant.now();
 
@@ -53,33 +49,22 @@ public class JwtService {
         return (int) (accessTokenExpirationMs / 1000);
     }
 
-    // vazio se o token for invalido, malformado ou expirado
-    public Optional<UUID> validateAndGetUserId(String token) {
+    public record AccessTokenClaims(UUID userId, String role) {}
+
+    // Tokens antigos sem role continuam autenticados, mas não recebem authorities.
+    public Optional<AccessTokenClaims> validateAccessToken(String token) {
         try {
-            String subject = Jwts.parser()
+            var claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token)
-                    .getPayload()
-                    .getSubject();
-
-            return Optional.of(UUID.fromString(subject));
-        } catch (JwtException | IllegalArgumentException ex) {
-            return Optional.empty();
-        }
-    }
-
-    // vazio se o token for invalido ou nao tiver a claim role
-    public Optional<String> extractRole(String token) {
-        try {
-            String role = Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload()
-                    .get("role", String.class);
-
-            return Optional.ofNullable(role);
+                    .getPayload();
+            String subject = claims.getSubject();
+            String role = claims.get("role", String.class);
+            if (subject == null || (role != null && role.isBlank())) {
+                return Optional.empty();
+            }
+            return Optional.of(new AccessTokenClaims(UUID.fromString(subject), role));
         } catch (JwtException | IllegalArgumentException ex) {
             return Optional.empty();
         }

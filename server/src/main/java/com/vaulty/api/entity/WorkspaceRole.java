@@ -47,18 +47,4 @@ public class WorkspaceRole {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
-
-    public static WorkspaceRole owner(Workspace workspace) {
-        WorkspaceRole role = new WorkspaceRole();
-        role.setWorkspace(workspace);
-        role.setName(OWNER_ROLE_NAME);
-        return role;
-    }
-
-    public static WorkspaceRole member(Workspace workspace) {
-        WorkspaceRole role = new WorkspaceRole();
-        role.setWorkspace(workspace);
-        role.setName(MEMBER_ROLE_NAME);
-        return role;
-    }
 }

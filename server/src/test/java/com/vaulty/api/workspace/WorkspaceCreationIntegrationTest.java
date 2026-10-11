@@ -22,19 +22,21 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     @Test
     void rejectsASecondWorkspaceAtTheDatabaseLevel() {
         User owner = createUser();
-        createWorkspace(owner);
+        configureWorkspace(owner);
 
         Workspace second = new Workspace();
         second.setOwner(owner);
         second.setName("Segundo workspace");
 
         assertThatThrownBy(() -> workspaceRepository.saveAndFlush(second))
-                .isInstanceOfAny(DataIntegrityViolationException.class, PersistenceException.class);
+                .isInstanceOfAny(DataIntegrityViolationException.class, PersistenceException.class)
+                .hasMessageContaining("uq_workspace_singleton");
     }
 
     @Test
     void rejectsSingletonFalseEvenAsTheOnlyRow() {
         User owner = createUser();
+        jdbcTemplate.update("DELETE FROM workspace");
 
         assertThatThrownBy(() -> jdbcTemplate.update(
                         """
@@ -42,7 +44,8 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
                         VALUES (gen_random_uuid(), ?, 'Workspace', false)
                         """,
                         owner.getId()))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_workspace_singleton");
     }
 
     @Test
@@ -61,7 +64,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     @Test
     void listsOnlyWorkspacesWhereTheAuthenticatedUserIsAMember() throws Exception {
         User owner = createUser();
-        createWorkspace(owner, "Workspace do proprietário");
+        configureWorkspace(owner, "Workspace do proprietário");
 
         mockMvc.perform(get("/workspaces").cookie(authCookie(owner)))
                 .andExpect(status().isOk())
@@ -73,7 +76,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     @Test
     void getsWorkspaceWhenTheAuthenticatedUserIsAMember() throws Exception {
         User owner = createUser();
-        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace acessível");
+        WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Workspace acessível");
 
         mockMvc.perform(get("/workspaces/{workspaceId}", createdWorkspace.id()).cookie(authCookie(owner)))
                 .andExpect(status().isOk())
@@ -85,7 +88,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     void doesNotExposeWorkspaceToUsersWhoAreNotMembers() throws Exception {
         User owner = createUser();
         User unrelatedUser = createUser();
-        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace privado");
+        WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Workspace privado");
 
         mockMvc.perform(get("/workspaces/{workspaceId}", createdWorkspace.id()).cookie(authCookie(unrelatedUser)))
                 .andExpect(status().isNotFound());
@@ -109,7 +112,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     @Test
     void updatesWorkspaceWhenTheAuthenticatedUserIsTheOwner() throws Exception {
         User owner = createUser();
-        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Nome anterior");
+        WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Nome anterior");
 
         mockMvc.perform(put("/workspaces/{workspaceId}", createdWorkspace.id())
                         .cookie(authCookie(owner))
@@ -134,7 +137,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     void doesNotAllowMembersWhoAreNotOwnersToUpdateWorkspace() throws Exception {
         User owner = createUser();
         User member = createUser();
-        WorkspaceResponse createdWorkspace = createWorkspace(owner, "Workspace privado");
+        WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Workspace privado");
         addMember(member, createdWorkspace.id());
 
         mockMvc.perform(put("/workspaces/{workspaceId}", createdWorkspace.id())

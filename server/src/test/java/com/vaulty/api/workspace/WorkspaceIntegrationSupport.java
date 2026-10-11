@@ -7,10 +7,6 @@ import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.mapper.WorkspaceMapper;
-import com.vaulty.api.repository.EmailOutboxRepository;
-import com.vaulty.api.repository.PasswordResetTokenRepository;
-import com.vaulty.api.repository.RefreshTokenRepository;
-import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
@@ -18,17 +14,14 @@ import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
 import jakarta.servlet.http.Cookie;
 import java.util.UUID;
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 @AutoConfigureMockMvc
+@Transactional
 abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
 
     @Autowired protected MockMvc mockMvc;
@@ -39,27 +32,6 @@ abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
     @Autowired protected WorkspaceMapper workspaceMapper;
     @Autowired protected JwtService jwtService;
     @Autowired protected PasswordEncoder passwordEncoder;
-    @Autowired protected TransactionTemplate transactionTemplate;
-    @Autowired protected JdbcTemplate jdbcTemplate;
-
-    @Autowired private EmailOutboxRepository emailOutboxRepository;
-    @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
-    @Autowired private RefreshTokenRepository refreshTokenRepository;
-    @Autowired private UserInviteRepository userInviteRepository;
-    @Autowired private Flyway flyway;
-
-    @BeforeEach
-    void setUpWorkspaceFixture() {
-        cleanDatabase();
-    }
-
-    // o banco é compartilhado entre as classes de teste: recria o admin e o workspace semeados
-    // pelas migrations, dos quais os demais testes dependem
-    @AfterEach
-    void tearDownWorkspaceFixture() {
-        flyway.clean();
-        flyway.migrate();
-    }
 
     protected User createUser() {
         return createUser("Test User");
@@ -70,20 +42,22 @@ abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
         user.setName(name);
         user.setEmail(UUID.randomUUID() + "@example.com");
         user.setPasswordHash(passwordEncoder.encode("password123"));
-        return userRepository.save(user);
+        return userRepository.saveAndFlush(user);
     }
 
-    protected WorkspaceResponse createWorkspace(User owner) {
-        return createWorkspace(owner, "Workspace");
+    protected WorkspaceResponse configureWorkspace(User owner) {
+        return configureWorkspace(owner, "Workspace");
     }
 
-    protected WorkspaceResponse createWorkspace(User owner, String name) {
-        Workspace workspace = new Workspace();
+    protected WorkspaceResponse configureWorkspace(User owner, String name) {
+        Workspace workspace = workspaceRepository.findSingleton().orElseThrow();
         workspace.setOwner(owner);
         workspace.setName(name);
         workspaceRepository.saveAndFlush(workspace);
+        workspaceMemberRepository.deleteAll();
 
-        WorkspaceRole ownerRole = workspaceRoleRepository.save(WorkspaceRole.owner(workspace));
+        WorkspaceRole ownerRole = workspaceRoleRepository
+                .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.OWNER_ROLE_NAME).orElseThrow();
         workspaceMemberRepository.save(workspaceMapper.toMember(owner, workspace, ownerRole));
 
         return workspaceMapper.toResponse(workspace);
@@ -91,27 +65,16 @@ abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
 
     protected void addMember(User user, UUID workspaceId) {
         Workspace workspace = workspaceRepository.findById(workspaceId).orElseThrow();
-        WorkspaceRole role = workspaceRoleRepository.findAll().stream()
-                .filter(candidate -> candidate.getWorkspace().getId().equals(workspaceId))
-                .findFirst()
-                .orElseThrow();
+        WorkspaceRole role = workspaceRoleRepository
+                .findByWorkspaceIdAndName(workspaceId, WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
 
         WorkspaceMember member = workspaceMapper.toMember(user, workspace, role);
         workspaceMemberRepository.save(member);
     }
 
     protected Cookie authCookie(User user) {
-        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId()));
-    }
-
-    private void cleanDatabase() {
-        workspaceMemberRepository.deleteAll();
-        workspaceRoleRepository.deleteAll();
-        workspaceRepository.deleteAll();
-        emailOutboxRepository.deleteAll();
-        passwordResetTokenRepository.deleteAll();
-        refreshTokenRepository.deleteAll();
-        userInviteRepository.deleteAll();
-        userRepository.deleteAll();
+        String role = workspaceMemberRepository.findByUserId(user.getId())
+                .map(member -> member.getRole().getName()).orElse(null);
+        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), role));
     }
 }

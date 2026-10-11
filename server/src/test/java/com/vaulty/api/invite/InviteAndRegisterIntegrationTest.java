@@ -7,19 +7,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.vaulty.api.PostgresIntegrationTest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
-import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
-import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
+import com.vaulty.api.service.WorkspaceService;
 import jakarta.servlet.http.Cookie;
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -36,16 +34,10 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
     @Autowired private UserRepository userRepository;
     @Autowired private UserInviteRepository userInviteRepository;
     @Autowired private WorkspaceRepository workspaceRepository;
-    @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
+    @Autowired private WorkspaceService workspaceService;
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
     @Autowired private JwtService jwtService;
     @Autowired private PasswordEncoder passwordEncoder;
-
-    @AfterEach
-    void cleanUp() {
-        userInviteRepository.deleteAll();
-        userRepository.deleteAllByEmailNot(ADMIN_EMAIL);
-    }
 
     @Test
     void ownerCanInviteANewEmail() throws Exception {
@@ -111,16 +103,7 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
         user.setPasswordHash(passwordEncoder.encode("password123"));
         userRepository.save(user);
 
-        Workspace workspace = workspaceRepository.findSingleton().orElseThrow();
-        WorkspaceRole memberRole = workspaceRoleRepository
-                .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
-                .orElseThrow();
-
-        WorkspaceMember membership = new WorkspaceMember();
-        membership.setUser(user);
-        membership.setWorkspace(workspace);
-        membership.setRole(memberRole);
-        workspaceMemberRepository.save(membership);
+        workspaceService.addAsMember(user);
 
         return user;
     }
@@ -135,6 +118,7 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
     }
 
     private Cookie authCookie(User user) {
-        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId()));
+        String role = workspaceService.getRoleName(user.getId());
+        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), role));
     }
 }

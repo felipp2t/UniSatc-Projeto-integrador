@@ -12,14 +12,12 @@ import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
 import com.vaulty.api.exception.InvalidCredentialsException;
 import com.vaulty.api.exception.InvalidInviteException;
-import com.vaulty.api.repository.EmailOutboxRepository;
 import com.vaulty.api.repository.PasswordResetTokenRepository;
 import com.vaulty.api.repository.RefreshTokenRepository;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,19 +28,9 @@ class ExpiredAuthDataCleanupIntegrationTest extends PostgresIntegrationTest {
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
     @Autowired private UserInviteRepository userInviteRepository;
-    @Autowired private EmailOutboxRepository emailOutboxRepository;
     @Autowired private ExpiredAuthDataCleanupService cleanupService;
     @Autowired private AuthService authService;
     @Autowired private PasswordEncoder passwordEncoder;
-
-    @BeforeEach
-    void cleanDatabase() {
-        emailOutboxRepository.deleteAll();
-        passwordResetTokenRepository.deleteAll();
-        refreshTokenRepository.deleteAll();
-        userInviteRepository.deleteAll();
-        userRepository.deleteAllByEmailNot("admin@gmail.com");
-    }
 
     @Test
     void rejectionDoesNotPretendToDeleteAndMaintenanceRemovesOnlyExpiredRecords() {

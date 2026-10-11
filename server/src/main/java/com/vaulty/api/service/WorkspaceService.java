@@ -44,7 +44,7 @@ public class WorkspaceService {
         }
     }
 
-    // null se o usuario ainda nao tiver vinculo com o workspace (nao deveria acontecer em uso normal)
+    // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
     @Transactional(readOnly = true)
     public String getRoleName(UUID userId) {
         return workspaceMemberRepository.findByUserId(userId)

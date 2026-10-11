@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -35,10 +34,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             FilterChain filterChain)
             throws ServletException, IOException {
-        Optional<String> token = extractAccessTokenCookie(request);
-
-        token.flatMap(jwtService::validateAndGetUserId)
-                .ifPresent(userId -> authenticate(userId, token.flatMap(jwtService::extractRole).orElse(null)));
+        extractAccessTokenCookie(request)
+                .flatMap(jwtService::validateAccessToken)
+                .ifPresent(this::authenticate);
 
         filterChain.doFilter(request, response);
     }
@@ -54,9 +52,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .findFirst();
     }
 
-    private void authenticate(UUID userId, String role) {
-        List<GrantedAuthority> authorities = role == null ? List.of() : List.of(new SimpleGrantedAuthority(role));
-        var authentication = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+    private void authenticate(JwtService.AccessTokenClaims claims) {
+        List<GrantedAuthority> authorities = claims.role() == null
+                ? List.of()
+                : List.of(new SimpleGrantedAuthority(claims.role()));
+        var authentication = new UsernamePasswordAuthenticationToken(claims.userId(), null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

@@ -93,9 +93,11 @@ reuso de links antigos.
 ## Workspace (em andamento)
 
 Cada instalação representa uma única empresa e tem **exatamente um workspace**, provisionado uma
-vez pela migration `V5__enforce_workspace_singleton.sql` junto com o papel `Owner` e o vínculo do
-admin inicial (seedado em `V2`). Não existe criação nem seleção de workspaces em tempo de
-execução — a tabela `workspace` tem uma coluna `singleton` com `CHECK`/`UNIQUE` que torna uma
+vez pela migration `V5__enforce_workspace_singleton.sql`. Em instalações vazias, ela cria o
+workspace e o vínculo `Owner` do admin inicial (seedado em `V2`). Em upgrades, preserva o
+workspace e seu proprietário, garantindo seu papel e vínculo `Owner`. A migration `V6`
+garante o papel `Member` no workspace existente. Não existe criação nem seleção de workspaces
+em tempo de execução — a tabela `workspace` tem uma coluna `singleton` com `CHECK`/`UNIQUE` que torna uma
 segunda linha impossível, inclusive sob concorrência.
 
 | Método | Rota | Auth | Sucesso | Regra de acesso |
