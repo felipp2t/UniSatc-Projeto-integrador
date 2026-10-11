@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
+import { createQueryClient } from '@/api/query-client'
 import {
   enforceRoutePermission,
   type PermissionChecker,
@@ -58,6 +59,7 @@ function createApplicationRouter(
   const router = createRouter({
     context: {
       permissionChecker: { can: () => true },
+      queryClient: createQueryClient(),
       session,
     },
     history,
@@ -202,6 +204,7 @@ function createPermissionRouter(checker: PermissionChecker) {
   const router = createRouter({
     context: {
       permissionChecker: checker,
+      queryClient: createQueryClient(),
       session: createSession('authenticated'),
     },
     history: createMemoryHistory({ initialEntries: ['/restricted'] }),

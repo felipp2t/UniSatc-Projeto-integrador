@@ -10,22 +10,32 @@ export interface ApiErrorBody {
   [key: string]: unknown
 }
 
+export interface ApiErrorOptions {
+  canceled?: boolean
+  networkError?: boolean
+}
+
 export class ApiError extends Error {
   readonly body: unknown
   readonly config: InternalAxiosRequestConfig | undefined
   readonly status: number | undefined
+  readonly canceled: boolean
+  readonly networkError: boolean
 
   constructor(
     message: string,
     status?: number,
     body?: unknown,
-    config?: InternalAxiosRequestConfig
+    config?: InternalAxiosRequestConfig,
+    options: ApiErrorOptions = {}
   ) {
     super(message)
     this.name = 'ApiError'
     this.body = body
     this.config = config
     this.status = status
+    this.canceled = options.canceled ?? false
+    this.networkError = options.networkError ?? false
   }
 
   get isUnauthorized() {
@@ -34,6 +44,22 @@ export class ApiError extends Error {
 
   get isRateLimited() {
     return this.status === 429
+  }
+
+  get isCanceled() {
+    return this.canceled
+  }
+
+  get isNetworkError() {
+    return this.networkError
+  }
+
+  get isServerError() {
+    return this.status !== undefined && this.status >= 500
+  }
+
+  get isNotFound() {
+    return this.status === 404
   }
 }
 
@@ -56,13 +82,18 @@ export function toApiError(error: unknown) {
   if (axios.isAxiosError(error)) {
     const body = error.response?.data
     const status = error.response?.status
+    const canceled = axios.isCancel(error) || error.code === 'ERR_CANCELED'
     const fallback = error.message || 'Não foi possível comunicar com a API.'
 
     return new ApiError(
       getErrorMessage(body, fallback),
       status,
       body,
-      error.config
+      error.config,
+      {
+        canceled,
+        networkError: !(canceled || error.response),
+      }
     )
   }
 
