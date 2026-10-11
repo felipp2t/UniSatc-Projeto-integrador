@@ -206,7 +206,7 @@ Permite ao usuário logado trocar a própria senha, exigindo a senha atual como 
 O que a função faz:
 1. Valida que `newPassword == confirmPassword` (senão `400`).
 2. Busca o usuário autenticado (`userId` vem do `accessToken`).
-3. Compara `currentPassword` com o `password_hash` atual via Argon2 (`401` se não bater).
+3. Compara `currentPassword` com o `password_hash` atual via Argon2 (`400` se não bater).
 4. Grava o novo `password_hash` (Argon2).
 5. **Deleta todos os refresh tokens e tokens de redefinição pendentes do usuário** — qualquer
    outra sessão/dispositivo precisa autenticar de novo e links antigos deixam de funcionar. A
@@ -218,8 +218,8 @@ O que a função faz:
 | Auth | Cookie `accessToken` |
 | Request body | `{ "currentPassword": string, "newPassword": string (min 8), "confirmPassword": string (min 8) }` |
 | Sucesso | `204` |
-| `400` | `newPassword` != `confirmPassword`, ou corpo inválido |
-| `401` | não autenticado, ou `currentPassword` incorreta |
+| `400` | senha atual incorreta, `newPassword` != `confirmPassword`, ou corpo inválido |
+| `401` | não autenticado |
 
 ---
 

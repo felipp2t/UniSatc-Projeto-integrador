@@ -2,6 +2,9 @@ package com.vaulty.api.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.vaulty.api.PostgresIntegrationTest;
 import com.vaulty.api.dto.auth.ResetPasswordRequest;
@@ -15,13 +18,18 @@ import com.vaulty.api.repository.PasswordResetTokenRepository;
 import com.vaulty.api.repository.RefreshTokenRepository;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
+import com.vaulty.api.service.JwtService;
+import jakarta.servlet.http.Cookie;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.MockMvc;
 
+@AutoConfigureMockMvc
 class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired private UserRepository userRepository;
@@ -32,6 +40,8 @@ class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
     @Autowired private UserService userService;
     @Autowired private AuthService authService;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JwtService jwtService;
+    @Autowired private MockMvc mockMvc;
 
     @BeforeEach
     void cleanDatabase() {
@@ -59,6 +69,34 @@ class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> authService.resetPassword(
                         new ResetPasswordRequest(reset.getToken(), "another-password", "another-password")))
                 .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    void wrongCurrentPasswordReturnsBadRequestWithoutChangingCredentials() throws Exception {
+        User user = createUser("old-password");
+        createResetToken(user, "pending-reset-token", OffsetDateTime.now().plusHours(1));
+        createRefreshToken(user, "active-refresh-token", OffsetDateTime.now().plusHours(1));
+
+        mockMvc.perform(patch("/me/password")
+                        .cookie(new Cookie("accessToken", jwtService.generateAccessToken(user.getId())))
+                        .contentType("application/json")
+                        .content("""
+                                {"currentPassword":"wrong-password","newPassword":"new-password","confirmPassword":"new-password"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Senha atual incorreta"))
+                .andExpect(jsonPath("$.path").value("/me/password"));
+
+        String passwordHash = userRepository.findById(user.getId()).orElseThrow().getPasswordHash();
+        assertThat(passwordEncoder.matches("old-password", passwordHash)).isTrue();
+        assertThat(passwordEncoder.matches("new-password", passwordHash)).isFalse();
+        assertThat(refreshTokenRepository.findAll())
+                .extracting(RefreshToken::getToken)
+                .containsExactly("active-refresh-token");
+        assertThat(passwordResetTokenRepository.findAll())
+                .extracting(PasswordResetToken::getToken)
+                .containsExactly("pending-reset-token");
     }
 
     @Test

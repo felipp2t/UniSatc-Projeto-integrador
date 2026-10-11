@@ -23,6 +23,10 @@ public interface UserControllerDocs {
     ResponseEntity<Void> updateProfile(@Parameter(hidden = true) UUID userId, UpdateProfileRequest request);
 
     @Operation(summary = "Altera a senha do usuário autenticado")
-    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "400"), @ApiResponse(responseCode = "401")})
+    @ApiResponses({
+        @ApiResponse(responseCode = "204"),
+        @ApiResponse(responseCode = "400", description = "Senha atual incorreta ou corpo inválido"),
+        @ApiResponse(responseCode = "401", description = "Não autenticado")
+    })
     ResponseEntity<Void> changePassword(@Parameter(hidden = true) UUID userId, ChangePasswordRequest request);
 }
