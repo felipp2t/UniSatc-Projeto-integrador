@@ -18,6 +18,7 @@ import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
 import jakarta.servlet.http.Cookie;
 import java.util.UUID;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,15 +46,19 @@ abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private UserInviteRepository userInviteRepository;
+    @Autowired private Flyway flyway;
 
     @BeforeEach
     void setUpWorkspaceFixture() {
         cleanDatabase();
     }
 
+    // o banco é compartilhado entre as classes de teste: recria o admin e o workspace semeados
+    // pelas migrations, dos quais os demais testes dependem
     @AfterEach
     void tearDownWorkspaceFixture() {
-        cleanDatabase();
+        flyway.clean();
+        flyway.migrate();
     }
 
     protected User createUser() {
