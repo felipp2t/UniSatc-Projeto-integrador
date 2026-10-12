@@ -11,15 +11,27 @@ import {
 } from '@tanstack/react-router'
 import { render, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
 import type { SessionService } from '@/auth/session'
 import type { RouterContext } from '@/router-context'
 import { routerDefaults } from '@/router-defaults'
 import '@/test/dom-setup'
 
+const routeMatchWarningPattern = /Error in route match/
+
 afterEach(() => vi.restoreAllMocks())
 afterEach(() => vi.unstubAllEnvs())
+
+beforeEach(() => {
+  const originalWarn = console.warn
+
+  vi.spyOn(console, 'warn').mockImplementation((...args) => {
+    if (routeMatchWarningPattern.test(String(args[0]))) return
+
+    originalWarn(...args)
+  })
+})
 
 function createSession(initialize: () => Promise<void>): SessionService {
   return {
@@ -77,13 +89,21 @@ function createTestRouter(child: () => ReactElement, session: SessionService) {
 }
 
 async function renderRouter(router: ReturnType<typeof createTestRouter>) {
+  const caughtErrors: unknown[] = []
+
   router.updateLatestLocation()
   try {
     await router.load({ sync: true })
   } catch {
     // RouteError is rendered by RouterProvider after the failed load.
   }
-  return render(<RouterProvider router={router} />)
+  const rendered = render(<RouterProvider router={router} />, {
+    onCaughtError: (error) => {
+      caughtErrors.push(error)
+    },
+  })
+
+  return { caughtErrors, ...rendered }
 }
 
 describe('global route error handling', () => {
@@ -98,7 +118,13 @@ describe('global route error handling', () => {
       createSession(() => Promise.resolve())
     )
 
-    await renderRouter(router)
+    const { caughtErrors } = await renderRouter(router)
+
+    expect(
+      caughtErrors.some(
+        (error) => error instanceof Error && error.message === 'render failure'
+      )
+    ).toBe(true)
 
     expect(await screen.findByText('Header')).toBeInTheDocument()
     expect(
@@ -130,7 +156,10 @@ describe('global route error handling', () => {
     })
     const router = createTestRouter(() => <p>Protected page</p>, session)
 
-    await renderRouter(router)
+    const { caughtErrors } = await renderRouter(router)
+
+    expect(caughtErrors.length).toBeGreaterThan(0)
+    expect(caughtErrors.every((error) => error instanceof ApiError)).toBe(true)
 
     expect(
       await screen.findByText('Não foi possível conectar ao servidor.')
