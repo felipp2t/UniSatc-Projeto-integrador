@@ -2,7 +2,9 @@ package com.vaulty.api.workspace;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -244,6 +246,60 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
                         UUID.randomUUID(), workspaceId, "Engenharia"))
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("uq_collection_workspace_parent_name");
+    }
+
+    @Test
+    void renamesFolderAndRejectsDuplicateName() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID firstId = createFolder(owner, workspaceId, "Primeira", null);
+        createFolder(owner, workspaceId, "Segunda", null);
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, firstId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\" Renomeada \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Renomeada"));
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, firstId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Segunda\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void deletesOnlyEmptyFolders() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID parentId = createFolder(owner, workspaceId, "Pai", null);
+        UUID childId = createFolder(owner, workspaceId, "Filha", parentId);
+
+        mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, parentId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isConflict());
+        mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, childId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, parentId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void memberCannotRenameOrDeleteFolder() throws Exception {
+        User owner = createUser();
+        User member = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(member, workspaceId);
+        UUID folderId = createFolder(owner, workspaceId, "Privada", null);
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, folderId)
+                        .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Alterada\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, folderId)
+                        .cookie(authCookie(member)))
+                .andExpect(status().isForbidden());
     }
 
     private UUID createFolder(User owner, UUID workspaceId, String name, UUID parentId) throws Exception {
