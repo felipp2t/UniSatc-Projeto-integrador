@@ -106,6 +106,11 @@ segunda linha impossível, inclusive sob concorrência.
 | GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
 | GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
 | PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |
+| POST | `/workspaces/{workspaceId}/collections` | Sim | 201 com a pasta criada | Exige membro; somente o proprietário pode criar nesta etapa. Pasta pai deve pertencer ao mesmo workspace. |
+| GET | `/workspaces/{workspaceId}/collections` | Sim | 200 com página de pastas do nível | Exige vínculo de membro; `parentId` omitido lista a raiz. `page` começa em 0 e `size` tem padrão 20 e máximo 100. |
+| GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Sim | 200 com o caminho da raiz à pasta | Exige vínculo de membro; pasta fora do workspace retorna 404. |
+
+Pastas são persistidas na tabela `collection`. A raiz é o workspace e não possui registro: `parent_id = NULL` identifica pastas da raiz. Nomes são únicos dentro do mesmo nível e nomes de pais precisam pertencer ao mesmo workspace.
 
 ## Estrutura do código
 
@@ -114,6 +119,6 @@ Camadas técnicas em `src/main/java/com/vaulty/api`: `controller`, `service`, `r
 `@RestControllerAdvice`).
 
 Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken`,
-`EmailOutbox`, `Workspace`, `WorkspaceRole` e `WorkspaceMember`. Coleções, itens, notificações,
+`EmailOutbox`, `Workspace`, `WorkspaceRole`, `WorkspaceMember` e `WorkspaceCollection`. Itens, notificações,
 histórico de atividades, arquivos, convites para workspaces e RBAC além do papel inicial de
 proprietário ainda não foram implementados.
