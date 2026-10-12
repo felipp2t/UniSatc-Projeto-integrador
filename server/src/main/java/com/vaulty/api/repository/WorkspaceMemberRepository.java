@@ -19,6 +19,16 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
     Optional<WorkspaceMember> findByUserId(@Param("userId") UUID userId);
 
     @Query("""
+            select member from WorkspaceMember member
+            join fetch member.role
+            join fetch member.workspace
+            where member.user.id = :userId
+              and member.workspace.id = :workspaceId
+            """)
+    Optional<WorkspaceMember> findByWorkspaceIdAndUserId(
+            @Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId);
+
+    @Query("""
             select sibling
             from WorkspaceMember membership
             join membership.workspace workspace

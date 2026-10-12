@@ -274,6 +274,68 @@ O que a função faz:
 
 ---
 
+## RF11 — Pastas e navegação
+
+As rotas exigem autenticação pelo cookie `accessToken` e vínculo ao workspace. O papel `Member`
+recebe acesso somente de leitura nesta etapa; a criação é permitida apenas ao proprietário.
+
+### Criar pasta
+
+**`POST /workspaces/{workspaceId}/collections`** — somente o proprietário.
+
+Request:
+```json
+{ "name": "Engenharia", "parentId": null }
+```
+
+`parentId` pode ser omitido ou `null` para criar na raiz. Para subpastas, deve apontar para uma
+pasta do mesmo workspace. O nome é removido de espaços nas extremidades, não pode ficar vazio e
+aceita até 255 caracteres. Uma pasta com o mesmo nome no mesmo nível responde `409`; o nome pode
+se repetir em outros níveis.
+
+Sucesso (`201`):
+```json
+{ "id": "uuid", "name": "Engenharia", "parentId": null }
+```
+
+### Listar pastas
+
+**`GET /workspaces/{workspaceId}/collections?parentId={uuid}&page=0&size=20`** — qualquer membro.
+
+Sem `parentId`, lista as pastas da raiz. Com `parentId`, lista somente filhas diretas da pasta.
+`page` começa em zero (padrão `0`); `size` deve estar entre 1 e 100 (padrão `20`). A ordenação
+é por nome e, em caso de empate, por ID. Uma página além do fim retorna `items` vazio.
+
+Sucesso (`200`):
+```json
+{
+  "items": [{ "id": "uuid", "name": "Engenharia", "parentId": null }],
+  "page": 0,
+  "size": 20,
+  "totalItems": 1,
+  "totalPages": 1
+}
+```
+
+Parâmetros de paginação inválidos respondem `400`. Se a pasta pai não existir no workspace,
+responde `404`.
+
+### Consultar caminho para breadcrumb
+
+**`GET /workspaces/{workspaceId}/collections/{collectionId}/path`** — qualquer membro.
+
+Sucesso (`200`): lista de `{ "id", "name" }` ordenada da raiz até a pasta consultada. A raiz é
+representada pelo workspace, então não aparece como item nessa lista. Pasta inexistente ou fora
+do workspace responde `404`.
+
+| | |
+|---|---|
+| `400` | nome ausente, vazio ou maior que 255 caracteres |
+| `401` | não autenticado |
+| `403` | membro sem permissão para criar (nesta etapa, não é o proprietário) |
+| `404` | workspace sem vínculo, pasta pai ausente ou pasta fora do workspace |
+| `409` | nome já utilizado no mesmo nível |
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
@@ -288,3 +350,6 @@ O que a função faz:
 | RF08 | PATCH | `/me/password` | Cookie `accessToken` |
 | RF09 | PATCH | `/me` | Cookie `accessToken` |
 | RF10 | GET | `/me` | Cookie `accessToken` |
+| RF11 | POST | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
+| RF11 | GET | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
+| RF11 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Cookie `accessToken` |
