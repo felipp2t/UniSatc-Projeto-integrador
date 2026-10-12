@@ -1,0 +1,275 @@
+% Base acadêmica: decisões e fontes em ../ABNT.md.
+% Compilar com LuaLaTeX. Documento em redação, não versão de entrega.
+\documentclass[12pt,oneside,openany,a4paper,english,brazil]{abntex2}
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+}{
+  \setmainfont{TeX Gyre Termes}
+  \PackageWarningNoLine{vaulty}{Times New Roman indisponivel; usando TeX Gyre Termes}
+}
+\usepackage{graphicx}
+\usepackage[a4paper,left=3cm,right=2cm,top=3cm,bottom=2cm,
+  headheight=12pt,headsep=\dimexpr1cm-12pt\relax]{geometry}
+
+% Escolhas do modelo: 12 pontos no texto; 10 nas exceções.
+\renewcommand{\ABNTEXchapterfont}{\normalfont\bfseries}
+\renewcommand{\ABNTEXchapterfontsize}{\normalsize}
+\renewcommand{\ABNTEXsectionfont}{\normalfont\bfseries}
+\renewcommand{\ABNTEXsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXsubsectionfont}{\normalfont\itshape}
+\renewcommand{\ABNTEXsubsectionfontsize}{\normalsize}
+\renewcommand{\ABNTEXfontereduzida}{\fontsize{10}{12}\selectfont}
+\renewcommand{\footnotesize}{\fontsize{10}{12}\selectfont}
+\setlength{\ABNTEXcitacaorecuo}{4cm}
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+\setsecnumdepth{subsubsection}
+\settocdepth{subsubsection}
+\setlength{\beforechapskip}{0pt}
+\setlength{\afterchapskip}{\baselineskip}
+\setbeforesecskip{\baselineskip}
+\setaftersecskip{\baselineskip}
+\setbeforesubsecskip{\baselineskip}
+\setaftersubsecskip{\baselineskip}
+\captionnamefont{\normalfont\normalsize}
+\captiontitlefont{\normalfont\normalsize}
+\captiondelim{ --- }
+\captionstyle{\SingleSpacing\raggedright}
+\setlength{\footmarkwidth}{0.6em}
+\setlength{\footmarksep}{0pt}
+\renewcommand{\footnoterule}{\kern-3pt\hrule width 5cm\kern2.6pt}
+\hypersetup{hidelinks,pdftitle={Vaulty: documentação do projeto integrador}}
+
+% TODO: substituir pelos dados oficiais, sem atribuir autoria não confirmada.
+\autor{[Nome completo do integrante 1]\\
+  [Nome completo do integrante 2]\\
+  [Nome completo do integrante 3]\\
+  [Nome completo do integrante 4]}
+\titulo{VAULTY: CENTRALIZAÇÃO DE INFORMAÇÕES OPERACIONAIS}
+\instituicao{Centro Universitário SATC\\[Nome oficial do curso]}
+\local{[Cidade de apresentação]}
+\data{2026}
+\orientador{[Nome e titulação do orientador]}
+\preambulo{Trabalho de Projeto Integrador apresentado ao
+  [nome oficial do curso] do Centro Universitário SATC, como requisito
+  para [objetivo acadêmico definido pela disciplina].}
+
+\newcommand{\pendente}[1]{\textit{[A preencher: #1.]}}
+\newcommand{\natureza}{%
+  \noindent\hspace*{0.5\textwidth}%
+  \begin{minipage}{0.5\textwidth}
+    \SingleSpacing\imprimirpreambulo
+  \end{minipage}\par}
+\newcommand{\fonte}[1]{\par\begingroup
+  \ABNTEXfontereduzida\SingleSpacing\noindent Fonte: #1\par\endgroup}
+\newcommand{\referencia}[1]{\noindent #1\par\vspace{\baselineskip}}
+
+% Estilo próprio: número no alto à direita também na abertura das seções.
+\makepagestyle{vaulty}
+\makeoddhead{vaulty}{}{}{\ABNTEXfontereduzida\thepage}
+\makeevenhead{vaulty}{}{}{\ABNTEXfontereduzida\thepage}
+\makeoddfoot{vaulty}{}{}{}
+\makeevenfoot{vaulty}{}{}{}
+
+\newif\iffichacatalografica
+\fichacatalograficafalse % Habilitar somente com os dados da biblioteca.
+
+\begin{document}
+\selectlanguage{brazil}
+\frenchspacing
+\OnehalfSpacing
+\pretextual
+
+% Capa fora da contagem; composição em 12 pontos.
+\begin{capa}
+  \centering
+  {\imprimirinstituicao\par}
+  \vspace{2cm}
+  {\imprimirautor\par}
+  \vfill
+  {\bfseries\imprimirtitulo\par}
+  \vfill
+  {\imprimirlocal\par}
+  {\imprimirdata\par}
+\end{capa}
+
+% Folha de rosto: primeira página contada, sem número visível.
+\setcounter{page}{1}
+\begin{titlingpage}
+  \thispagestyle{empty}
+  \begin{center}
+    \imprimirautor\par
+    \vspace{4cm}
+    {\bfseries\imprimirtitulo\par}
+  \end{center}
+  \vspace{2cm}
+  \natureza
+  \vspace{1cm}
+  \noindent\hspace*{0.5\textwidth}%
+  \begin{minipage}{0.5\textwidth}
+    \SingleSpacing Orientador: \imprimirorientador
+  \end{minipage}
+  \vfill
+  \begin{center}\imprimirlocal\par\imprimirdata\end{center}
+\end{titlingpage}
+\setcounter{page}{2}
+
+\iffichacatalografica
+  \thispagestyle{empty}
+  \vspace*{\fill}
+  % TODO: inserir ficha fornecida pela biblioteca, por exemplo como imagem.
+  \pendente{dados internacionais de catalogação fornecidos pela biblioteca}
+  \clearpage
+  \addtocounter{page}{-1} % Página catalográfica não integra a contagem.
+\fi
+
+% Folha de aprovação sem título; não declara aprovação já ocorrida.
+\begin{folhadeaprovacao}
+  \begin{center}
+    \imprimirautor\par
+    \vspace{2cm}
+    {\bfseries\imprimirtitulo\par}
+  \end{center}
+  \vspace{1cm}
+  \natureza
+  \vspace{1cm}
+  \noindent Data de aprovação: \pendente{preencher após aprovação}
+  \vspace{1cm}
+  \assinatura{[Nome, titulação e instituição do examinador 1]}
+  \assinatura{[Nome, titulação e instituição do examinador 2]}
+  \assinatura{[Nome, titulação e instituição do examinador 3]}
+\end{folhadeaprovacao}
+
+\begin{resumo}
+  \noindent\pendente{resumo final em parágrafo único, com objetivo,
+  método, resultados comprovados e conclusão; extensão recomendada
+  de 150 a 500 palavras}
+  \vspace{\baselineskip}
+  \noindent\textbf{Palavras-chave:} engenharia de requisitos;
+  informação operacional; controle de acesso.
+\end{resumo}
+
+\begin{resumo}[Abstract]
+  \begin{otherlanguage*}{english}
+    \noindent\pendente{tradução fiel do resumo final para o inglês}
+    \vspace{\baselineskip}
+    \noindent\textbf{Keywords:} requirements engineering;
+    operational information; access control.
+  \end{otherlanguage*}
+\end{resumo}
+
+% Ativar listas somente quando houver figuras/tabelas reais.
+% \listoffigures*\cleardoublepage
+% \listoftables*\cleardoublepage
+\tableofcontents*\cleardoublepage
+
+\textual
+\pagestyle{vaulty}
+\aliaspagestyle{chapter}{vaulty}
+
+\chapter{INTRODUÇÃO}
+O Vaulty é um sistema proposto para centralizar informações operacionais,
+como chaves de API e documentação, em um ambiente com controle de acesso.
+O problema definido pelo proponente é o tempo gasto procurando essas
+informações em conversas pessoais, além da dificuldade de disponibilizá-las
+a outros desenvolvedores que também necessitam delas.
+
+Este trabalho apresenta a concepção e a organização dos requisitos do
+projeto integrador. A documentação distingue as decisões confirmadas pelo
+proponente, a revisão coletiva ainda pendente e as evidências de implementação
+e verificação. O benefício de reduzir o tempo de procura é esperado e ainda
+precisa de avaliação; não se apresenta como resultado medido.
+
+\section{Objetivo geral}
+Especificar uma solução que permita aos usuários autorizados encontrar e
+consultar informações operacionais cadastradas, sem depender de uma nova
+solicitação pessoal para localizar cada informação.
+
+\section{Objetivos específicos}
+Definir os tipos de conteúdo e seu ciclo de vida; modelar as ações permitidas
+e o acesso aos recursos; estabelecer critérios de aceite e condições de
+verificação; relacionar requisitos às tarefas de desenvolvimento; e registrar
+decisões e mudanças de escopo.
+
+\section{Organização do documento}
+A apresentação adota a estrutura de trabalho acadêmico da Associação
+Brasileira de Normas Técnicas (ABNT), conforme a NBR 14724:2024
+(ABNT, 2024). As seções seguintes tratam da fundamentação, do método,
+dos requisitos, da verificação e das considerações finais.
+
+\chapter{FUNDAMENTAÇÃO TEÓRICA}
+\pendente{conceitos de Engenharia de Requisitos utilizados no projeto,
+com referências bibliográficas efetivamente consultadas}
+
+\chapter{MÉTODO E CONCEPÇÃO}
+\section{Origem e elaboração dos requisitos}
+O projeto teve origem na proposta do proponente. A especificação foi refinada
+por discussão das necessidades, regras de acesso, fluxos de uso e critérios de
+aceite. O registro documental de 12 de outubro de 2026 identifica a versão
+candidata 0.2, confirmada pelo proponente e pendente de revisão dos demais
+integrantes. A validação externa dos requisitos permanece pendente.
+
+\section{Público e escopo}
+O público contempla desenvolvedores e profissionais de infraestrutura.
+A primeira entrega abrange textos, links, segredos e documentos com um
+arquivo por item. A criação de chaves de API permanece no processo externo
+ao produto. Vídeos e plataformas Apple não integram a entrega definida.
+
+\section{Equipe e restrição de prazo}
+A equipe possui quatro integrantes, dois no backend e dois no frontend,
+com disponibilidade concentrada nos finais de semana. O prazo informado
+para apresentação à banca é 27 de novembro de 2026. A estimativa do esforço
+restante e a revisão do compromisso de entrega pelo grupo estão pendentes.
+
+\chapter{ESPECIFICAÇÃO DOS REQUISITOS}
+\section{Organização e rastreabilidade}
+A especificação atual identifica 53 requisitos funcionais (RF), 17 requisitos
+não funcionais (RNF) e critérios de aceite (CA). Os casos de uso (UC)
+descrevem os fluxos consolidados. Os identificadores devem ser preservados
+na transposição para este documento e na ligação com tarefas e testes.
+
+\section{Síntese do acesso ao conteúdo}
+O papel de um membro determina as ações permitidas; grupos e
+compartilhamentos determinam quais conteúdos estão acessíveis. A operação
+exige autorização nos dois aspectos. Pastas permitem acesso habitual por
+grupos, enquanto itens podem conceder acesso individual como exceção.
+Busca, listagem e consulta devem respeitar o acesso efetivo ao conteúdo.
+
+\section{Complementação da especificação}
+\pendente{transpor os requisitos, regras de negócio e critérios de aceite
+de REQUISITOS.md; os cinco casos de uso de CASOS-DE-USO.md;
+o modelo de MODELO-CONCEITUAL.md; e a matriz de RASTREABILIDADE.md}
+
+\chapter{PLANO DE VERIFICAÇÃO E RESULTADOS}
+Os critérios documentados definem o comportamento a verificar. O plano
+de desempenho contempla seis usuários em contextos isolados e 120 buscas;
+a execução e suas evidências ainda precisam ser registradas. A recuperação
+do backup também depende de verificação em ambiente descartável.
+
+\pendente{descrever ambiente real, procedimentos, resultados e limitações
+de cada cenário efetivamente executado, preservando falhas e requisitos
+ainda não atendidos}
+
+\chapter{CONSIDERAÇÕES FINAIS}
+\pendente{avaliar os objetivos à luz das evidências, registrar limitações
+e trabalho futuro; não antecipar conclusões de testes pendentes}
+
+\postextual
+\chapter*{REFERÊNCIAS}
+\addcontentsline{toc}{chapter}{REFERÊNCIAS}
+\begin{SingleSpace}
+  \referencia{ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS.
+    \textbf{ABNT NBR 14724:2024}: informação e documentação:
+    trabalhos acadêmicos: apresentação. Rio de Janeiro: ABNT, 2024.
+    Disponível em:
+    \url{https://funesa.se.gov.br/wp-content/uploads/2025/06/TRABALHOS-ACADEMICOS.pdf}.
+    Acesso em: 12 out. 2026.}
+\end{SingleSpace}
+
+% Apêndices: material produzido pelos autores. Anexos: material de terceiros.
+% Ativar quando existir conteúdo; manter numeração contínua e fontes dos anexos.
+% \begin{apendicesenv}
+%   \chapter{INSTRUMENTOS DE VERIFICAÇÃO}
+% \end{apendicesenv}
+\end{document}

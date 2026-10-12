@@ -1,7 +1,9 @@
-# API — RF01 a RF10 (autenticação, convite e conta do usuário)
+# API — Conta, convites e pastas
 
 Referência detalhada de cada endpoint implementado no backend Java. Para instruções de setup e
 bootstrap do banco, veja [`../README.md`](../README.md).
+
+Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados; decisões novas de grupos, compartilhamento, remoção e readmissão ainda exigem conferência de implementação e não são presumidas como concluídas.
 
 Convenções gerais:
 - Todas as respostas de erro seguem o mesmo formato JSON (`GlobalExceptionHandler`):
@@ -23,7 +25,7 @@ Convenções gerais:
   SMTP é chamado por um worker após o commit. Falhas de envio são tentadas novamente até 5 vezes;
   por isso, a resposta HTTP confirma que o e-mail foi enfileirado, não que já foi entregue.
 - Não existe cadastro público: uma conta só nasce quando o dono do workspace envia um convite
-  (RF01) e o convidado conclui o cadastro com o token recebido por e-mail (RF02), entrando no
+  (RF10) e o convidado conclui o cadastro com o token recebido por e-mail (RF01/RF11), entrando no
   workspace único da empresa com o papel `Member` (acesso inicial, sem RBAC granular ainda).
 - **Início do RNF04** (autorização por permissão no próprio token): o `accessToken` carrega uma
   claim `role` com o nome do papel do usuário no workspace (`Owner` ou `Member`, por enquanto —
@@ -36,7 +38,7 @@ Convenções gerais:
 
 ---
 
-## RF01 — Convite de novo usuário
+## RF10 — Convite de novo usuário
 
 **`POST /invites`** — autenticado (cookie `accessToken`), **somente o dono do workspace**.
 
@@ -65,12 +67,12 @@ O que a função faz, em ordem:
 
 ---
 
-## RF02 — Cadastro via convite
+## RF01/RF11 — Cadastro via convite
 
 **`POST /auth/register`** — sem autenticação.
 
 Completa o cadastro de quem recebeu um convite, usando o `email` + `token` que vieram do link do
-e-mail (RF01).
+e-mail (RF10).
 
 O que a função faz, em ordem:
 1. Valida que `password == confirmPassword` (senão `400`).
@@ -96,7 +98,7 @@ O que a função faz, em ordem:
 
 ---
 
-## RF03 — Login
+## RF02 — Login
 
 **`POST /auth/login`** — sem autenticação.
 
@@ -118,7 +120,7 @@ O que a função faz:
 
 ---
 
-## RF04 — Renovação de sessão (refresh)
+## RF03 — Renovação de sessão (refresh)
 
 **`POST /auth/refresh`** — autenticação via cookie `refreshToken` (não via `accessToken`).
 
@@ -141,7 +143,7 @@ O que a função faz:
 
 ---
 
-## RF05 — Logout
+## RF04 — Logout
 
 **`POST /auth/logout`** — autenticação via cookie `refreshToken`.
 
@@ -161,7 +163,7 @@ O que a função faz:
 
 ---
 
-## RF06 — Esqueci minha senha
+## RF49 — Esqueci minha senha
 
 **`POST /auth/forgot-password`** — sem autenticação.
 
@@ -183,11 +185,11 @@ O que a função faz:
 
 ---
 
-## RF07 — Redefinição de senha
+## RF49 — Redefinição de senha
 
 **`POST /auth/reset-password`** — sem autenticação (o token do e-mail já autoriza a operação).
 
-Define uma nova senha a partir do token recebido por e-mail (RF06).
+Define uma nova senha a partir do token recebido por e-mail (RF49).
 
 O que a função faz:
 1. Valida que `newPassword == confirmPassword` (senão `400`).
@@ -208,7 +210,7 @@ O que a função faz:
 
 ---
 
-## RF08 — Troca de senha
+## RF05 — Troca de senha
 
 **`PATCH /me/password`** — autenticado (cookie `accessToken`).
 
@@ -234,12 +236,12 @@ O que a função faz:
 
 ---
 
-## RF09 — Atualização do perfil
+## RF06 — Atualização do perfil
 
 **`PATCH /me`** — autenticado (cookie `accessToken`).
 
 Atualiza os dados do próprio perfil. Hoje só existe `name` como campo editável — `email` é o
-identificador de login (imutável por aqui) e senha tem endpoint próprio (RF08).
+identificador de login (imutável por aqui) e senha tem endpoint próprio (RF05).
 
 O que a função faz:
 1. Busca o usuário autenticado.
@@ -255,7 +257,7 @@ O que a função faz:
 
 ---
 
-## RF10 — Consulta do perfil autenticado
+## RF07 — Consulta do perfil autenticado
 
 **`GET /me`** — autenticado (cookie `accessToken`).
 
@@ -274,7 +276,7 @@ O que a função faz:
 
 ---
 
-## RF11 — Pastas e navegação
+## RF23, RF26 e RF27 — Pastas e navegação
 
 As rotas exigem autenticação pelo cookie `accessToken` e vínculo ao workspace. O papel `Member`
 recebe acesso somente de leitura nesta etapa; a criação é permitida apenas ao proprietário.
@@ -341,16 +343,16 @@ do workspace responde `404`.
 
 | RF | Método | Rota | Auth |
 |---|---|---|---|
-| RF01 | POST | `/invites` | Cookie `accessToken` |
-| RF02 | POST | `/auth/register` | Não |
-| RF03 | POST | `/auth/login` | Não |
-| RF04 | POST | `/auth/refresh` | Cookie `refreshToken` |
-| RF05 | POST | `/auth/logout` | Cookie `refreshToken` |
-| RF06 | POST | `/auth/forgot-password` | Não |
-| RF07 | POST | `/auth/reset-password` | Não |
-| RF08 | PATCH | `/me/password` | Cookie `accessToken` |
-| RF09 | PATCH | `/me` | Cookie `accessToken` |
-| RF10 | GET | `/me` | Cookie `accessToken` |
-| RF11 | POST | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
-| RF11 | GET | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
-| RF11 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Cookie `accessToken` |
+| RF10 | POST | `/invites` | Cookie `accessToken` |
+| RF01/RF11 | POST | `/auth/register` | Não |
+| RF02 | POST | `/auth/login` | Não |
+| RF03 | POST | `/auth/refresh` | Cookie `refreshToken` |
+| RF04 | POST | `/auth/logout` | Cookie `refreshToken` |
+| RF49 | POST | `/auth/forgot-password` | Não |
+| RF49 | POST | `/auth/reset-password` | Não |
+| RF05 | PATCH | `/me/password` | Cookie `accessToken` |
+| RF06 | PATCH | `/me` | Cookie `accessToken` |
+| RF07 | GET | `/me` | Cookie `accessToken` |
+| RF23 | POST | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
+| RF26 | GET | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
+| RF27 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Cookie `accessToken` |
