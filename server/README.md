@@ -34,6 +34,9 @@ de redefinição de uso único.
    use `DB_USERNAME=vaulty` e `DB_PASSWORD=vaulty`. Gere um valor aleatório de pelo menos 32 bytes
    para `JWT_SECRET`; a aplicação não inicia se essa variável estiver ausente. O `.env` é carregado
    automaticamente pelo Spring Boot, sem precisar exportar as variáveis no terminal.
+   Para criar e consultar segredos, configure `SECRET_ENCRYPTION_KEY` com 32 bytes aleatórios
+   codificados em Base64. Gere-a, por exemplo, com `openssl rand -base64 32` e mantenha a mesma
+   chave entre reinicializações para poder descriptografar os valores já salvos.
 3. Para testar convites e recuperação de senha, configure `MAIL_HOST`, `MAIL_PORT`,
    `MAIL_USERNAME`, `MAIL_PASSWORD` e `MAIL_FROM`. Com Mailtrap Email Sandbox, use o host
    `sandbox.smtp.mailtrap.io`, porta `2525` e as credenciais exibidas na aba SMTP do seu Sandbox.
@@ -109,8 +112,26 @@ segunda linha impossível, inclusive sob concorrência.
 | POST | `/workspaces/{workspaceId}/collections` | Sim | 201 com a pasta criada | Exige membro; somente o proprietário pode criar nesta etapa. Pasta pai deve pertencer ao mesmo workspace. |
 | GET | `/workspaces/{workspaceId}/collections` | Sim | 200 com página de pastas do nível | Exige vínculo de membro; `parentId` omitido lista a raiz. `page` começa em 0 e `size` tem padrão 20 e máximo 100. |
 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Sim | 200 com o caminho da raiz à pasta | Exige vínculo de membro; pasta fora do workspace retorna 404. |
+| PUT | `/workspaces/{workspaceId}/collections/{collectionId}` | Sim | 200 com a pasta renomeada | Exige `collection/update`; título repetido no nível retorna 409. |
+| DELETE | `/workspaces/{workspaceId}/collections/{collectionId}` | Sim | 204 | Exige `collection/delete`; subpasta ou item bloqueia com 409. |
 
 Pastas são persistidas na tabela `collection`. A raiz é o workspace e não possui registro: `parent_id = NULL` identifica pastas da raiz. Nomes são únicos dentro do mesmo nível e nomes de pais precisam pertencer ao mesmo workspace.
+
+## Itens (Entrega 2)
+
+| Método | Rota | Sucesso | Regra |
+|---|---|---|---|
+| POST | `/workspaces/{workspaceId}/items` | 201 | `item/create`; segredos exigem também `secret/create`. |
+| GET | `/workspaces/{workspaceId}/items` | 200 | Lista metadados paginados da raiz ou da pasta indicada por `collectionId`; segredos só aparecem para quem tem `secret/read`. |
+| GET | `/workspaces/{workspaceId}/items/search?q=...` | 200 | Busca paginada por título em todas as pastas, aceita pequenas variações de digitação e ordena por relevância; aplica as mesmas permissões. |
+| GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Retorna texto ou link; segredos retornam apenas metadados. |
+| GET | `/workspaces/{workspaceId}/items/{itemId}/secret` | 200 | Revela o valor somente com `item/read` e `secret/read`. |
+
+Na criação, informe `type` (`text`, `link` ou `secret`), `title`, `collectionId` opcional e
+respectivamente `textContent`, `linkUrl` HTTP(S) ou `value`. As listagens retornam `items`,
+`page`, `size`, `totalItems` e `totalPages`; `page` começa em 0 e `size` vai de 1 a 100.
+O valor de um segredo é criptografado com AES-256-GCM antes da gravação e nunca aparece nas
+respostas de criação, listagem, busca ou consulta comum.
 
 ## Estrutura do código
 
