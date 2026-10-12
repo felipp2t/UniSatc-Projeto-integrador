@@ -4,7 +4,7 @@ Versão de trabalho iniciada em 11/10/2026 e revisada em 12/10/2026 a partir do 
 
 ## Alcance e situação
 
-Este documento consolida os requisitos discutidos até aqui; a revisão do conjunto completo ainda está em andamento. Ele complementa o [levantamento inicial](../Valty_Levantamento_Requisitos_ABNT%202.docx.pdf), o [contexto do domínio](../CONTEXT.md), o [plano de entregas](../PLANO-DE-ENTREGAS.md) e o [ADR do workspace único](./adr/0001-workspace-unico-por-empresa.md).
+Este documento consolida os requisitos discutidos até aqui; a revisão do conjunto completo ainda está em andamento. Ele complementa o levantamento inicial mantido localmente, o [contexto do domínio](../CONTEXT.md), o plano de entregas local e o [ADR do workspace único](./adr/0001-workspace-unico-por-empresa.md).
 
 “Confirmado” significa acordado com o proponente do projeto nesta sessão. Os requisitos são propostas do grupo para o contexto descrito; não foram levantados em entrevistas nem aprovados pela infraestrutura da empresa. O contato com a empresa tratou da assinatura necessária à continuidade do projeto. Esta especificação é uma versão de trabalho e não constitui uma baseline aprovada pela empresa nem evidência de implementação.
 
@@ -758,7 +758,7 @@ A lista única, priorizada e com recomendações aprovadas pelo proponente em 12
 
 A organização aplica as notas do vault da disciplina de Engenharia de Requisitos: aula 02 (níveis de requisitos e critérios de aceite), aula 05 (classificação), aula 07 (especificação), aula 09 (identificação) e aula 10 (rastreabilidade). As siglas e os identificadores são convenções do projeto, não exigências de prefixo do material didático.
 
-- [Levantamento inicial em PDF](../Valty_Levantamento_Requisitos_ABNT%202.docx.pdf).
+- Levantamento inicial em PDF, mantido localmente e fora do repositório.
 - [Issues do projeto](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues), consultadas em 11/10/2026.
 - [Empresa e membros — épico #2](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/2) e [Papéis e permissões — épico #3](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/3), com alinhamentos de 23/09/2026.
 - Cenário de uso e decisões de refinamento fornecidos pelo proponente do projeto nesta sessão, sem validação externa dos requisitos.

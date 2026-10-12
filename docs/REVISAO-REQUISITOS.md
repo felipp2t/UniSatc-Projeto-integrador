@@ -1,6 +1,6 @@
 # Revisão de consistência e lacunas — Vaulty
 
-Revisão de 12/10/2026. Escopo: [especificação](./REQUISITOS.md), [casos de uso](./CASOS-DE-USO.md), [modelo conceitual](./MODELO-CONCEITUAL.md), [contexto](../CONTEXT.md), [plano](../PLANO-DE-ENTREGAS.md), [ADR](./adr/0001-workspace-unico-por-empresa.md), levantamento inicial e referências de IDs da documentação do backend. Não é auditoria de implementação nem comprovação de atendimento aos requisitos.
+Revisão de 12/10/2026. Escopo: [especificação](./REQUISITOS.md), [casos de uso](./CASOS-DE-USO.md), [modelo conceitual](./MODELO-CONCEITUAL.md), [contexto](../CONTEXT.md), plano local de entregas, [ADR](./adr/0001-workspace-unico-por-empresa.md), levantamento inicial e referências de IDs da documentação do backend. Não é auditoria de implementação nem comprovação de atendimento aos requisitos.
 
 **Situação após avaliação em 12/10/2026:** o proponente aceitou todos os itens. L01–L09 são decisões aprovadas e incorporadas aos requisitos; L10–L14 são encaminhamentos autorizados, cuja execução continua pendente onde não houver resultado ou evidência. A aprovação do proponente não substitui a revisão dos demais integrantes nem a validação externa. As colunas abaixo preservam o texto avaliado como registro da proposta aceita.
 
