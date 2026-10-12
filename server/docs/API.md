@@ -16,9 +16,10 @@ Convenções gerais:
 - Os cookies `accessToken` e `refreshToken` são sempre `httpOnly` + `secure` + `sameSite=Strict`
   + `path=/` (RNF01) — nunca aparecem no corpo da resposta.
 - Senhas nunca são retornadas em nenhuma resposta.
-- `POST /auth/login`, `POST /auth/register`, `POST /auth/forgot-password` e
-  `POST /auth/reset-password` (sujeitos a brute-force/spam) têm rate limit de 5 requisições por
-  minuto por IP, via `RateLimitFilter` (janela fixa em memória) — passar do limite responde
+- `POST /auth/login`, `POST /auth/register`, `POST /auth/forgot-password`,
+  `POST /auth/reset-password` e `POST /invites/validate` (sujeitos a brute-force/spam) têm
+  rate limit de 5 requisições por minuto por IP e caminho, via `RateLimitFilter` (janela fixa
+  em memória) — cada caminho tem contador próprio e passar do limite responde
   `429 Too Many Requests`. O registro remove IPs inativos e tem limite rígido de 10.000 entradas;
   ao atingir esse limite, novos IPs recebem `429` até haver espaço, sem reiniciar limites ativos.
 - Convites e recuperações usam uma outbox transacional: token e e-mail são gravados juntos, mas o
@@ -64,6 +65,14 @@ O que a função faz, em ordem:
 | `401` | não autenticado |
 | `403` | autenticado, mas não é o dono do workspace |
 | `409` | já existe uma conta com esse e-mail |
+
+**`POST /invites/validate`** — público, sem autenticação.
+
+Valida o par `email` + `token` antes da tela de cadastro. O corpo contém ambos os campos; eles não são enviados na query string. Para um convite pendente e válido, responde `200` com o e-mail canônico do convite e `remainingSeconds`, calculado pelo servidor. A resposta usa `Cache-Control: no-store`.
+
+Convites inexistentes, expirados, revogados, substituídos ou já utilizados retornam a mesma resposta genérica `404` (“Convite indisponível”), sem revelar o motivo. A validação é apenas informativa: `POST /auth/register` volta a validar o convite dentro da transação que cria conta e vínculo.
+
+O endpoint usa o limite existente de cinco requisições por minuto por IP e caminho, com contador separado de `/auth/register`.
 
 ---
 
@@ -344,6 +353,7 @@ do workspace responde `404`.
 | RF | Método | Rota | Auth |
 |---|---|---|---|
 | RF10 | POST | `/invites` | Cookie `accessToken` |
+| RF11 | POST | `/invites/validate` | Não |
 | RF01/RF11 | POST | `/auth/register` | Não |
 | RF02 | POST | `/auth/login` | Não |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` |

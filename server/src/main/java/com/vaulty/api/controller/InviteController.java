@@ -1,10 +1,13 @@
 package com.vaulty.api.controller;
 
 import com.vaulty.api.controller.docs.InviteControllerDocs;
+import com.vaulty.api.dto.invite.InviteValidationRequest;
+import com.vaulty.api.dto.invite.InviteValidationResponse;
 import com.vaulty.api.dto.invite.InviteUserRequest;
 import com.vaulty.api.service.InviteService;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,5 +35,14 @@ public class InviteController implements InviteControllerDocs {
         inviteService.inviteUser(inviterId, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @PostMapping("/validate")
+    @Override
+    public ResponseEntity<InviteValidationResponse> validate(
+            @Valid @RequestBody InviteValidationRequest request) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(inviteService.validate(request));
     }
 }
