@@ -12,6 +12,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface WorkspaceCollectionRepository extends JpaRepository<WorkspaceCollection, UUID> {
 
+    boolean existsByParentIdAndWorkspaceId(UUID parentId, UUID workspaceId);
+
     Page<WorkspaceCollection> findAllByWorkspaceIdAndParentIsNull(UUID workspaceId, Pageable pageable);
 
     Page<WorkspaceCollection> findAllByWorkspaceIdAndParentId(UUID workspaceId, UUID parentId, Pageable pageable);

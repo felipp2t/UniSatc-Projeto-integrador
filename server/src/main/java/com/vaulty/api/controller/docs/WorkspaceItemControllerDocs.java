@@ -1,0 +1,48 @@
+package com.vaulty.api.controller.docs;
+
+import com.vaulty.api.dto.item.CreateItemRequest;
+import com.vaulty.api.dto.item.ItemPageResponse;
+import com.vaulty.api.dto.item.ItemResponse;
+import com.vaulty.api.dto.item.SecretValueResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
+import org.springframework.http.ResponseEntity;
+
+@Tag(name = "Items")
+public interface WorkspaceItemControllerDocs {
+
+    @Operation(summary = "Cria um item de texto, link ou segredo")
+    @ApiResponses({@ApiResponse(responseCode = "201"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
+        @ApiResponse(responseCode = "409")})
+    ResponseEntity<ItemResponse> create(@Parameter(hidden = true) UUID userId,
+                                        UUID workspaceId, CreateItemRequest request);
+
+    @Operation(summary = "Lista os itens ativos da raiz ou de uma pasta")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
+    ResponseEntity<ItemPageResponse> list(@Parameter(hidden = true) UUID userId,
+                                          UUID workspaceId, UUID collectionId, int page, int size);
+
+    @Operation(summary = "Busca itens ativos pelo título, com tolerância a erros de digitação e relevância")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
+    ResponseEntity<ItemPageResponse> search(@Parameter(hidden = true) UUID userId,
+                                            UUID workspaceId, String q, int page, int size);
+
+    @Operation(summary = "Consulta um item de texto, link ou metadados de segredo")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404")})
+    ResponseEntity<ItemResponse> get(@Parameter(hidden = true) UUID userId,
+                                     UUID workspaceId, UUID itemId);
+
+    @Operation(summary = "Revela o valor de um segredo autorizado")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404")})
+    ResponseEntity<SecretValueResponse> reveal(@Parameter(hidden = true) UUID userId,
+                                               UUID workspaceId, UUID itemId);
+}
