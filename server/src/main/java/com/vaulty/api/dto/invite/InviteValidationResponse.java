@@ -1,3 +1,7 @@
 package com.vaulty.api.dto.invite;
 
-public record InviteValidationResponse(String email, long remainingSeconds) {}
+import io.swagger.v3.oas.annotations.media.Schema;
+
+public record InviteValidationResponse(
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String email,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long remainingSeconds) {}
