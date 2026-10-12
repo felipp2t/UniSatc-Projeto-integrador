@@ -88,13 +88,46 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
         User owner = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
 
-        for (String[] parameters : new String[][] {{"-1", "20"}, {"0", "0"}, {"0", "101"}}) {
+        for (String[] parameters : new String[][] {
+                {"-1", "20"}, {"0", "0"}, {"0", "101"}, {"107374183", "20"}, {"2147483647", "100"}}) {
             mockMvc.perform(get("/workspaces/{workspaceId}/collections", workspaceId)
                             .cookie(authCookie(owner))
                             .param("page", parameters[0]).param("size", parameters[1]))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value(400));
         }
+    }
+
+    @Test
+    void acceptsPaginationOffsetsWithinJpaLimit() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        createFolder(owner, workspaceId, "Engenharia", null);
+
+        for (String[] parameters : new String[][] {{"107374182", "20"}, {"2147483647", "1"}}) {
+            mockMvc.perform(get("/workspaces/{workspaceId}/collections", workspaceId)
+                            .cookie(authCookie(owner))
+                            .param("page", parameters[0]).param("size", parameters[1]))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items.length()").value(0))
+                    .andExpect(jsonPath("$.totalItems").value(1));
+        }
+    }
+
+    @Test
+    void rejectsDuplicateNamesWithinAParent() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID parentId = createFolder(owner, workspaceId, "Engenharia", null);
+        createFolder(owner, workspaceId, "Projetos", parentId);
+
+        mockMvc.perform(post("/workspaces/{workspaceId}/collections", workspaceId)
+                        .cookie(authCookie(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateCollectionRequest("Projetos", parentId))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value("Já existe uma pasta com esse nome neste nível"));
     }
 
     @Test

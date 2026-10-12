@@ -6,14 +6,12 @@ import com.vaulty.api.dto.collection.CollectionResponse;
 import com.vaulty.api.dto.collection.CreateCollectionRequest;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceCollection;
-import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ValidationException;
-import com.vaulty.api.repository.CollectionPathProjection;
 import com.vaulty.api.repository.WorkspaceCollectionRepository;
-import com.vaulty.api.repository.WorkspaceMemberRepository;
+import com.vaulty.api.repository.WorkspaceRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -32,12 +30,11 @@ public class WorkspaceCollectionService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final WorkspaceCollectionRepository collectionRepository;
-    private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final WorkspaceRepository workspaceRepository;
 
     @Transactional
     public CollectionResponse create(UUID userId, UUID workspaceId, CreateCollectionRequest request) {
-        var member = requireMember(userId, workspaceId);
-        var workspace = member.getWorkspace();
+        var workspace = requireWorkspace(userId, workspaceId);
 
         if (!workspace.getOwner().getId().equals(userId)) {
             throw new ForbiddenException("Apenas o dono do workspace pode criar pastas");
@@ -47,13 +44,6 @@ public class WorkspaceCollectionService {
                 : collectionRepository.findByIdAndWorkspaceId(request.parentId(), workspaceId)
                         .orElseThrow(() -> new ResourceNotFoundException("Pasta pai não encontrada"));
 
-        boolean nameAlreadyExists = parent == null
-                ? collectionRepository.existsByWorkspaceIdAndParentIsNullAndName(workspaceId, request.name())
-                : collectionRepository.existsByWorkspaceIdAndParentIdAndName(
-                        workspaceId, parent.getId(), request.name());
-        if (nameAlreadyExists) {
-            throw new ConflictException("Já existe uma pasta com esse nome neste nível");
-        }
         var collection = new WorkspaceCollection();
         collection.setWorkspace(workspace);
         collection.setParent(parent);
@@ -71,9 +61,11 @@ public class WorkspaceCollectionService {
 
     @Transactional(readOnly = true)
     public CollectionPageResponse list(UUID userId, UUID workspaceId, UUID parentId, int page, int size) {
-        requireMember(userId, workspaceId);
-        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new ValidationException("Página deve ser maior ou igual a zero e tamanho deve estar entre 1 e 100");
+        requireWorkspace(userId, workspaceId);
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE || (long) page * size > Integer.MAX_VALUE) {
+            throw new ValidationException(
+                    "Página deve ser maior ou igual a zero, tamanho deve estar entre 1 e 100 "
+                            + "e deslocamento não pode exceder " + Integer.MAX_VALUE);
         }
 
         var pageable = PageRequest.of(page, size, Sort.by("name").ascending().and(Sort.by("id").ascending()));
@@ -93,7 +85,7 @@ public class WorkspaceCollectionService {
 
     @Transactional(readOnly = true)
     public List<CollectionPathEntry> path(UUID userId, UUID workspaceId, UUID collectionId) {
-        requireMember(userId, workspaceId);
+        requireWorkspace(userId, workspaceId);
         var path = collectionRepository.findPath(workspaceId, collectionId);
         if (path.isEmpty()) {
             throw new ResourceNotFoundException("Pasta não encontrada");
@@ -101,8 +93,8 @@ public class WorkspaceCollectionService {
         return path.stream().map(entry -> new CollectionPathEntry(entry.getId(), entry.getName())).toList();
     }
 
-    private WorkspaceMember requireMember(UUID userId, UUID workspaceId) {
-        return workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
+    private Workspace requireWorkspace(UUID userId, UUID workspaceId) {
+        return workspaceRepository.findByIdAndMemberUserId(workspaceId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
     }
 

@@ -1,38 +1,51 @@
-# PR #126 — Correções e revisão final
+# Revisão de qualidade — PR #128
 
-PR: https://github.com/felipp2t/UniSatc-Projeto-integrador/pull/126
-Branch: `feat/122-workspace-singleton-and-invite-authorization`
-Referência original: `0f4493aac4d16a98cdd10089a718c154f3ff9709`, mais as correções desta revisão.
-Base do PR: `f5a47a9216a716f52b0c55ab5290a9a0ef94cee5`.
-Data: 2026-10-11.
+PR: https://github.com/felipp2t/UniSatc-Projeto-integrador/pull/128
 
-**Revisão final com `thermo-nuclear-code-quality-review`: sem achados pendentes no escopo revisado.** Este documento registra a revisão técnica e a validação das correções.
+Base: `f2c567ee65ac6ef550ff88bafda10fc869509dca` (`develop`). Head original: `d940b2e1d18d1da9efc83f12a72e497d8b138ed1`. Revisão final inclui as correções locais na branch `feat/pastas-paginadas`.
 
-## Achados originais corrigidos
+## Parecer final
 
-| Achado | Correção |
-|---|---|
-| Migration falhava quando já existia um workspace | V5 cria o workspace somente quando não existe nenhum, preserva o proprietário e os dados existentes e garante seu vínculo Owner. V5/V6 usam o workspace real para os papéis, sem depender de UUIDs fixos distribuídos. Múltiplos workspaces continuam sendo rejeitados explicitamente. |
-| JWT validado separadamente para identidade e papel | Uma única validação produz `AccessTokenClaims`, consumido diretamente pelo filtro. Falhas rejeitam a autenticação inteira. Tokens antigos sem papel continuam autenticados, com authorities vazias; a compatibilidade está documentada. |
-| Limpeza de testes exposta em produção | Removido `UserRepository.deleteAllByEmailNot`. A fixture comum centraliza a limpeza por JDBC em transação e preserva o proprietário pelo vínculo com o workspace. Os testes de workspace usam rollback em vez de apagar o schema e executar migrations novamente. |
+**Sem achados pendentes no escopo revisado.** Foram aplicados os critérios da skill `thermo-nuclear-code-quality-review` após cada rodada de correção. Esse parecer representa os arquivos examinados e a validação executada, não uma garantia de ausência de qualquer defeito possível.
 
-## Ajustes encontrados nas revisões seguintes
+## Rodada 1 — Achados originais corrigidos
 
-- Removidas as fábricas `WorkspaceRole.owner/member` e a sobrecarga de emissão de JWT que ficaram sem necessidade.
-- O suporte de workspace agora configura o singleton existente; membros recebem o papel Member explicitamente.
-- A fixture de convite reutiliza `WorkspaceService.addAsMember`, eliminando uma segunda implementação do vínculo de membro.
-- A limpeza aproveita o `ON DELETE CASCADE` existente, sem repetir a exclusão de memberships.
-- Os testes das constraints exigem os nomes `uq_workspace_singleton` e `ck_workspace_singleton`. A fixture persiste o usuário antes da inserção por JDBC, evitando um falso positivo por erro de FK.
-- README e documentação da API refletem o upgrade que preserva dados e a compatibilidade com tokens antigos.
+### Médio — Unicidade implementada em dois caminhos
 
-## Verificação
+Em `WorkspaceCollectionService.create`, a pré-consulta de nomes duplicados repetia a regra já garantida por `uq_collection_workspace_parent_name` e pelo tratamento de sua violação. A consulta não eliminava a necessidade do tratamento concorrente.
 
-- Build limpo com `mvn -o -B clean verify -Dsurefire.runOrder=random`: **44 testes; 0 falhas; 0 erros; 0 ignorados; BUILD SUCCESS**.
-- Também houve execuções completas anteriores com build e suíte aprovados durante as rodadas de correção.
-- Testes novos de migration cobrem instalação vazia, workspace existente com e sem Owner previamente criado, preservação de dados/vínculo e rejeição de múltiplos workspaces.
-- Testes novos do filtro verificam principal e authorities de Owner/Member, compatibilidade sem papel e rejeição de assinatura incorreta, expiração, token malformado, subject inválido/ausente e papel inválido.
-- Teste de refresh confirma que a emissão recalcula o papel a partir do vínculo atual.
-- `git diff --check`: aprovado.
-- Revisão do diff completo contra a base do PR, incluindo novas correções e testes: nenhum arquivo Java alterado ultrapassa 1.000 linhas; o maior tem 202 linhas. Nenhum parser duplicado ou método de limpeza de testes permanece em produção.
+**Correção:** removidos a pré-consulta, a bifurcação raiz/subpasta e os dois métodos `exists...`. A constraint continua sendo a fonte da unicidade. O `saveAndFlush` traduz somente a violação dessa constraint para 409 e relança as demais violações. O teste HTTP de duplicidade agora exercita esse caminho.
 
-A suíte foi executada com Java 21/Maven em container temporário e PostgreSQL isolado por Testcontainers. O snapshot validado foi comparado com os arquivos da branch local. O banco de desenvolvimento não foi usado pelos testes.
+### Médio — Consulta de vínculo duplicava o caminho canônico
+
+O novo `WorkspaceMemberRepository.findByWorkspaceIdAndUserId` carregava membro e papel sem que o fluxo precisasse deles. Já existia `WorkspaceRepository.findByIdAndMemberUserId` para consultar o workspace visível ao usuário.
+
+**Correção:** o serviço passou a reutilizar a consulta existente e seu helper retorna `Workspace`. O método redundante foi removido. Foram preservados o 404 sem vínculo e o 403 para criação por membro que não é proprietário.
+
+## Rodada 2 — Limite de paginação corrigido
+
+### Médio — Contrato aceitava offsets incompatíveis com JPA
+
+A validação aceitava `page=107374183&size=20`. Uma reprodução isolada falhou com `InvalidDataAccessApiUsageException: Page offset exceeds Integer.MAX_VALUE (2147483647)` em `PageableUtils.getOffsetAsInteger`, em vez de devolver uma resposta controlada.
+
+**Correção:** a validação existente agora rejeita `page × size > Integer.MAX_VALUE` com 400. A multiplicação usa `long` para evitar overflow na própria validação. O limite foi documentado em `server/docs/API.md`.
+
+**Regressão:** testes cobrem o primeiro offset inválido para tamanho 20, multiplicação acima do limite com página máxima, a última página válida para tamanho 20 e o offset máximo exato com tamanho 1. Também foi acrescentado um teste de conflito de nomes dentro da mesma pasta pai, complementando a cobertura de duplicidade na raiz.
+
+## Rodada 3 — Revisão final
+
+Reexaminados os arquivos da PR e as correções, incluindo fluxo transacional, tradução de conflitos, contratos de entrada e saída, consultas, hierarquia, paginação e documentação. Não foram encontrados novos problemas concretos de estrutura, abstração, duplicação ou crescimento de condicionais que justifiquem outra alteração.
+
+Os métodos distintos para raiz e filhos mantêm explícita a semântica de `NULL`; a CTE de breadcrumb mantém a travessia no repositório. Nenhum arquivo cruza 1.000 linhas. Não há motivo demonstrado para acrescentar camadas ou fragmentar esses módulos.
+
+## Validação final
+
+Executada em `server/`:
+
+- `mvn -o -B test`: **57 testes, zero falhas, zero erros, zero ignorados; BUILD SUCCESS**.
+- `mvn -o -B -Dmaven.repo.local=/tmp/pr128-maven-cache -DskipTests verify`: **BUILD SUCCESS**, incluindo geração do JAR e reempacotamento Spring Boot. Os testes foram executados separadamente pelo comando anterior.
+- `git diff --check`: passou.
+
+O primeiro `verify` offline executou os 55 testes anteriores com sucesso, mas parou por falta de sete artefatos de empacotamento no cache. Suas licenças foram classificadas pela política local como permissivas (Apache-2.0 e BSD-2-Clause), e os artefatos foram obtidos somente em um cache temporário para concluir a validação. Nenhuma dependência foi adicionada ao projeto.
+
+As alterações anteriores do usuário foram preservadas. As correções foram preparadas na branch da PR, `feat/pastas-paginadas`.

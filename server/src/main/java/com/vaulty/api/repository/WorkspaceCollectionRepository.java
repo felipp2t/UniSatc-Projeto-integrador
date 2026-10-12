@@ -18,10 +18,6 @@ public interface WorkspaceCollectionRepository extends JpaRepository<WorkspaceCo
 
     Optional<WorkspaceCollection> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
 
-    boolean existsByWorkspaceIdAndParentIsNullAndName(UUID workspaceId, String name);
-
-    boolean existsByWorkspaceIdAndParentIdAndName(UUID workspaceId, UUID parentId, String name);
-
     @Query(value = """
             WITH RECURSIVE collection_path AS (
                 SELECT id, name, parent_id, 0 AS depth

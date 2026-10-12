@@ -317,6 +317,7 @@ Sucesso (`200`):
 }
 ```
 
+O deslocamento (`page × size`) não pode exceder `2147483647`, limite da paginação JPA.
 Parâmetros de paginação inválidos respondem `400`. Se a pasta pai não existir no workspace,
 responde `404`.
 
