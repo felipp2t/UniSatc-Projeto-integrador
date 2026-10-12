@@ -1,4 +1,4 @@
-import { AxiosError } from 'axios'
+import axios, { AxiosError } from 'axios'
 import { describe, expect, it } from 'vitest'
 import { ApiError, toApiError } from './errors'
 
@@ -17,6 +17,39 @@ describe('ApiError', () => {
     expect(new ApiError('not found', 404).isNotFound).toBe(true)
     expect(new ApiError('server', 503).isServerError).toBe(true)
     expect(new ApiError('client', 400).isServerError).toBe(false)
+  })
+
+  it.each(['ECONNABORTED', 'ETIMEDOUT'])(
+    'classifies %s as a transport error',
+    (code) => {
+      expect(toApiError(new AxiosError('timeout', code)).isNetworkError).toBe(
+        true
+      )
+    }
+  )
+
+  it.each([
+    'ERR_BAD_OPTION',
+    'ERR_BAD_OPTION_VALUE',
+    'ERR_INVALID_URL',
+    'ERR_NOT_SUPPORT',
+    undefined,
+  ])('does not classify %s as a transport error', (code) => {
+    const error = toApiError(new AxiosError('invalid configuration', code))
+    expect(error.isNetworkError).toBe(false)
+    expect(error.isCanceled).toBe(false)
+  })
+
+  it('does not classify a real configuration failure as a network error', async () => {
+    const request = axios.get('/unused', {
+      // @ts-expect-error Deliberately invalid configuration to exercise Axios validation.
+      transitional: { silentJSONParsing: 'invalid' },
+    })
+
+    await expect(request.catch(toApiError)).resolves.toMatchObject({
+      message: 'option silentJSONParsing must be a boolean',
+      networkError: false,
+    })
   })
 
   it('preserves regular Axios responses', () => {

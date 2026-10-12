@@ -11,14 +11,12 @@ import type { ReactElement } from 'react'
 import { registerTestQueryClient } from './query-client-registry'
 
 function createTestQueryClient() {
-  return registerTestQueryClient(
-    new QueryClient({
-      defaultOptions: {
-        mutations: { gcTime: Number.POSITIVE_INFINITY, retry: false },
-        queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
-      },
-    })
-  )
+  return new QueryClient({
+    defaultOptions: {
+      mutations: { gcTime: Number.POSITIVE_INFINITY, retry: false },
+      queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
+    },
+  })
 }
 
 export function renderWithProviders(
@@ -28,6 +26,7 @@ export function renderWithProviders(
   } = {}
 ): RenderResult & { queryClient: QueryClient } {
   const { queryClient = createTestQueryClient(), ...renderOptions } = options
+  registerTestQueryClient(queryClient)
   return {
     ...rtlRender(
       <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,

@@ -19,17 +19,16 @@ const defaultIsEmpty = (data: unknown) =>
 export function AsyncBoundary<TData, TError = Error>({
   children,
   empty,
-  isEmpty = defaultIsEmpty as (data: TData) => boolean,
+  isEmpty = defaultIsEmpty,
   loading,
   query,
 }: AsyncBoundaryProps<TData, TError>) {
-  const hasData = query.data !== undefined
+  const { data, refetch } = query
   const handleRetry = useCallback(async () => {
-    await query.refetch()
-  }, [query])
+    await refetch()
+  }, [refetch])
 
-  if (hasData) {
-    const data = query.data as TData
+  if (data !== undefined) {
     const content = isEmpty(data)
       ? (empty ?? <EmptyState title='Nenhum resultado encontrado.' />)
       : children(data)

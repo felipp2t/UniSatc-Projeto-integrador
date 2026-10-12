@@ -4,7 +4,6 @@ const clients = new Set<QueryClient>()
 
 export function registerTestQueryClient(client: QueryClient) {
   clients.add(client)
-  return client
 }
 
 export function clearTestQueryClients() {

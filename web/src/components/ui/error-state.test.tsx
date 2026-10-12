@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AxiosError } from 'axios'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
@@ -64,4 +65,29 @@ describe('ErrorState', () => {
       screen.getByRole('button', { name: 'Tentar novamente' })
     ).toBeInTheDocument()
   })
+
+  it.each(['synchronous', 'asynchronous'])(
+    'handles a %s retry failure without an unhandled error',
+    async (mode) => {
+      const onError = vi.fn((event: ErrorEvent) => event.preventDefault())
+      window.addEventListener('error', onError)
+      const onRetry = vi.fn(() => {
+        if (mode === 'synchronous') throw new Error('retry failed')
+        return Promise.reject(new Error('retry failed'))
+      })
+      render(<ErrorState message='Falhou' onRetry={onRetry} />)
+
+      try {
+        await userEvent
+          .setup()
+          .click(screen.getByRole('button', { name: 'Tentar novamente' }))
+
+        expect(onRetry).toHaveBeenCalledTimes(1)
+        expect(screen.getByRole('alert')).toHaveTextContent('Falhou')
+        expect(onError).not.toHaveBeenCalled()
+      } finally {
+        window.removeEventListener('error', onError)
+      }
+    }
+  )
 })

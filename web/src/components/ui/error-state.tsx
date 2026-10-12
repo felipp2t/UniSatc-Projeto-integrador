@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { toApiError } from '@/api/errors'
+import { type ApiError, toApiError } from '@/api/errors'
 import { Button } from './button'
 
 export interface ErrorStateProps {
@@ -9,8 +9,7 @@ export interface ErrorStateProps {
   variant?: 'page' | 'compact'
 }
 
-function getErrorMessage(error: unknown) {
-  const apiError = toApiError(error)
+function getErrorMessage(apiError: ApiError) {
   if (apiError.isNetworkError) return 'Não foi possível conectar ao servidor.'
   if (apiError.isNotFound) return 'O conteúdo solicitado não foi encontrado.'
   if (apiError.isServerError) return 'O servidor está indisponível no momento.'
@@ -31,9 +30,11 @@ export function ErrorState({
   const isUnknownError =
     !message && apiError.status === undefined && !apiError.isNetworkError
 
-  const handleRetry = useCallback(() => {
-    if (onRetry) {
-      Promise.resolve(onRetry()).catch(() => undefined)
+  const handleRetry = useCallback(async () => {
+    try {
+      await onRetry?.()
+    } catch {
+      // The operation owner supplies the updated error through props.
     }
   }, [onRetry])
 
@@ -48,7 +49,7 @@ export function ErrorState({
       role='alert'
     >
       <p className='text-destructive text-sm'>
-        {message ?? getErrorMessage(error)}
+        {message ?? getErrorMessage(apiError)}
       </p>
       {isUnknownError && import.meta.env.DEV ? (
         <details className='text-muted-foreground text-xs'>

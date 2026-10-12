@@ -1,7 +1,8 @@
-import { onlineManager, QueryClient } from '@tanstack/react-query'
+import { onlineManager } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './errors'
-import { retryQuery } from './query-client'
+import { createQueryClient, retryQuery } from './query-client'
 
 afterEach(() => onlineManager.setOnline(true))
 
@@ -31,23 +32,28 @@ describe('retryQuery', () => {
       )
     ).toBe(false)
     expect(retryQuery(0, new Error('bug'))).toBe(false)
+    expect(
+      retryQuery(
+        0,
+        new AxiosError('invalid configuration', 'ERR_BAD_OPTION_VALUE')
+      )
+    ).toBe(false)
   })
 
-  it('runs mutations immediately while offline and rejects through mutateAsync', async () => {
+  it('runs mutations immediately while offline and rejects without retrying', async () => {
     onlineManager.setOnline(false)
     const mutationFn = vi.fn().mockRejectedValue(new Error('offline'))
-    const queryClient = new QueryClient({
-      defaultOptions: { mutations: { networkMode: 'always', retry: false } },
-    })
+    const queryClient = createQueryClient()
     const mutation = queryClient.getMutationCache().build(queryClient, {
       mutationFn,
-      networkMode: 'always',
-      retry: false,
     })
 
-    await expect(mutation.execute(undefined)).rejects.toThrow('offline')
-    expect(mutationFn).toHaveBeenCalledTimes(1)
-    expect(mutation.state.isPaused).toBe(false)
-    queryClient.clear()
+    try {
+      await expect(mutation.execute(undefined)).rejects.toThrow('offline')
+      expect(mutationFn).toHaveBeenCalledTimes(1)
+      expect(mutation.state.isPaused).toBe(false)
+    } finally {
+      queryClient.clear()
+    }
   })
 })

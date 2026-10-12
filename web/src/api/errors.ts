@@ -92,7 +92,11 @@ export function toApiError(error: unknown) {
       error.config,
       {
         canceled,
-        networkError: !(canceled || error.response),
+        networkError:
+          !(canceled || error.response) &&
+          (error.code === 'ERR_NETWORK' ||
+            error.code === 'ECONNABORTED' ||
+            error.code === 'ETIMEDOUT'),
       }
     )
   }
