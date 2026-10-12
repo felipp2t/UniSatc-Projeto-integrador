@@ -9,6 +9,7 @@ import { enforceRoutePermission } from '@/auth/permissions'
 import { sanitizeInternalRedirect } from '@/auth/redirect'
 import { Header } from '@/components/header'
 import { NotFoundPage } from '@/components/not-found-page'
+import { OfflineBanner } from '@/components/offline-banner'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -54,6 +55,7 @@ function ProtectedLayout() {
           userEmail={session.user?.email}
           userName={session.user?.name}
         />
+        <OfflineBanner />
         <div className='flex min-h-0 flex-1 overflow-hidden'>
           <ScrollArea className='flex-1'>
             <Outlet />

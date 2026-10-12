@@ -83,8 +83,9 @@ vi.mock('@/api/endpoints', () => ({
 vi.mock('@/components/ui/button', () => ({
   Button: ({
     children,
+    loading: _loading,
     ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement>) =>
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean }) =>
     createElement('button', { type: 'button', ...props }, children),
 }))
 

@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { ErrorState } from '@/components/ui/error-state'
 import {
   Field,
   FieldError,
@@ -56,6 +57,7 @@ export function FolderCard({
   const handleDeleteClick = useCallback(() => {
     handleDelete().catch(() => undefined)
   }, [handleDelete])
+  const displayedError = error ?? internalError
   return (
     <div
       className={cn(
@@ -94,6 +96,9 @@ export function FolderCard({
                 permanentemente.
               </DialogDescription>
             </DialogHeader>
+            {displayedError ? (
+              <ErrorState message={displayedError} variant='compact' />
+            ) : null}
             <DialogFooter>
               <Button onClick={closeDialog} type='button' variant='outline'>
                 Cancelar
@@ -109,8 +114,8 @@ export function FolderCard({
           </DialogContent>
         </Dialog>
       ) : null}
-      {(error ?? internalError) ? (
-        <p className='text-destructive text-xs'>{error ?? internalError}</p>
+      {displayedError && !open ? (
+        <ErrorState message={displayedError} variant='compact' />
       ) : null}
     </div>
   )
