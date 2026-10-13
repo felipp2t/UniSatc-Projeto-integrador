@@ -13,12 +13,16 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-// limita brute-force/spam em login, cadastro e recuperacao de senha, igual ao authRateLimit do vaulty original (5 req/min)
+// Limita brute-force/spam nos fluxos públicos de conta e validação de convite (5 req/min por IP e caminho).
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final List<String> LIMITED_PATHS =
-            List.of("/auth/login", "/auth/register", "/auth/forgot-password", "/auth/reset-password");
+    private static final List<String> LIMITED_PATHS = List.of(
+            "/auth/login",
+            "/auth/register",
+            "/auth/forgot-password",
+            "/auth/reset-password",
+            "/invites/validate");
 
     private final ObjectMapper objectMapper;
     private final RateLimitRegistry registry;
