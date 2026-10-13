@@ -30,28 +30,17 @@ public interface WorkspaceItemRepository extends JpaRepository<WorkspaceItem, UU
             SELECT item.* FROM item
             WHERE item.workspace_id = :workspaceId AND item.archived_at IS NULL
               AND (:includeSecrets = TRUE OR item.type <> 'secret')
-              AND (lower(item.title) LIKE :pattern ESCAPE '!'
-                   OR lower(item.title) % :term)
-            ORDER BY CASE
-                WHEN lower(item.title) = :term THEN 0
-                WHEN lower(item.title) LIKE :prefixPattern ESCAPE '!' THEN 1
-                WHEN lower(item.title) LIKE :pattern ESCAPE '!' THEN 2
-                ELSE 3
-            END,
-            similarity(lower(item.title), :term) DESC,
-            lower(item.title), item.id
+              AND item.title_search @@ plainto_tsquery('simple', normalize_content_name(:term))
+            ORDER BY item.title_key, item.id
             """,
             countQuery = """
             SELECT count(*) FROM item
             WHERE item.workspace_id = :workspaceId AND item.archived_at IS NULL
               AND (:includeSecrets = TRUE OR item.type <> 'secret')
-              AND (lower(item.title) LIKE :pattern ESCAPE '!'
-                   OR lower(item.title) % :term)
+              AND item.title_search @@ plainto_tsquery('simple', normalize_content_name(:term))
             """, nativeQuery = true)
     Page<WorkspaceItem> searchByTitle(@Param("workspaceId") UUID workspaceId,
                                       @Param("term") String term,
-                                      @Param("pattern") String pattern,
-                                      @Param("prefixPattern") String prefixPattern,
                                       @Param("includeSecrets") boolean includeSecrets,
                                       Pageable pageable);
 }

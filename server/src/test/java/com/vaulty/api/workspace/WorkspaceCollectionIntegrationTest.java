@@ -10,9 +10,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaulty.api.dto.collection.CreateCollectionRequest;
+import com.vaulty.api.dto.collection.RenameCollectionRequest;
 import com.vaulty.api.entity.User;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
@@ -300,6 +303,32 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, folderId)
                         .cookie(authCookie(member)))
                 .andExpect(status().isForbidden());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"produção", " Producao ", "Produção"})
+    void renameRejectsEquivalentNamesInTheSameParent(String duplicateName) throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        createFolder(owner, workspaceId, "Produção", null);
+        UUID targetId = createFolder(owner, workspaceId, "Outra", null);
+        mockMvc.perform(put("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, targetId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RenameCollectionRequest(duplicateName))))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void renameAllowsEquivalentNamesInDifferentParents() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID parentId = createFolder(owner, workspaceId, "Produção", null);
+        UUID targetId = createFolder(owner, workspaceId, "Outra", parentId);
+        mockMvc.perform(put("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, targetId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\" producao \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("producao"));
     }
 
     private UUID createFolder(User owner, UUID workspaceId, String name, UUID parentId) throws Exception {

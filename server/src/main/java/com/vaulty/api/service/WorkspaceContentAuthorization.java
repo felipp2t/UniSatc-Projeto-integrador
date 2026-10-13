@@ -1,7 +1,6 @@
 package com.vaulty.api.service;
 
 import com.vaulty.api.entity.Workspace;
-import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.RolePermissionRepository;
@@ -36,10 +35,6 @@ public class WorkspaceContentAuthorization {
         }
         var member = memberRepository.findByWorkspaceIdAndUserId(workspace.getId(), userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        var role = member.getRole();
-        if (WorkspaceRole.MEMBER_ROLE_NAME.equals(role.getName())) {
-            return "read".equals(action) && ("item".equals(resource) || "collection".equals(resource));
-        }
-        return permissionRepository.allows(role.getId(), resource, action);
+        return permissionRepository.allows(member.getRole().getId(), resource, action);
     }
 }

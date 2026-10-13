@@ -9,10 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vaulty.api.dto.item.CreateItemRequest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.WorkspaceRole;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
@@ -74,6 +77,12 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
         User member = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
         addMember(member, workspaceId);
+        UUID memberRoleId = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, member.getId())
+                .orElseThrow().getRole().getId();
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT resource FROM role_permission WHERE role_id = ? AND action = 'read'",
+                        String.class, memberRoleId))
+                .containsExactlyInAnyOrder("item", "collection");
         UUID textId = createItem(owner, workspaceId, "text", "Guia", null, "Ler", null, null);
         UUID secretId = createItem(owner, workspaceId, "secret", "Chave API", null, null, null, "valor-privado");
 
@@ -92,6 +101,12 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId)
                         .cookie(authCookie(member)))
                 .andExpect(status().isForbidden());
+        for (UUID unavailableId : new UUID[] {secretId, UUID.randomUUID()}) {
+            mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, unavailableId)
+                            .cookie(authCookie(member)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.message").value("Item indisponível"));
+        }
         mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
                         .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"text\",\"title\":\"Proibido\",\"textContent\":\"x\"}"))
@@ -130,28 +145,134 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void ranksExactTitlesFirstAndFindsSmallTypingErrors() throws Exception {
+    void searchesAllCompleteWordsInAnyOrderIgnoringCaseAndAccents() throws Exception {
         User owner = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
-        createItem(owner, workspaceId, "text", "Banco de senhas", null, "A", null, null);
-        createItem(owner, workspaceId, "text", "Senha banco produção", null, "B", null, null);
-        createItem(owner, workspaceId, "text", "Senha banco", null, "C", null, null);
-        createItem(owner, workspaceId, "text", "Taxa 100% anual", null, "D", null, null);
+        createItem(owner, workspaceId, "text", "Chave da API de Produção", null, "A", null, null);
+        createItem(owner, workspaceId, "text", "Produção de API", null, "B", null, null);
+        createItem(owner, workspaceId, "text", "API de Homologação", null, "C", null, null);
+        createItem(owner, workspaceId, "text", "API Producaox", null, "D", null, null);
+        UUID archivedId = createItem(owner, workspaceId, "text", "API Produção arquivada", null, "E", null, null);
+        jdbcTemplate.update("UPDATE item SET archived_at = now() WHERE id = ?", archivedId);
 
+        for (String term : new String[] {"api producao", "PRODUÇÃO API", "producao", "PRODUÇÃO"}) {
+            mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
+                            .cookie(authCookie(owner)).param("q", term).param("size", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].title").value("Chave da API de Produção"))
+                    .andExpect(jsonPath("$.totalItems").value(2))
+                    .andExpect(jsonPath("$.totalPages").value(2));
+        }
         mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
-                        .cookie(authCookie(owner)).param("q", "SENHA BANCO").param("size", "1"))
+                        .cookie(authCookie(owner)).param("q", "api producao").param("page", "1").param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].title").value("Senha banco"))
-                .andExpect(jsonPath("$.totalItems").value(3));
-        mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
-                        .cookie(authCookie(owner)).param("q", "senah banco"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].title").value("Senha banco"));
-        mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
-                        .cookie(authCookie(owner)).param("q", "%"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalItems").value(1))
-                .andExpect(jsonPath("$.items[0].title").value("Taxa 100% anual"));
+                .andExpect(jsonPath("$.items[0].title").value("Produção de API"))
+                .andExpect(jsonPath("$.totalItems").value(2));
+        for (String term : new String[] {"ap produ", "senah banco", "api prod", "%", "_", "!"}) {
+            mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
+                            .cookie(authCookie(owner)).param("q", term))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalItems").value(0));
+        }
+    }
+
+    @Test
+    void rejectsInvalidContentWithoutPersistingAnItemOrSecret() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        CreateItemRequest[] requests = {
+            new CreateItemRequest("text", "Blank", null, "   ", null, null),
+            new CreateItemRequest("text", "Empty", null, "", null, null),
+            new CreateItemRequest("text", "Too long", null, "x".repeat(100001), null, null),
+            new CreateItemRequest("secret", "Too long", null, null, null, "x".repeat(8193)),
+            new CreateItemRequest("secret", "Blank", null, null, null, "  "),
+            new CreateItemRequest("text", "Mixed", null, "text", null, "secret"),
+            new CreateItemRequest("link", "Mixed", null, "text", "https://example.com", null)
+        };
+        for (var request : requests) {
+            mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                            .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM item", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM item_secret", Integer.class)).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"https://", "http://", "ftp://example.com", "https://example.com/a b",
+            "https:///path", "https://example.com:65536", "https://example.com:bad", "//example.com"})
+    void rejectsIncompleteOrMalformedUrls(String url) throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        var request = new CreateItemRequest("link", "Invalid", null, null, url, null);
+        mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM item", Integer.class)).isZero();
+    }
+
+    @Test
+    void acceptsExactLimitsAndPreservesTextAndSecretContent() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        String text = "  # Guia\n\n" + "x".repeat(99990);
+        String value = "  " + "é".repeat(8188) + "  ";
+        String url = "https://intranet/" + "a".repeat(2031);
+        UUID textId = createItem(owner, workspaceId, "text", "Texto", null, text, null, null);
+        UUID secretId = createItem(owner, workspaceId, "secret", "Segredo", null, null, null, value);
+        UUID linkId = createItem(owner, workspaceId, "link", "Link", null, null, url, null);
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, textId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.textContent").value(text));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.value").value(value));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, linkId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.linkUrl").value(url));
+        var tooLong = new CreateItemRequest("link", "Too long", null, null, url + "a", null);
+        mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(tooLong)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http://intranet", "https://localhost:8443/path", "https://192.168.1.1/a%20b",
+            "http://[::1]:8080/", "HTTPS://example.com/path?q=one%20two#fragment"})
+    void acceptsCompleteInternalAndPublicUrls(String url) throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        createItem(owner, workspaceId, "link", "Link", null, null, url, null);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"chave de produção", " Chave de Producao ", "Chave de Produção"})
+    void rejectsEquivalentTitlesAtRootIncludingAnArchivedItem(String duplicateTitle) throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID itemId = createItem(owner, workspaceId, "text", "Chave de Produção", null, "A", null, null);
+        jdbcTemplate.update("UPDATE item SET archived_at = now() WHERE id = ?", itemId);
+        var request = new CreateItemRequest("text", duplicateTitle, null, "B", null, null);
+        mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Título indisponível nesta localização"));
+    }
+
+    @Test
+    void acceptsEquivalentTitlesInDifferentLocationsAndPreservesPresentation() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID folderId = createFolder(owner, workspaceId, "Pasta");
+        UUID itemId = createItem(owner, workspaceId, "text", "  Chave de Produção  ", null, "A", null, null);
+        createItem(owner, workspaceId, "text", "chave de producao", folderId, "B", null, null);
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Chave de Produção"));
     }
 
     @Test

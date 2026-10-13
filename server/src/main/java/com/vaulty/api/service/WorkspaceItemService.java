@@ -10,14 +10,14 @@ import com.vaulty.api.entity.WorkspaceItemSecret;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ValidationException;
+import com.vaulty.api.repository.PersistenceConstraints;
 import com.vaulty.api.repository.WorkspaceCollectionRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.repository.WorkspaceItemSecretRepository;
-import java.util.Set;
-import java.util.Locale;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -29,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkspaceItemService {
 
     private static final String DUPLICATE_TITLE_CONSTRAINT = "uq_item_workspace_collection_title";
-    private static final Set<String> TYPES = Set.of("text", "link", "secret");
     private static final int MAX_PAGE_SIZE = 100;
 
     private final WorkspaceItemRepository itemRepository;
@@ -67,8 +66,8 @@ public class WorkspaceItemService {
             }
             return toResponse(item, true);
         } catch (DataIntegrityViolationException exception) {
-            if (isDuplicateTitleViolation(exception)) {
-                throw new ConflictException("Já existe um item com esse título neste nível");
+            if (PersistenceConstraints.causedBy(exception, DUPLICATE_TITLE_CONSTRAINT)) {
+                throw new ConflictException("Título indisponível nesta localização");
             }
             throw exception;
         }
@@ -96,12 +95,10 @@ public class WorkspaceItemService {
         if (query == null || query.isBlank() || query.trim().length() > 255) {
             throw new ValidationException("Busca deve conter entre 1 e 255 caracteres");
         }
-        String term = query.trim().toLowerCase(Locale.ROOT);
-        String escaped = term.replace("!", "!!").replace("%", "!%").replace("_", "!_");
         var pageable = PageRequest.of(page, size);
         boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
         return ItemPageResponse.from(itemRepository.searchByTitle(
-                        workspaceId, term, "%" + escaped + "%", escaped + "%", includeSecrets, pageable)
+                        workspaceId, query.trim(), includeSecrets, pageable)
                 .map(item -> toResponse(item, false)));
     }
 
@@ -109,11 +106,10 @@ public class WorkspaceItemService {
     public ItemResponse get(UUID userId, UUID workspaceId, UUID itemId) {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
+        boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
         var item = itemRepository.findByIdAndWorkspaceIdAndArchivedAtIsNull(itemId, workspaceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado"));
-        if ("secret".equals(item.getType())) {
-            authorization.require(userId, workspace, "secret", "read");
-        }
+                .filter(found -> includeSecrets || !"secret".equals(found.getType()))
+                .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
         return toResponse(item, true);
     }
 
@@ -131,20 +127,30 @@ public class WorkspaceItemService {
     }
 
     private void validateContent(CreateItemRequest request) {
-        if (request.type() == null || !TYPES.contains(request.type())) {
+        if (request.type() == null) {
             throw new ValidationException("Tipo de item inválido para esta entrega");
         }
         boolean valid = switch (request.type()) {
-            case "text" -> request.textContent() != null && request.linkUrl() == null && request.value() == null;
+            case "text" -> request.textContent() != null && !request.textContent().isBlank()
+                    && request.linkUrl() == null && request.value() == null;
             case "link" -> request.textContent() == null && request.value() == null
-                    && request.linkUrl() != null && request.linkUrl().length() <= 2048
-                    && (request.linkUrl().startsWith("http://") || request.linkUrl().startsWith("https://"));
+                    && request.linkUrl() != null && isHttpUrl(request.linkUrl());
             case "secret" -> request.textContent() == null && request.linkUrl() == null
                     && request.value() != null && !request.value().isBlank();
-            default -> false;
+            default -> throw new ValidationException("Tipo de item inválido para esta entrega");
         };
         if (!valid) {
             throw new ValidationException("Conteúdo inválido para o tipo de item");
+        }
+    }
+
+    private boolean isHttpUrl(String value) {
+        try {
+            URI uri = new URI(value).parseServerAuthority();
+            return ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
+                    && uri.getHost() != null && uri.getPort() >= -1 && uri.getPort() <= 65535;
+        } catch (URISyntaxException exception) {
+            return false;
         }
     }
 
@@ -161,15 +167,4 @@ public class WorkspaceItemService {
                 includeContent ? item.getLinkUrl() : null);
     }
 
-    private boolean isDuplicateTitleViolation(Throwable exception) {
-        var cause = exception;
-        while (cause != null) {
-            if (cause instanceof ConstraintViolationException violation
-                    && DUPLICATE_TITLE_CONSTRAINT.equals(violation.getConstraintName())) {
-                return true;
-            }
-            cause = cause.getCause();
-        }
-        return false;
-    }
 }

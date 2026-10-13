@@ -111,7 +111,7 @@ segunda linha impossível, inclusive sob concorrência.
 | GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
 | GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
 | PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |
-| POST | `/workspaces/{workspaceId}/collections` | Sim | 201 com a pasta criada | Exige membro; somente o proprietário pode criar nesta etapa. Pasta pai deve pertencer ao mesmo workspace. |
+| POST | `/workspaces/{workspaceId}/collections` | Sim | 201 com a pasta criada | Exige `collection/create`; pasta pai deve pertencer ao mesmo workspace. |
 | GET | `/workspaces/{workspaceId}/collections` | Sim | 200 com página de pastas do nível | Exige vínculo de membro; `parentId` omitido lista a raiz. `page` começa em 0 e `size` tem padrão 20 e máximo 100. |
 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Sim | 200 com o caminho da raiz à pasta | Exige vínculo de membro; pasta fora do workspace retorna 404. |
 | PUT | `/workspaces/{workspaceId}/collections/{collectionId}` | Sim | 200 com a pasta renomeada | Exige `collection/update`; título repetido no nível retorna 409. |
@@ -125,15 +125,27 @@ Pastas são persistidas na tabela `collection`. A raiz é o workspace e não pos
 |---|---|---|---|
 | POST | `/workspaces/{workspaceId}/items` | 201 | `item/create`; segredos exigem também `secret/create`. |
 | GET | `/workspaces/{workspaceId}/items` | 200 | Lista metadados paginados da raiz ou da pasta indicada por `collectionId`; segredos só aparecem para quem tem `secret/read`. |
-| GET | `/workspaces/{workspaceId}/items/search?q=...` | 200 | Busca paginada por título em todas as pastas, aceita pequenas variações de digitação e ordena por relevância; aplica as mesmas permissões. |
-| GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Retorna texto ou link; segredos retornam apenas metadados. |
+| GET | `/workspaces/{workspaceId}/items/search?q=...` | 200 | Busca paginada por todas as palavras do título, em qualquer ordem, ignorando caixa e acentos; aplica as mesmas permissões. |
+| GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Retorna texto ou link; segredos retornam apenas metadados com `secret/read` e ficam indisponíveis sem essa permissão. |
 | GET | `/workspaces/{workspaceId}/items/{itemId}/secret` | 200 | Revela o valor somente com `item/read` e `secret/read`. |
 
 Na criação, informe `type` (`text`, `link` ou `secret`), `title`, `collectionId` opcional e
-respectivamente `textContent`, `linkUrl` HTTP(S) ou `value`. As listagens retornam `items`,
+respectivamente `textContent` (até 100.000 caracteres e não apenas espaços), `linkUrl` HTTP(S)
+completa (até 2.048 caracteres) ou `value` (até 8.192 caracteres e não apenas espaços).
+Texto/Markdown e valor secreto são preservados exatamente, incluindo espaços significativos. As listagens retornam `items`,
 `page`, `size`, `totalItems` e `totalPages`; `page` começa em 0 e `size` vai de 1 a 100.
 O valor de um segredo é criptografado com AES-256-GCM antes da gravação e nunca aparece nas
 respostas de criação, listagem, busca ou consulta comum.
+
+Títulos de itens e nomes de pastas são únicos por localização, ignorando caixa, acentos e
+espaços nas extremidades. Itens arquivados continuam reservando o título. A busca considera
+palavras completas, usa todas as palavras da consulta e ordena por título normalizado e ID;
+não pesquisa o conteúdo. A migração `V11` registra as permissões iniciais de `Member`
+(`item/read` e `collection/read`), mantendo segredos e ações de escrita restritos.
+
+A migração `V12` recalcula as identidades e a busca dos registros existentes. Caso encontre
+nomes equivalentes na mesma localização, interrompe a atualização para regularização manual;
+não renomeia nem exclui conteúdo automaticamente.
 
 ## Estrutura do código
 
@@ -142,6 +154,6 @@ Camadas técnicas em `src/main/java/com/vaulty/api`: `controller`, `service`, `r
 `@RestControllerAdvice`).
 
 Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken`,
-`EmailOutbox`, `Workspace`, `WorkspaceRole`, `WorkspaceMember` e `WorkspaceCollection`. Itens, notificações,
-histórico de atividades, arquivos, convites para workspaces e RBAC além do papel inicial de
-proprietário ainda não foram implementados.
+`EmailOutbox`, `Workspace`, `WorkspaceRole`, `WorkspaceMember`, `WorkspaceCollection`,
+`WorkspaceItem`, `WorkspaceItemSecret` e `RolePermission`. Notificações, histórico de atividades,
+anexos, compartilhamento granular de conteúdo e gestão de papéis ainda não foram implementados.

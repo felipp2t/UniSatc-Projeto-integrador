@@ -28,7 +28,7 @@ public interface WorkspaceItemControllerDocs {
     ResponseEntity<ItemPageResponse> list(@Parameter(hidden = true) UUID userId,
                                           UUID workspaceId, UUID collectionId, int page, int size);
 
-    @Operation(summary = "Busca itens ativos pelo título, com tolerância a erros de digitação e relevância")
+    @Operation(summary = "Busca itens ativos por todas as palavras do título, ignorando caixa e acentos")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
         @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
     ResponseEntity<ItemPageResponse> search(@Parameter(hidden = true) UUID userId,
