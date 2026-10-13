@@ -11,6 +11,13 @@ import org.springframework.data.repository.query.Param;
 public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember, UUID> {
 
     @Query("""
+            select member from WorkspaceMember member join fetch member.role
+            where member.workspace.id = :workspaceId and member.user.id = :userId
+            """)
+    Optional<WorkspaceMember> findByWorkspaceIdAndUserId(
+            @Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId);
+
+    @Query("""
             select member from WorkspaceMember member
             join fetch member.role
             join fetch member.workspace

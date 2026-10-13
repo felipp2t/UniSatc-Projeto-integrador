@@ -12,7 +12,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @SpringBootTest(properties = {
     "app.scheduling.enabled=false",
     "jwt.secret=test-secret-with-at-least-thirty-two-bytes",
-    "spring.mail.host=localhost"
+    "spring.mail.host=localhost",
+    "app.secret-encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 })
 public abstract class PostgresIntegrationTest {
 

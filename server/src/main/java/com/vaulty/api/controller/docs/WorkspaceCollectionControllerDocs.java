@@ -4,6 +4,7 @@ import com.vaulty.api.dto.collection.CollectionPathEntry;
 import com.vaulty.api.dto.collection.CollectionPageResponse;
 import com.vaulty.api.dto.collection.CollectionResponse;
 import com.vaulty.api.dto.collection.CreateCollectionRequest;
+import com.vaulty.api.dto.collection.RenameCollectionRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,4 +37,18 @@ public interface WorkspaceCollectionControllerDocs {
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "404")})
     ResponseEntity<List<CollectionPathEntry>> path(
             @Parameter(hidden = true) UUID userId, UUID workspaceId, UUID collectionId);
+
+    @Operation(summary = "Renomeia uma pasta")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
+        @ApiResponse(responseCode = "409")})
+    ResponseEntity<CollectionResponse> rename(
+            @Parameter(hidden = true) UUID userId, UUID workspaceId, UUID collectionId,
+            RenameCollectionRequest request);
+
+    @Operation(summary = "Exclui uma pasta vazia")
+    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404"), @ApiResponse(responseCode = "409")})
+    ResponseEntity<Void> delete(@Parameter(hidden = true) UUID userId,
+                                UUID workspaceId, UUID collectionId);
 }
