@@ -1,6 +1,8 @@
 package com.vaulty.api.controller;
 
 import com.vaulty.api.controller.docs.InviteControllerDocs;
+import com.vaulty.api.dto.invite.InviteValidationRequest;
+import com.vaulty.api.dto.invite.InviteValidationResponse;
 import com.vaulty.api.dto.invite.InviteUserRequest;
 import com.vaulty.api.service.InviteService;
 import jakarta.validation.Valid;
@@ -32,5 +34,12 @@ public class InviteController implements InviteControllerDocs {
         inviteService.inviteUser(inviterId, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @PostMapping("/validate")
+    @Override
+    public ResponseEntity<InviteValidationResponse> validate(
+            @Valid @RequestBody InviteValidationRequest request) {
+        return ResponseEntity.ok(inviteService.validate(request));
     }
 }

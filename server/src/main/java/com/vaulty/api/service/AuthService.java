@@ -18,6 +18,7 @@ import com.vaulty.api.repository.PasswordResetTokenRepository;
 import com.vaulty.api.repository.RefreshTokenRepository;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -47,6 +48,8 @@ public class AuthService {
 
     private final WorkspaceService workspaceService;
 
+    private final Clock clock;
+
     private final long refreshTokenExpirationMs;
 
     private final long passwordResetExpirationMs;
@@ -70,6 +73,8 @@ public class AuthService {
 
             WorkspaceService workspaceService,
 
+            Clock clock,
+
             @Value("${jwt.refresh-token-expiration-ms}")
             long refreshTokenExpirationMs,
 
@@ -84,6 +89,7 @@ public class AuthService {
         this.emailOutboxService = emailOutboxService;
         this.credentialService = credentialService;
         this.workspaceService = workspaceService;
+        this.clock = clock;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
         this.passwordResetExpirationMs = passwordResetExpirationMs;
     }
@@ -105,7 +111,7 @@ public class AuthService {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
                 .orElseThrow(() -> new InvalidCredentialsException("Token de atualização inválido"));
 
-        if (!refreshToken.getExpiresAt().isAfter(OffsetDateTime.now())) {
+        if (!refreshToken.getExpiresAt().isAfter(OffsetDateTime.now(clock))) {
             throw new InvalidCredentialsException("Token de atualização inválido");
         }
 
@@ -131,7 +137,7 @@ public class AuthService {
         UserInvite invite = userInviteRepository.findByEmailAndToken(request.email(), request.token())
                 .orElseThrow(() -> new ResourceNotFoundException("Convite não encontrado"));
 
-        if (!invite.getExpiresAt().isAfter(OffsetDateTime.now())) {
+        if (!invite.getExpiresAt().isAfter(OffsetDateTime.now(clock))) {
             throw new InvalidInviteException("Convite expirado");
         }
 
@@ -167,7 +173,7 @@ public class AuthService {
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.token())
                 .orElseThrow(() -> new InvalidCredentialsException("Token de redefinição inválido"));
 
-        if (!resetToken.getExpiresAt().isAfter(OffsetDateTime.now())) {
+        if (!resetToken.getExpiresAt().isAfter(OffsetDateTime.now(clock))) {
             throw new InvalidCredentialsException("Token de redefinição inválido");
         }
 
@@ -180,7 +186,7 @@ public class AuthService {
         PasswordResetToken resetToken = new PasswordResetToken();
         resetToken.setToken(UUID.randomUUID().toString());
         resetToken.setUser(user);
-        resetToken.setExpiresAt(OffsetDateTime.now().plus(Duration.ofMillis(passwordResetExpirationMs)));
+        resetToken.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(passwordResetExpirationMs)));
         passwordResetTokenRepository.save(resetToken);
 
         emailOutboxService.enqueuePasswordReset(
@@ -191,7 +197,7 @@ public class AuthService {
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(UUID.randomUUID().toString());
         refreshToken.setUser(userRepository.getReferenceById(userId));
-        refreshToken.setExpiresAt(OffsetDateTime.now().plus(Duration.ofMillis(refreshTokenExpirationMs)));
+        refreshToken.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(refreshTokenExpirationMs)));
         refreshTokenRepository.save(refreshToken);
 
         String role = workspaceService.getRoleName(userId);
