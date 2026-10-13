@@ -7,7 +7,6 @@ import com.vaulty.api.dto.invite.InviteUserRequest;
 import com.vaulty.api.service.InviteService;
 import jakarta.validation.Valid;
 import java.util.UUID;
-import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -41,8 +40,6 @@ public class InviteController implements InviteControllerDocs {
     @Override
     public ResponseEntity<InviteValidationResponse> validate(
             @Valid @RequestBody InviteValidationRequest request) {
-        return ResponseEntity.ok()
-                .cacheControl(CacheControl.noStore())
-                .body(inviteService.validate(request));
+        return ResponseEntity.ok(inviteService.validate(request));
     }
 }

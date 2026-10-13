@@ -18,21 +18,32 @@ import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.service.JwtService;
 import com.vaulty.api.service.WorkspaceService;
 import jakarta.servlet.http.Cookie;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 @AutoConfigureMockMvc
+@Import(InviteAndRegisterIntegrationTest.ClockConfiguration.class)
 class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
 
     private static final String ADMIN_EMAIL = "admin@gmail.com";
 
+    @Autowired private Clock clock;
     @Autowired private MockMvc mockMvc;
     @Autowired private UserRepository userRepository;
     @Autowired private UserInviteRepository userInviteRepository;
@@ -109,13 +120,13 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.email").value("validar@example.com"))
-                .andExpect(jsonPath("$.remainingSeconds").isNumber());
+                .andExpect(jsonPath("$.remainingSeconds").value(7 * 24 * 60 * 60));
     }
 
     @Test
     void invalidAndExpiredInvitesHaveTheSameUnavailableResponse() throws Exception {
         UserInvite expiredInvite = createInvite(
-                "expirado@example.com", OffsetDateTime.now().minusSeconds(1));
+                "expirado@example.com", OffsetDateTime.now(clock).minusSeconds(1));
         RequestPostProcessor remoteAddress = uniqueRemoteAddress();
 
         mockMvc.perform(post("/invites/validate")
@@ -169,6 +180,96 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
                 .andExpect(header().string("Cache-Control", "no-store"));
     }
 
+    @Test
+    void invalidBodyIsNotCached() throws Exception {
+        mockMvc.perform(post("/invites/validate")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string("Cache-Control", "no-store"));
+
+        mockMvc.perform(post("/invites/validate")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string("Cache-Control", "no-store"));
+    }
+
+    @Test
+    void emailWithAnAccountHasTheSameUnavailableResponse() throws Exception {
+        UserInvite invite = createInvite(ADMIN_EMAIL);
+
+        mockMvc.perform(post("/invites/validate")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "token": "%s" }
+                                """.formatted(invite.getEmail(), invite.getToken())))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.message").value("Convite indisponível"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {-1, 0, 1})
+    void validationAndRegistrationAgreeAtExpiration(long remainingMicros) throws Exception {
+        UserInvite invite = createInvite(
+                "boundary@example.com", OffsetDateTime.now(clock).plusNanos(remainingMicros * 1000));
+        boolean valid = remainingMicros > 0;
+
+        var validation = mockMvc.perform(post("/invites/validate")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "token": "%s" }
+                                """.formatted(invite.getEmail(), invite.getToken())))
+                .andExpect(status().is(valid ? 200 : 404))
+                .andExpect(header().string("Cache-Control", "no-store"));
+        if (valid) {
+            validation.andExpect(jsonPath("$.remainingSeconds").value(1));
+        } else {
+            validation.andExpect(jsonPath("$.message").value("Convite indisponível"));
+        }
+
+        var registration = mockMvc.perform(post("/auth/register")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s", "token": "%s", "name": "Boundary User",
+                                  "password": "password123", "confirmPassword": "password123"
+                                }
+                                """.formatted(invite.getEmail(), invite.getToken())))
+                .andExpect(status().is(valid ? 200 : 409));
+        if (!valid) {
+            registration.andExpect(jsonPath("$.message").value("Convite expirado"));
+        }
+        assertThat(userRepository.findByEmail(invite.getEmail()).isPresent()).isEqualTo(valid);
+        assertThat(userInviteRepository.findByEmailAndToken(invite.getEmail(), invite.getToken()).isPresent())
+                .isEqualTo(!valid);
+    }
+
+    @Test
+    void otherEndpointsKeepTheirDefaultCachePolicy() throws Exception {
+        mockMvc.perform(post("/auth/register")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate"));
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class ClockConfiguration {
+        @Bean
+        @Primary
+        Clock inviteTestClock() {
+            return Clock.fixed(Instant.parse("2030-01-01T00:00:00Z"), ZoneOffset.UTC);
+        }
+    }
+
     private User admin() {
         return userRepository.findByEmail(ADMIN_EMAIL).orElseThrow();
     }
@@ -194,7 +295,7 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
     }
 
     private UserInvite createInvite(String email) {
-        return createInvite(email, OffsetDateTime.now().plusDays(7));
+        return createInvite(email, OffsetDateTime.now(clock).plusDays(7));
     }
 
     private UserInvite createInvite(String email, OffsetDateTime expiresAt) {

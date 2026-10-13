@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -41,10 +40,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
             FilterChain filterChain)
             throws ServletException, IOException {
-        if ("POST".equals(request.getMethod()) && "/invites/validate".equals(request.getRequestURI())) {
-            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
-        }
-
         if (!isRateLimited(request)) {
             filterChain.doFilter(request, response);
             return;

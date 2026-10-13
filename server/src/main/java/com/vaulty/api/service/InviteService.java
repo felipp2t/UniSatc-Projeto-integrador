@@ -63,8 +63,8 @@ public class InviteService {
                 .filter(candidate -> candidate.getExpiresAt().isAfter(now))
                 .orElseThrow(() -> new ResourceNotFoundException("Convite indisponível"));
 
-        long remainingMillis = Duration.between(now, invite.getExpiresAt()).toMillis();
-        long remainingSeconds = Math.max(1, (remainingMillis + 999) / 1000);
+        Duration remaining = Duration.between(now, invite.getExpiresAt());
+        long remainingSeconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
         return new InviteValidationResponse(invite.getEmail(), remainingSeconds);
     }
 
