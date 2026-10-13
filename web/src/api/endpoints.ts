@@ -4,9 +4,10 @@ import type {
   CollectionPageResponse,
   CollectionPathEntry,
   CreateItemRequest,
-  CreateWorkspaceRequest,
   ForgotPasswordRequest,
   InviteUserRequest,
+  InviteValidationRequest,
+  InviteValidationResponse,
   ItemPageResponse,
   ItemResponse,
   LoginRequest,
@@ -41,8 +42,6 @@ export const userApi = {
 }
 
 export const workspaceApi = {
-  create: (request: CreateWorkspaceRequest) =>
-    apiClient.post<WorkspaceResponse>('/workspaces', request),
   get: (workspaceId: string) =>
     apiClient.get<WorkspaceResponse>(`/workspaces/${workspaceId}`),
   list: () => apiClient.get<WorkspaceResponse[]>('/workspaces'),
@@ -57,6 +56,8 @@ export const workspaceApi = {
 export const inviteApi = {
   create: (request: InviteUserRequest) =>
     apiClient.post<void>('/invites', request),
+  validate: (request: InviteValidationRequest) =>
+    apiClient.post<InviteValidationResponse>('/invites/validate', request),
 }
 
 export const collectionsApi = {

@@ -118,7 +118,8 @@ describe('application router guards', () => {
 
   it.each([
     '/login',
-    '/convite/invite-token',
+    '/cadastro',
+    '/cadastro?email=novo%40example.com&token=invite-token',
     '/esqueci-senha',
     '/redefinir-senha',
   ])(
@@ -131,7 +132,7 @@ describe('application router guards', () => {
 
       await loadRouter(router)
 
-      expect(router.state.location.pathname).toBe(initialEntry)
+      expect(router.state.location.pathname).toBe(initialEntry.split('?')[0])
     }
   )
 
