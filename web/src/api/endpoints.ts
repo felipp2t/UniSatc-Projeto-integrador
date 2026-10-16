@@ -1,9 +1,12 @@
 import { apiClient } from './client'
 import type {
   ChangePasswordRequest,
+  CollectionPageResponse,
+  CreateItemRequest,
   CreateWorkspaceRequest,
   ForgotPasswordRequest,
   InviteUserRequest,
+  ItemResponse,
   LoginRequest,
   RegisterRequest,
   ResetPasswordRequest,
@@ -52,4 +55,17 @@ export const workspaceApi = {
 export const inviteApi = {
   create: (request: InviteUserRequest) =>
     apiClient.post<void>('/invites', request),
+}
+
+export const collectionsApi = {
+  list: (workspaceId: string, parentId?: string, page = 0, size = 100) =>
+    apiClient.get<CollectionPageResponse>(
+      `/workspaces/${workspaceId}/collections`,
+      { params: { page, parentId, size } }
+    ),
+}
+
+export const itemsApi = {
+  create: (workspaceId: string, request: CreateItemRequest) =>
+    apiClient.post<ItemResponse>(`/workspaces/${workspaceId}/items`, request),
 }
