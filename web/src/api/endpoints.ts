@@ -2,11 +2,13 @@ import { apiClient } from './client'
 import type {
   ChangePasswordRequest,
   CollectionPageResponse,
+  CollectionPathEntry,
   CreateItemRequest,
   CreateWorkspaceRequest,
   ForgotPasswordRequest,
   InviteUserRequest,
   ItemResponse,
+  ItemPageResponse,
   LoginRequest,
   RegisterRequest,
   ResetPasswordRequest,
@@ -63,9 +65,17 @@ export const collectionsApi = {
       `/workspaces/${workspaceId}/collections`,
       { params: { page, parentId, size } }
     ),
+  path: (workspaceId: string, collectionId: string) =>
+    apiClient.get<CollectionPathEntry[]>(
+      `/workspaces/${workspaceId}/collections/${collectionId}/path`
+    ),
 }
 
 export const itemsApi = {
   create: (workspaceId: string, request: CreateItemRequest) =>
     apiClient.post<ItemResponse>(`/workspaces/${workspaceId}/items`, request),
+  list: (workspaceId: string, collectionId?: string, page = 0, size = 100) =>
+    apiClient.get<ItemPageResponse>(`/workspaces/${workspaceId}/items`, {
+      params: { collectionId, page, size },
+    }),
 }

@@ -401,7 +401,17 @@ function getCreateError(error: unknown, type: CreateItemType) {
   return apiError.message || 'Não foi possível criar o item.'
 }
 
-export function CreateItemDialog() {
+export function CreateItemDialog({
+  collectionId,
+  onItemCreated,
+  workspaceId: initialWorkspaceId,
+  workspaceName,
+}: {
+  collectionId?: string
+  onItemCreated?: () => void
+  workspaceId?: string
+  workspaceName?: string
+}) {
   const titleId = useId()
   const formRef = useRef<HTMLFormElement>(null)
   const [open, setOpen] = useState(false)
@@ -431,12 +441,17 @@ export function CreateItemDialog() {
       .then((loadedWorkspaces) => {
         if (ignore) return
         setWorkspaces(loadedWorkspaces)
-        const [onlyWorkspace] = loadedWorkspaces
-        setWorkspaceId(
-          loadedWorkspaces.length === 1 && onlyWorkspace
-            ? onlyWorkspace.id
-            : undefined
+        const selectedWorkspace = loadedWorkspaces.find(
+          ({ id }) => id === initialWorkspaceId
         )
+        const [onlyWorkspace] = loadedWorkspaces
+        const selected = selectedWorkspace ?? onlyWorkspace
+        setWorkspaceId(selected?.id)
+        if (selected?.id === initialWorkspaceId && collectionId) {
+          setLocation(collectionId)
+        } else {
+          setLocation('root')
+        }
       })
       .catch((error: unknown) => {
         if (!ignore) setSubmitError(toApiError(error).message)
@@ -448,7 +463,7 @@ export function CreateItemDialog() {
     return () => {
       ignore = true
     }
-  }, [open])
+  }, [collectionId, initialWorkspaceId, open])
 
   useEffect(() => {
     if (!(open && workspaceId)) {
@@ -580,6 +595,7 @@ export function CreateItemDialog() {
         appToast.success('Item criado.', {
           description: `${request.title} foi salvo com sucesso.`,
         })
+        onItemCreated?.()
         handleOpenChange(false)
       } catch (error) {
         setSubmitError(getCreateError(error, selectedType))
@@ -587,7 +603,15 @@ export function CreateItemDialog() {
         setSubmitting(false)
       }
     },
-    [content, handleOpenChange, location, selectedType, title, workspaceId]
+    [
+      content,
+      handleOpenChange,
+      location,
+      onItemCreated,
+      selectedType,
+      title,
+      workspaceId,
+    ]
   )
 
   return (
@@ -657,7 +681,13 @@ export function CreateItemDialog() {
             onWorkspaceChange={handleWorkspaceChange}
             titleId={titleId}
             workspaceId={workspaceId}
-            workspaces={workspaces}
+            workspaces={workspaces.map((workspace) => ({
+              ...workspace,
+              name:
+                workspace.id === initialWorkspaceId && workspaceName
+                  ? workspaceName
+                  : workspace.name,
+            }))}
           />
 
           <ItemContentField

@@ -26,9 +26,10 @@ export interface ItemResponse {
   collectionId: string | null
   id: string
   linkUrl: string | null
+  preview: string | null
   textContent: string | null
   title: string
-  type: CreateItemType
+  type: ItemType
 }
 export interface CollectionResponse {
   id: string
@@ -41,6 +42,18 @@ export interface CollectionPageResponse {
   size: number
   totalItems: number
   totalPages: number
+}
+export type ItemType = 'link' | 'secret' | 'text'
+export interface ItemPageResponse {
+  items: ItemResponse[]
+  page: number
+  size: number
+  totalItems: number
+  totalPages: number
+}
+export interface CollectionPathEntry {
+  id: string
+  name: string
 }
 export type CreateWorkspaceRequest =
   components['schemas']['CreateWorkspaceRequest']

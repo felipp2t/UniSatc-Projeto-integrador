@@ -30,6 +30,7 @@ public class WorkspaceItemService {
 
     private static final String DUPLICATE_TITLE_CONSTRAINT = "uq_item_workspace_collection_title";
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_PREVIEW_LENGTH = 80;
 
     private final WorkspaceItemRepository itemRepository;
     private final WorkspaceItemSecretRepository secretRepository;
@@ -161,10 +162,23 @@ public class WorkspaceItemService {
     }
 
     private ItemResponse toResponse(WorkspaceItem item, boolean includeContent) {
+        String preview = switch (item.getType()) {
+            case "text" -> truncate(item.getTextContent());
+            case "link" -> truncate(item.getLinkUrl());
+            case "secret" -> null;
+            default -> null;
+        };
         return new ItemResponse(item.getId(), item.getType(), item.getTitle(),
                 item.getCollection() == null ? null : item.getCollection().getId(),
                 includeContent ? item.getTextContent() : null,
-                includeContent ? item.getLinkUrl() : null);
+                includeContent ? item.getLinkUrl() : null, preview);
+    }
+
+    private String truncate(String value) {
+        if (value == null || value.length() <= MAX_PREVIEW_LENGTH) {
+            return value;
+        }
+        return value.substring(0, MAX_PREVIEW_LENGTH - 1) + "…";
     }
 
 }
