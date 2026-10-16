@@ -2,6 +2,35 @@ import type { components } from './generated/schema'
 
 export type ChangePasswordRequest =
   components['schemas']['ChangePasswordRequest']
+export type CreateItemType = 'text' | 'link' | 'secret'
+export type CreateItemRequest =
+  | {
+      type: 'text'
+      title: string
+      collectionId?: string
+      textContent: string
+    }
+  | {
+      type: 'link'
+      title: string
+      collectionId?: string
+      linkUrl: string
+    }
+  | {
+      type: 'secret'
+      title: string
+      collectionId?: string
+      value: string
+    }
+export interface ItemResponse {
+  collectionId: string | null
+  id: string
+  linkUrl: string | null
+  preview: string | null
+  textContent: string | null
+  title: string
+  type: ItemType
+}
 export interface CollectionResponse {
   id: string
   name: string
@@ -15,15 +44,6 @@ export interface CollectionPageResponse {
   totalPages: number
 }
 export type ItemType = 'link' | 'secret' | 'text'
-export interface ItemResponse {
-  collectionId: string | null
-  id: string
-  linkUrl: string | null
-  preview: string | null
-  textContent: string | null
-  title: string
-  type: ItemType
-}
 export interface ItemPageResponse {
   items: ItemResponse[]
   page: number

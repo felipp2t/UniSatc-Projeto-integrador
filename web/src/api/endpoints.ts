@@ -3,10 +3,12 @@ import type {
   ChangePasswordRequest,
   CollectionPageResponse,
   CollectionPathEntry,
+  CreateItemRequest,
   CreateWorkspaceRequest,
   ForgotPasswordRequest,
   InviteUserRequest,
   ItemPageResponse,
+  ItemResponse,
   LoginRequest,
   RegisterRequest,
   ResetPasswordRequest,
@@ -70,6 +72,8 @@ export const collectionsApi = {
 }
 
 export const itemsApi = {
+  create: (workspaceId: string, request: CreateItemRequest) =>
+    apiClient.post<ItemResponse>(`/workspaces/${workspaceId}/items`, request),
   list: (workspaceId: string, collectionId?: string, page = 0, size = 100) =>
     apiClient.get<ItemPageResponse>(`/workspaces/${workspaceId}/items`, {
       params: { collectionId, page, size },

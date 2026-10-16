@@ -17,6 +17,8 @@ import type {
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
+import { CreateItemDialog } from '@/components/create-item-dialog'
+import { NotFoundPage } from '@/components/not-found-page'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -42,6 +44,7 @@ type ItemTypeFilter = (typeof itemTypeOptions)[number]
 export const Route = createFileRoute('/_protected/')({
   component: HomePage,
   head: () => ({ meta: [{ title: 'Vaulty' }] }),
+  notFoundComponent: NotFoundPage,
   validateSearch: searchSchema,
 })
 
@@ -90,6 +93,9 @@ function WorkspaceBrowser({
   workspaceId: string
   workspaceName: string
 }) {
+  const [refreshKey, setRefreshKey] = useState(0)
+  const refreshItems = useCallback(() => setRefreshKey((key) => key + 1), [])
+
   return (
     <main className='mx-auto flex min-h-full w-full max-w-7xl flex-col gap-7 px-6 py-10 md:px-8 md:py-12'>
       <WorkspaceBreadcrumbs
@@ -99,6 +105,7 @@ function WorkspaceBrowser({
       />
       <WorkspaceHeading
         collectionId={collectionId}
+        onItemCreated={refreshItems}
         workspaceId={workspaceId}
         workspaceName={workspaceName}
       />
@@ -106,7 +113,11 @@ function WorkspaceBrowser({
         collectionId={collectionId}
         workspaceId={workspaceId}
       />
-      <ItemsSection collectionId={collectionId} workspaceId={workspaceId} />
+      <ItemsSection
+        collectionId={collectionId}
+        refreshKey={refreshKey}
+        workspaceId={workspaceId}
+      />
     </main>
   )
 }
@@ -168,12 +179,14 @@ function WorkspaceBreadcrumbs({
 
 function WorkspaceHeading({
   collectionId,
+  onItemCreated,
   workspaceId,
   workspaceName,
 }: {
   collectionId: string | undefined
   workspaceId: string
   workspaceName: string
+  onItemCreated: () => void
 }) {
   const currentCollection = useQuery({
     enabled: Boolean(collectionId),
@@ -201,6 +214,12 @@ function WorkspaceHeading({
           </h1>
         </div>
       </div>
+      <CreateItemDialog
+        collectionId={collectionId}
+        onItemCreated={onItemCreated}
+        workspaceId={workspaceId}
+        workspaceName={workspaceName}
+      />
     </header>
   )
 }
@@ -273,9 +292,11 @@ function CollectionCard({
 
 function ItemsSection({
   collectionId,
+  refreshKey,
   workspaceId,
 }: {
   collectionId: string | undefined
+  refreshKey: number
   workspaceId: string
 }) {
   const [itemType, setItemType] = useState<ItemTypeFilter>('all')
@@ -284,7 +305,7 @@ function ItemsSection({
   const items = useQuery({
     queryFn: async () =>
       (await itemsApi.list(workspaceId, collectionId, page, 100)).data,
-    queryKey: ['items', workspaceId, collectionId, page],
+    queryKey: ['items', workspaceId, collectionId, page, refreshKey],
   })
   const changeItemType = useCallback((value: ItemTypeFilter) => {
     setItemType(value)
