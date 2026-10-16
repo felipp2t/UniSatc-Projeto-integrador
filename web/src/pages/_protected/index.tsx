@@ -12,13 +12,13 @@ import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
-import { CreateItemDialog } from '@/components/create-item-dialog'
-import { NotFoundPage } from '@/components/not-found-page'
 import type {
   CollectionPageResponse,
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
+import { CreateItemDialog } from '@/components/create-item-dialog'
+import { NotFoundPage } from '@/components/not-found-page'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -105,9 +105,9 @@ function WorkspaceBrowser({
       />
       <WorkspaceHeading
         collectionId={collectionId}
+        onItemCreated={refreshItems}
         workspaceId={workspaceId}
         workspaceName={workspaceName}
-        onItemCreated={refreshItems}
       />
       <CollectionsSection
         collectionId={collectionId}
