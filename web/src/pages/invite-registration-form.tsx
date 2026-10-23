@@ -4,7 +4,12 @@ import { z } from 'zod'
 import { authApi } from '@/api/endpoints'
 import { type ApiError, toApiError } from '@/api/errors'
 import { Button } from '@/components/ui/button'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { SecretInput } from '@/components/ui/secret-input'
 import { BrandMark, InviteStatus, unavailableMessage } from './invite-status'
@@ -254,7 +259,7 @@ export function InviteRegistrationForm({
 
 type RegistrationValues = z.infer<typeof registrationSchema>
 type PasswordFieldName = 'password' | 'confirmPassword'
-type PasswordFieldProps = {
+interface PasswordFieldProps {
   disabled: boolean
   formId: string
   label: string
@@ -323,4 +328,3 @@ function getRegistrationError(error: ApiError) {
   }
   return 'Não foi possível criar sua conta. Verifique sua conexão e tente novamente.'
 }
-

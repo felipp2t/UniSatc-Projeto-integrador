@@ -43,7 +43,10 @@ function InviteRegistrationPage() {
       }
 
       const { data } = await inviteApi.validate({ email, token })
-      return { data, deadline: performance.now() + data.remainingSeconds * 1000 }
+      return {
+        data,
+        deadline: performance.now() + data.remainingSeconds * 1000,
+      }
     },
     queryKey: inviteValidationQueryKey(email, token),
   })
@@ -128,15 +131,14 @@ function InviteRegistrationPage() {
 
   return (
     <InviteRegistrationForm
+      deadline={validation.deadline}
       email={validation.data.email}
       onGoToLogin={handleGoToLogin}
       onRegistered={handleRegistered}
-      deadline={validation.deadline}
       token={token ?? ''}
     />
   )
 }
-
 function InviteRetryStatus({ onRetry }: { onRetry: () => void }) {
   return (
     <main className='flex min-h-svh items-center justify-center bg-background p-6'>
