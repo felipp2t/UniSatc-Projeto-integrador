@@ -9,6 +9,9 @@ import com.vaulty.api.entity.PasswordResetToken;
 import com.vaulty.api.entity.RefreshToken;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.InvalidCredentialsException;
@@ -22,6 +25,7 @@ import com.vaulty.api.repository.UserRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,6 +53,8 @@ public class AuthService {
 
     private final WorkspaceService workspaceService;
 
+    private final ActivityLogService activityLogService;
+
     private final Clock clock;
 
     private final long refreshTokenExpirationMs;
@@ -74,6 +80,8 @@ public class AuthService {
 
             WorkspaceService workspaceService,
 
+            ActivityLogService activityLogService,
+
             Clock clock,
 
             @Value("${jwt.refresh-token-expiration-ms}")
@@ -90,6 +98,7 @@ public class AuthService {
         this.emailOutboxService = emailOutboxService;
         this.credentialService = credentialService;
         this.workspaceService = workspaceService;
+        this.activityLogService = activityLogService;
         this.clock = clock;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
         this.passwordResetExpirationMs = passwordResetExpirationMs;
@@ -153,7 +162,11 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         userRepository.save(user);
 
-        workspaceService.addAsMember(user);
+        var member = workspaceService.addAsMember(user);
+
+        activityLogService.record(member.getWorkspace().getId(), user.getId(), ActivityActorContext.REGISTERED_USER,
+                ActivityAction.MEMBER_JOINED, ActivityResourceType.MEMBER, member.getId(),
+                Map.of("name", user.getName(), "email", user.getEmail(), "inviteId", invite.getId()));
 
         userInviteRepository.delete(invite);
 

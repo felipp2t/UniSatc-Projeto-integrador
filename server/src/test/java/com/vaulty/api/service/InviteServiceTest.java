@@ -33,7 +33,8 @@ class InviteServiceTest {
         when(invites.findByEmailAndTokenAndStatus(invite.getEmail(), invite.getToken(), UserInviteStatus.PENDING))
                 .thenReturn(Optional.of(invite));
         InviteService service = new InviteService(
-                invites, users, mock(WorkspaceService.class), mock(EmailOutboxService.class), clock, 604800000);
+                invites, users, mock(WorkspaceService.class), mock(EmailOutboxService.class),
+                mock(ActivityLogService.class), clock, 604800000);
 
         var result = service.validate(new InviteValidationRequest(invite.getEmail(), invite.getToken()));
 

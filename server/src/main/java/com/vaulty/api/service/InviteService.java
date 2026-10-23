@@ -5,6 +5,9 @@ import com.vaulty.api.dto.invite.InviteValidationRequest;
 import com.vaulty.api.dto.invite.InviteValidationResponse;
 import com.vaulty.api.entity.UserInvite;
 import com.vaulty.api.entity.UserInviteStatus;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.UserInviteRepository;
@@ -12,7 +15,9 @@ import com.vaulty.api.repository.UserRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +33,13 @@ public class InviteService {
 
     private final EmailOutboxService emailOutboxService;
 
+    private final ActivityLogService activityLogService;
+
     private final long inviteExpirationMs;
 
     private final Clock clock;
 
+    @Autowired
     public InviteService(
             UserInviteRepository userInviteRepository,
 
@@ -41,6 +49,8 @@ public class InviteService {
 
             EmailOutboxService emailOutboxService,
 
+            ActivityLogService activityLogService,
+
             Clock clock,
 
             @Value("${invite.expiration-ms}")
@@ -49,6 +59,7 @@ public class InviteService {
         this.userRepository = userRepository;
         this.workspaceService = workspaceService;
         this.emailOutboxService = emailOutboxService;
+        this.activityLogService = activityLogService;
         this.clock = clock;
         this.inviteExpirationMs = inviteExpirationMs;
     }
@@ -68,11 +79,14 @@ public class InviteService {
         OffsetDateTime now = OffsetDateTime.now(clock);
         UserInvite invite = requirePendingInviteForUpdate(request, now);
         invite.setStatus(UserInviteStatus.DECLINED);
+        activityLogService.recordInviteeEmail(workspaceService.singletonId(), invite.getEmail(),
+                ActivityAction.MEMBER_INVITE_DECLINED, ActivityResourceType.MEMBER, invite.getId(),
+                Map.of("email", invite.getEmail()));
     }
 
     @Transactional
     public void inviteUser(UUID inviterId, InviteUserRequest request) {
-        workspaceService.requireOwner(inviterId);
+        var workspace = workspaceService.requireOwner(inviterId);
 
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new ConflictException("E-mail já possui uma conta");
@@ -86,6 +100,10 @@ public class InviteService {
         invite.setInvitedBy(userRepository.getReferenceById(inviterId));
         invite.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(inviteExpirationMs)));
         userInviteRepository.save(invite);
+
+        activityLogService.record(workspace.getId(), inviterId, ActivityActorContext.USER,
+                ActivityAction.MEMBER_INVITED, ActivityResourceType.MEMBER, invite.getId(),
+                Map.of("email", invite.getEmail(), "expiresAt", invite.getExpiresAt().toString()));
 
         emailOutboxService.enqueueInvite(invite.getEmail(), invite.getToken(), invite.getExpiresAt());
     }
