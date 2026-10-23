@@ -3,14 +3,18 @@ import type {
   ChangePasswordRequest,
   CollectionPageResponse,
   CollectionPathEntry,
+  CollectionResponse,
+  CreateCollectionRequest,
   CreateItemRequest,
-  CreateWorkspaceRequest,
   ForgotPasswordRequest,
   InviteUserRequest,
+  InviteValidationRequest,
+  InviteValidationResponse,
   ItemPageResponse,
   ItemResponse,
   LoginRequest,
   RegisterRequest,
+  RenameCollectionRequest,
   ResetPasswordRequest,
   UpdateProfileRequest,
   UpdateWorkspaceRequest,
@@ -41,8 +45,6 @@ export const userApi = {
 }
 
 export const workspaceApi = {
-  create: (request: CreateWorkspaceRequest) =>
-    apiClient.post<WorkspaceResponse>('/workspaces', request),
   get: (workspaceId: string) =>
     apiClient.get<WorkspaceResponse>(`/workspaces/${workspaceId}`),
   list: () => apiClient.get<WorkspaceResponse[]>('/workspaces'),
@@ -57,9 +59,16 @@ export const workspaceApi = {
 export const inviteApi = {
   create: (request: InviteUserRequest) =>
     apiClient.post<void>('/invites', request),
+  validate: (request: InviteValidationRequest) =>
+    apiClient.post<InviteValidationResponse>('/invites/validate', request),
 }
 
 export const collectionsApi = {
+  create: (workspaceId: string, request: CreateCollectionRequest) =>
+    apiClient.post<CollectionResponse>(
+      `/workspaces/${workspaceId}/collections`,
+      request
+    ),
   list: (workspaceId: string, parentId?: string, page = 0, size = 100) =>
     apiClient.get<CollectionPageResponse>(
       `/workspaces/${workspaceId}/collections`,
@@ -68,6 +77,19 @@ export const collectionsApi = {
   path: (workspaceId: string, collectionId: string) =>
     apiClient.get<CollectionPathEntry[]>(
       `/workspaces/${workspaceId}/collections/${collectionId}/path`
+    ),
+  remove: (workspaceId: string, collectionId: string) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/collections/${collectionId}`
+    ),
+  rename: (
+    workspaceId: string,
+    collectionId: string,
+    request: RenameCollectionRequest
+  ) =>
+    apiClient.put<CollectionResponse>(
+      `/workspaces/${workspaceId}/collections/${collectionId}`,
+      request
     ),
 }
 

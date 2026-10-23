@@ -36,6 +36,10 @@ export interface CollectionResponse {
   name: string
   parentId: string | null
 }
+export type CreateCollectionRequest =
+  components['schemas']['CreateCollectionRequest']
+export type RenameCollectionRequest =
+  components['schemas']['RenameCollectionRequest']
 export interface CollectionPageResponse {
   items: CollectionResponse[]
   page: number
@@ -55,11 +59,13 @@ export interface CollectionPathEntry {
   id: string
   name: string
 }
-export type CreateWorkspaceRequest =
-  components['schemas']['CreateWorkspaceRequest']
 export type ForgotPasswordRequest =
   components['schemas']['ForgotPasswordRequest']
 export type InviteUserRequest = components['schemas']['InviteUserRequest']
+export type InviteValidationRequest =
+  components['schemas']['InviteValidationRequest']
+export type InviteValidationResponse =
+  components['schemas']['InviteValidationResponse']
 export type LoginRequest = components['schemas']['LoginRequest']
 export type RegisterRequest = components['schemas']['RegisterRequest']
 export type ResetPasswordRequest = components['schemas']['ResetPasswordRequest']

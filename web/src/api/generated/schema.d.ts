@@ -22,18 +22,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workspaces": {
+    "/workspaces/{workspaceId}/collections/{collectionId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Lista os workspaces do usuário */
+        get?: never;
+        /** Renomeia uma pasta */
+        put: operations["rename"];
+        post?: never;
+        /** Exclui uma pasta vazia */
+        delete: operations["delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{workspaceId}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista os itens ativos da raiz ou de uma pasta */
         get: operations["list"];
         put?: never;
-        /** Cria um workspace */
+        /** Cria um item de texto, link ou segredo */
         post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{workspaceId}/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista as pastas da raiz ou de uma pasta */
+        get: operations["list_1"];
+        put?: never;
+        /** Cria uma pasta na raiz ou dentro de outra pasta */
+        post: operations["create_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -51,6 +87,23 @@ export interface paths {
         put?: never;
         /** Envia convite para um novo usuário */
         post: operations["invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Valida convite para cadastro */
+        post: operations["validate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -194,6 +247,23 @@ export interface paths {
         patch: operations["changePassword"];
         trace?: never;
     };
+    "/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista os workspaces do usuário */
+        get: operations["list_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspaceId}/members": {
         parameters: {
             query?: never;
@@ -202,7 +272,75 @@ export interface paths {
             cookie?: never;
         };
         /** Lista os membros de um workspace */
-        get: operations["list_1"];
+        get: operations["list_3"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{workspaceId}/items/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consulta um item de texto, link ou metadados de segredo */
+        get: operations["get_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{workspaceId}/items/{itemId}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Revela o valor de um segredo autorizado */
+        get: operations["reveal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{workspaceId}/items/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Busca itens ativos por todas as palavras do título, ignorando caixa e acentos */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{workspaceId}/collections/{collectionId}/path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consulta o caminho de uma pasta desde a raiz */
+        get: operations["path"];
         put?: never;
         post?: never;
         delete?: never;
@@ -231,13 +369,62 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
         };
-        CreateWorkspaceRequest: {
+        RenameCollectionRequest: {
             name: string;
-            description?: string;
+        };
+        CollectionResponse: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            /** Format: uuid */
+            parentId?: string;
+        };
+        CreateItemRequest: {
+            type: string;
+            title: string;
+            /** Format: uuid */
+            collectionId?: string;
+            textContent?: string;
+            linkUrl?: string;
+            value?: string;
+        };
+        ItemResponse: {
+            /** Format: uuid */
+            id?: string;
+            type?: string;
+            title?: string;
+            /** Format: uuid */
+            collectionId?: string;
+            textContent?: string;
+            linkUrl?: string;
+        };
+        CreateCollectionRequest: {
+            name: string;
+            /** Format: uuid */
+            parentId?: string;
         };
         InviteUserRequest: {
             /** Format: email */
             email: string;
+        };
+        InviteValidationRequest: {
+            /** Format: email */
+            email: string;
+            token: string;
+        };
+        ApiErrorBody: {
+            /** Format: date-time */
+            timestamp?: string;
+            /** Format: int32 */
+            status?: number;
+            error?: string;
+            message?: string;
+            path?: string;
+        };
+        InviteValidationResponse: {
+            email: string;
+            /** Format: int64 */
+            remainingSeconds: number;
         };
         ResetPasswordRequest: {
             token: string;
@@ -279,6 +466,36 @@ export interface components {
             /** Format: uuid */
             roleId?: string;
             roleName?: string;
+        };
+        ItemPageResponse: {
+            items?: components["schemas"]["ItemResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            totalItems?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        SecretValueResponse: {
+            value?: string;
+        };
+        CollectionPageResponse: {
+            items?: components["schemas"]["CollectionResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            totalItems?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        CollectionPathEntry: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
         };
         UserResponse: {
             id?: string;
@@ -369,11 +586,122 @@ export interface operations {
             };
         };
     };
-    list: {
+    rename: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                workspaceId: string;
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameCollectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: {
+                collectionId?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                workspaceId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -384,7 +712,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["WorkspaceResponse"][];
+                    "*/*": components["schemas"]["ItemPageResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemPageResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemPageResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemPageResponse"];
                 };
             };
         };
@@ -393,12 +748,14 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                workspaceId: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateWorkspaceRequest"];
+                "application/json": components["schemas"]["CreateItemRequest"];
             };
         };
         responses: {
@@ -408,7 +765,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["WorkspaceResponse"];
+                    "*/*": components["schemas"]["ItemResponse"];
                 };
             };
             /** @description Bad Request */
@@ -417,7 +774,140 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["WorkspaceResponse"];
+                    "*/*": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemResponse"];
+                };
+            };
+        };
+    };
+    list_1: {
+        parameters: {
+            query?: {
+                parentId?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                workspaceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionPageResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionPageResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionPageResponse"];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCollectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionResponse"];
                 };
             };
         };
@@ -448,6 +938,57 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    validate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteValidationRequest"];
+            };
+        };
+        responses: {
+            /** @description Convite válido */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InviteValidationResponse"];
+                };
+            };
+            /** @description E-mail ou token em formato inválido */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Convite indisponível */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Limite de tentativas excedido */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };
@@ -695,14 +1236,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Bad Request */
+            /** @description Senha atual incorreta ou corpo inválido */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Unauthorized */
+            /** @description Não autenticado */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -711,7 +1252,27 @@ export interface operations {
             };
         };
     };
-    list_1: {
+    list_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkspaceResponse"][];
+                };
+            };
+        };
+    };
+    list_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -738,6 +1299,173 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["WorkspaceMemberResponse"][];
+                };
+            };
+        };
+    };
+    get_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemResponse"];
+                };
+            };
+        };
+    };
+    reveal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SecretValueResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SecretValueResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SecretValueResponse"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                q: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                workspaceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemPageResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemPageResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemPageResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ItemPageResponse"];
+                };
+            };
+        };
+    };
+    path: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionPathEntry"][];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionPathEntry"][];
                 };
             };
         };

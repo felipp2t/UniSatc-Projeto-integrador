@@ -74,12 +74,17 @@ describe('endpoint helpers', () => {
 
     const loginRequest = { email: 'user@example.com', password: 'password' }
     const inviteRequest = { email: 'invite@example.com' }
+    const validationRequest = {
+      email: 'invite@example.com',
+      token: 'invite-token',
+    }
 
     try {
       await authApi.login(loginRequest)
       await userApi.getMe()
       await workspaceApi.list()
       await inviteApi.create(inviteRequest)
+      await inviteApi.validate(validationRequest)
     } finally {
       apiClient.defaults.adapter = previousAdapter
     }
@@ -108,6 +113,14 @@ describe('endpoint helpers', () => {
         url: '/invites',
       })
     )
+    expect(adapter).toHaveBeenNthCalledWith(
+      5,
+      expect.objectContaining({
+        data: JSON.stringify(validationRequest),
+        method: 'post',
+        url: '/invites/validate',
+      })
+    )
   })
 })
 
@@ -117,6 +130,7 @@ describe('auth interceptor contract', () => {
     expect(shouldSkipAuthRefresh('/auth/refresh')).toBe(true)
     expect(shouldSkipAuthRefresh('/auth/login?source=invite')).toBe(true)
     expect(shouldSkipAuthRefresh('/auth/refresh#session')).toBe(true)
+    expect(shouldSkipAuthRefresh('/invites/validate')).toBe(true)
     expect(shouldSkipAuthRefresh('/me')).toBe(false)
   })
 
