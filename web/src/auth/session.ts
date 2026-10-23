@@ -17,6 +17,7 @@ export interface SessionService {
   logout: () => Promise<void>
   setNavigateToLogin: (navigate: () => void) => void
   readonly status: SessionStatus
+  updateUser: (user: UserResponse) => void
   readonly user: UserResponse | undefined
 }
 
@@ -107,6 +108,10 @@ class SessionServiceImpl implements SessionService {
 
   setNavigateToLogin(navigate: () => void) {
     this.navigateToLogin = navigate
+  }
+
+  updateUser(user: UserResponse) {
+    this.user = user
   }
 
   handleSessionExpired() {
