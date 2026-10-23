@@ -63,6 +63,9 @@ vi.mock('@/components/create-item-dialog', () => ({
       'Simulate item created'
     ),
 }))
+vi.mock('@/hooks/use-notification-toast', () => ({
+  useNotificationToast: vi.fn(),
+}))
 
 import { routeTree } from '@/route-tree.gen'
 
