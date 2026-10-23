@@ -2,7 +2,9 @@ package com.vaulty.api.controller;
 
 import com.vaulty.api.controller.docs.WorkspaceControllerDocs;
 import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
+import com.vaulty.api.dto.workspace.WorkspacePermissionsResponse;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
+import com.vaulty.api.service.WorkspaceContentAuthorization;
 import com.vaulty.api.service.WorkspaceService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,6 +25,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkspaceController implements WorkspaceControllerDocs {
 
     private final WorkspaceService workspaceService;
+    private final WorkspaceContentAuthorization authorization;
+
+    @GetMapping("/{workspaceId}/me/permissions")
+    @Override
+    public WorkspacePermissionsResponse permissions(
+            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId) {
+        return authorization.permissions(userId, workspaceId);
+    }
 
     @GetMapping
     @Override
