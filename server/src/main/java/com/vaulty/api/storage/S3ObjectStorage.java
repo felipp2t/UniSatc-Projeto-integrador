@@ -1,6 +1,6 @@
 package com.vaulty.api.storage;
 
-import software.amazon.awssdk.core.SdkException;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
