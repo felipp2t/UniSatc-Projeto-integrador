@@ -20,6 +20,7 @@ import type {
   UpdateWorkspaceRequest,
   UserResponse,
   WorkspaceMemberResponse,
+  WorkspacePermissionsResponse,
   WorkspaceResponse,
 } from './types'
 
@@ -51,6 +52,10 @@ export const workspaceApi = {
   listMembers: (workspaceId: string) =>
     apiClient.get<WorkspaceMemberResponse[]>(
       `/workspaces/${workspaceId}/members`
+    ),
+  myPermissions: (workspaceId: string) =>
+    apiClient.get<WorkspacePermissionsResponse>(
+      `/workspaces/${workspaceId}/me/permissions`
     ),
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
