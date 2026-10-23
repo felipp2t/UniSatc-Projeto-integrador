@@ -61,6 +61,8 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(jsonPath("$.paths['/workspaces'].get.summary").value("Lista os workspaces do usuário"))
+                .andExpect(jsonPath("$.paths['/workspaces/{workspaceId}/me/permissions'].get.summary")
+                        .value("Consulta as permissões do usuário no workspace"))
                 .andExpect(jsonPath("$.paths['/workspaces/{workspaceId}/members'].get.summary")
                         .value("Lista os membros de um workspace"));
     }
