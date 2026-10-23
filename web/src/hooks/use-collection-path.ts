@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { collectionKeys } from '@/api/collection-keys'
 import { collectionsApi } from '@/api/endpoints'
 
 export function useCollectionPath(
@@ -11,6 +12,8 @@ export function useCollectionPath(
       if (!collectionId) return []
       return (await collectionsApi.path(workspaceId, collectionId)).data
     },
-    queryKey: ['collection-path', workspaceId, collectionId],
+    queryKey: collectionId
+      ? collectionKeys.path(workspaceId, collectionId)
+      : collectionKeys.disabledPath(workspaceId),
   })
 }

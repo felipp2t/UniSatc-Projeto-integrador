@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { isUnavailableCollectionError } from '@/api/collection-errors'
+import { collectionKeys } from '@/api/collection-keys'
 import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
 import type {
   CollectionPageResponse,
@@ -116,7 +117,7 @@ function WorkspaceBrowser({
           100
         )
       ).data,
-    queryKey: ['collections', workspaceId, collectionId, collectionsPage],
+    queryKey: collectionKeys.list(workspaceId, collectionId, collectionsPage),
   })
   const {
     data: collectionsData,
@@ -458,6 +459,19 @@ function ItemsSection({
       (await itemsApi.list(workspaceId, collectionId, page, 100)).data,
     queryKey: ['items', workspaceId, collectionId, page],
   })
+  const isInvalidPage =
+    items.isSuccess &&
+    !items.isFetching &&
+    !items.isPlaceholderData &&
+    page > 0 &&
+    items.data.items.length === 0 &&
+    page >= items.data.totalPages
+
+  useEffect(() => {
+    if (!(isInvalidPage && items.data)) return
+    setPage(Math.max(0, items.data.totalPages - 1))
+  }, [isInvalidPage, items.data])
+
   const changeItemType = useCallback((value: ItemTypeFilter) => {
     setItemType(value)
     setPage(0)
@@ -503,6 +517,7 @@ function ItemsSection({
         error={items.error}
         isError={items.isError}
         isFetching={items.isFetching}
+        isInvalidPage={isInvalidPage}
         isPending={items.isPending}
         items={items.data}
         onCopyTitle={copyTitle}
@@ -579,6 +594,7 @@ function ItemsContent({
   error,
   isError,
   isFetching,
+  isInvalidPage,
   isPending,
   items,
   onCopyTitle,
@@ -591,6 +607,7 @@ function ItemsContent({
   error: Error | null
   isError: boolean
   isFetching: boolean
+  isInvalidPage: boolean
   isPending: boolean
   items: ItemPageResponse | undefined
   onCopyTitle: (title: string) => void
@@ -601,6 +618,7 @@ function ItemsContent({
   visibleItems: ItemResponse[]
 }) {
   if (isError) return <ErrorState error={error} />
+  if (isInvalidPage) return <LoadingState label='Carregando itens…' />
   if (isPending) return <LoadingState label='Carregando itens…' />
   if (visibleItems.length === 0) {
     return (

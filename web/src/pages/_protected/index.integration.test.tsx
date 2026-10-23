@@ -365,6 +365,23 @@ describe('workspace collection navigation', () => {
         within(collections).getByRole('button', { name: 'Próxima' })
       )
 
+      await waitFor(() => {
+        expect(apiMocks.collectionsList).toHaveBeenCalledWith(
+          workspaceId,
+          undefined,
+          1,
+          100
+        )
+      })
+
+      await waitFor(() => {
+        const updatedCollections = screen.getByRole('region', {
+          name: 'Pastas',
+        })
+        expect(
+          within(updatedCollections).getByText('Página 1 de 2')
+        ).toBeInTheDocument()
+      })
       expect(
         await screen.findByRole('link', { name: firstPageFolderName })
       ).toBeInTheDocument()
@@ -451,8 +468,8 @@ describe('workspace collection navigation', () => {
               items: [],
               page,
               size: 100,
-              totalItems: 100,
-              totalPages: 1,
+              totalItems: 0,
+              totalPages: 0,
             },
           }
     )
@@ -464,11 +481,50 @@ describe('workspace collection navigation', () => {
     await user.click(within(items).getByRole('button', { name: 'Próxima' }))
 
     expect(
-      await within(items).findByText('Nenhum item encontrado nesta página.')
+      await within(items).findByRole('heading', { name: 'Item 0' })
     ).toBeInTheDocument()
-    await user.click(within(items).getByRole('button', { name: 'Anterior' }))
+    expect(within(items).queryByText('Página 2 de 0')).not.toBeInTheDocument()
     expect(
-      await screen.findByRole('heading', { name: 'Item 0' })
+      within(items).queryByText('Nenhum item encontrado nesta página.')
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not clamp an item page when a type filter hides its server results', async () => {
+    apiMocks.itemsList.mockImplementation(async (_id, _collectionId, page) =>
+      itemPage(page, 'text')
+    )
+    const user = userEvent.setup()
+    await renderAt('/')
+
+    await screen.findByRole('heading', { name: 'Item 0' })
+    const items = screen.getByRole('region', { name: 'Itens' })
+    await user.click(within(items).getByRole('button', { name: 'Próxima' }))
+    await screen.findByRole('heading', { name: 'Item 1' })
+    await user.click(
+      within(items).getByRole('combobox', { name: 'Filtrar itens por tipo' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'Segredo' }))
+
+    expect(
+      await within(items).findByText(
+        'Nenhum item encontrado nesta página. Use a paginação para consultar outras páginas.'
+      )
+    ).toBeInTheDocument()
+    await user.click(within(items).getByRole('button', { name: 'Próxima' }))
+
+    await waitFor(() => {
+      expect(apiMocks.itemsList).toHaveBeenCalledWith(
+        workspaceId,
+        undefined,
+        1,
+        100
+      )
+      expect(within(items).getByText('Página 2 de 2')).toBeInTheDocument()
+    })
+    expect(
+      within(items).getByText(
+        'Nenhum item encontrado nesta página. Use a paginação para consultar outras páginas.'
+      )
     ).toBeInTheDocument()
   })
 

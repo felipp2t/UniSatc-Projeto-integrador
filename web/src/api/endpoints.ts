@@ -3,6 +3,8 @@ import type {
   ChangePasswordRequest,
   CollectionPageResponse,
   CollectionPathEntry,
+  CollectionResponse,
+  CreateCollectionRequest,
   CreateItemRequest,
   ForgotPasswordRequest,
   InviteUserRequest,
@@ -12,6 +14,7 @@ import type {
   ItemResponse,
   LoginRequest,
   RegisterRequest,
+  RenameCollectionRequest,
   ResetPasswordRequest,
   UpdateProfileRequest,
   UpdateWorkspaceRequest,
@@ -61,6 +64,11 @@ export const inviteApi = {
 }
 
 export const collectionsApi = {
+  create: (workspaceId: string, request: CreateCollectionRequest) =>
+    apiClient.post<CollectionResponse>(
+      `/workspaces/${workspaceId}/collections`,
+      request
+    ),
   list: (workspaceId: string, parentId?: string, page = 0, size = 100) =>
     apiClient.get<CollectionPageResponse>(
       `/workspaces/${workspaceId}/collections`,
@@ -69,6 +77,19 @@ export const collectionsApi = {
   path: (workspaceId: string, collectionId: string) =>
     apiClient.get<CollectionPathEntry[]>(
       `/workspaces/${workspaceId}/collections/${collectionId}/path`
+    ),
+  remove: (workspaceId: string, collectionId: string) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/collections/${collectionId}`
+    ),
+  rename: (
+    workspaceId: string,
+    collectionId: string,
+    request: RenameCollectionRequest
+  ) =>
+    apiClient.put<CollectionResponse>(
+      `/workspaces/${workspaceId}/collections/${collectionId}`,
+      request
     ),
 }
 
