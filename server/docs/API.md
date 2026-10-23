@@ -357,6 +357,45 @@ do workspace responde `404`.
 | `404` | workspace sem vínculo, pasta pai ausente ou pasta fora do workspace |
 | `409` | nome já utilizado no mesmo nível |
 
+## RF30 — Anexos de documentos e imagens
+
+O arquivo é enviado ao storage compatível com S3; o banco guarda somente sua chave opaca e
+metadados. Cada item `file` ou `image` possui exatamente um anexo. A primeira entrega aceita PDF,
+TXT, Markdown, DOCX, XLSX, PPTX, PNG e JPEG (`.jpg`/`.jpeg`), com até **20.000.000 bytes** por
+arquivo. Vídeos não são aceitos.
+
+**`POST /workspaces/{workspaceId}/items/attachments`** — autenticado; exige `item/create`.
+
+Recebe `multipart/form-data` com `title`, `file`, `description` opcional (até 2.000 caracteres) e
+`collectionId` opcional. Cria um novo item do tipo `file` ou `image` e seu único anexo. A pasta,
+quando informada, precisa pertencer ao mesmo workspace. Títulos seguem a unicidade normalizada de
+itens.
+
+**`PUT /workspaces/{workspaceId}/items/{itemId}/attachment`** — autenticado; exige `item/update`.
+
+Substitui o anexo por um arquivo novo. O sistema mantém o arquivo anterior se o envio ou a gravação
+falhar. Após a confirmação, o arquivo anterior é removido; não há histórico de versões recuperáveis.
+Itens arquivados não podem ser alterados até serem restaurados.
+
+**`PUT /workspaces/{workspaceId}/items/{itemId}/metadata`** — autenticado; exige `item/update`.
+
+Atualiza `{ "title": string, "description": string | null, "collectionId": UUID | null }` sem
+alterar o conteúdo do anexo. `title` é obrigatório (1–255 caracteres); `description` é opcional
+(até 2.000 caracteres). `collectionId: null` coloca o item na raiz. Conflito de título retorna `409`.
+
+**`GET /workspaces/{workspaceId}/items/{itemId}/attachment`** — autenticado; exige `item/read`.
+
+Entrega o arquivo com seu MIME type e nome original. PDF e imagens usam `inline` por padrão quando
+o navegador oferece suporte; `?download=true` força `attachment`. O download não expõe a chave nem
+uma URL pública do storage e usa `Cache-Control: no-store`. Itens arquivados permanecem consultáveis
+conforme as permissões atuais.
+
+As operações de criação, substituição e edição de metadados são registradas no histórico de
+atividades sem incluir bytes nem chave do storage.
+
+Se `app.storage.s3.bucket` não estiver configurado, a aplicação inicia sem storage e as rotas de
+upload, substituição e download retornam `503 Service Unavailable`.
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
@@ -376,3 +415,7 @@ do workspace responde `404`.
 | RF23 | POST | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
 | RF26 | GET | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
 | RF27 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Cookie `accessToken` |
+| RF30 | POST | `/workspaces/{workspaceId}/items/attachments` | Cookie `accessToken` |
+| RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
+| RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
+| RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
