@@ -111,6 +111,7 @@ segunda linha impossível, inclusive sob concorrência.
 | GET | `/workspaces` | Sim | 200 com a lista (0 ou 1 item) | Retorna o workspace único, se o usuário for membro. |
 | GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
 | GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
+| GET | `/workspaces/{workspaceId}/activity` | Sim | 200 com página do histórico | Exige `activity/read`; a visibilidade do histórico respeita as permissões atuais do usuário. |
 | PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |
 | POST | `/workspaces/{workspaceId}/collections` | Sim | 201 com a pasta criada | Exige `collection/create`; pasta pai deve pertencer ao mesmo workspace. |
 | GET | `/workspaces/{workspaceId}/collections` | Sim | 200 com página de pastas do nível | Exige vínculo de membro; `parentId` omitido lista a raiz. `page` começa em 0 e `size` tem padrão 20 e máximo 100. |
