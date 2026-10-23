@@ -261,14 +261,14 @@ type RegistrationValues = z.infer<typeof registrationSchema>
 type PasswordFieldName = 'password' | 'confirmPassword'
 interface PasswordFieldProps {
   disabled: boolean
+  errors: Array<{ message?: string } | undefined>
   formId: string
+  invalid: boolean
   label: string
   name: PasswordFieldName
-  value: RegistrationValues[PasswordFieldName]
-  errors: Array<{ message?: string } | undefined>
-  invalid: boolean
   onBlur: () => void
   onChange: (value: string) => void
+  value: RegistrationValues[PasswordFieldName]
 }
 
 function RegistrationPasswordField({

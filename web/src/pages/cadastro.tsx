@@ -5,11 +5,14 @@ import { z } from 'zod'
 import { inviteApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import type { InviteValidationResponse } from '@/api/types'
+import { InviteRegistrationForm } from '@/components/invite-registration-form'
+import {
+  BrandMark,
+  InviteStatus,
+  unavailableMessage,
+} from '@/components/invite-status'
 import { ErrorState } from '@/components/ui/error-state'
 import { OfflineState } from '@/components/ui/offline-state'
-
-import { InviteRegistrationForm } from './invite-registration-form'
-import { BrandMark, InviteStatus, unavailableMessage } from './invite-status'
 
 export const Route = createFileRoute('/cadastro')({
   component: InviteRegistrationPage,
@@ -167,5 +170,3 @@ function isUsableInviteInput(
     email && z.email().safeParse(email).success && token && token.length > 0
   )
 }
-
-
