@@ -357,6 +357,55 @@ do workspace responde `404`.
 | `404` | workspace sem vínculo, pasta pai ausente ou pasta fora do workspace |
 | `409` | nome já utilizado no mesmo nível |
 
+## Histórico de atividades
+
+**`GET /workspaces/{workspaceId}/activity`** — autenticado pelo cookie `accessToken`; exige
+vínculo ao workspace e a permissão `activity/read`.
+
+Aceita `page` (padrão `0`), `size` (padrão `20`, entre `1` e `100`), `from` e `to` (instantes
+ISO-8601 inclusivos), `actorId`, `action` e `resourceType`. A ordenação é da atividade mais nova
+para a mais antiga, com ID como desempate. O total e as páginas contam apenas eventos visíveis ao
+usuário. `action` aceita `folder_created`, `folder_renamed`, `folder_deleted`, `item_created`,
+`item_updated`, `item_archived`, `item_restored`, `item_deleted`, `member_invited`, `member_joined`,
+`member_role_changed`, `member_removed`, `member_invite_revoked`, `member_invite_declined`,
+`workspace_renamed`, `role_created`, `role_deleted` ou `role_permissions_changed`; `resourceType`
+aceita `folder`, `item`, `member`, `workspace` ou `role`. Os valores são sensíveis a maiúsculas e
+minúsculas. Valor desconhecido, intervalo invertido ou paginação inválida responde `400`.
+
+O proprietário vê todo o histórico do workspace. Para os demais usuários, são retornados somente
+eventos de itens e pastas ainda existentes no mesmo workspace, respeitando `item/read` ou
+`collection/read` atuais; eventos de itens secretos exigem também `secret/read`. Eventos de
+membros, workspace, papéis, exclusões e recursos que já não existem são exclusivos do proprietário.
+Itens arquivados continuam contando como existentes.
+
+Sucesso (`200`):
+```json
+{
+  "activities": [{
+    "id": "uuid",
+    "actorId": "uuid",
+    "actorName": "Ana",
+    "actorContext": "USER",
+    "action": "item_created",
+    "resourceType": "item",
+    "resourceId": "uuid",
+    "snapshot": { "type": "text", "title": "Runbook" },
+    "createdAt": "2026-10-23T12:00:00Z"
+  }],
+  "page": 0,
+  "size": 20,
+  "totalItems": 1,
+  "totalPages": 1
+}
+```
+
+| | |
+|---|---|
+| `400` | período ou paginação inválida |
+| `401` | não autenticado |
+| `403` | sem `activity/read` |
+| `404` | workspace não encontrado ou sem vínculo |
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
@@ -376,3 +425,4 @@ do workspace responde `404`.
 | RF23 | POST | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
 | RF26 | GET | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
 | RF27 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Cookie `accessToken` |
+| — | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
