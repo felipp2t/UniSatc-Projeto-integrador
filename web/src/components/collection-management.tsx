@@ -62,10 +62,10 @@ export function CollectionCard({
   )
 
   return (
-    <article className='flex min-h-24 flex-col justify-between gap-4 border-2 border-border bg-card p-4 transition-colors hover:border-primary/50'>
+    <article className='relative flex min-h-24 flex-col justify-between gap-4 border-2 border-border bg-card p-4 transition-colors hover:border-primary/50'>
       <div className='flex min-w-0 items-start justify-between gap-2'>
         <Link
-          className='group flex min-w-0 items-center gap-2'
+          className="group flex min-w-0 items-center gap-2 after:absolute after:inset-0 after:rounded-sm after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-offset-2"
           search={{ collectionId: collection.id }}
           to='/'
         >
@@ -81,7 +81,7 @@ export function CollectionCard({
           <DropdownMenuTrigger asChild>
             <button
               aria-label={`Ações de ${collection.name}`}
-              className='shrink-0 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
+              className='relative z-10 shrink-0 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
               type='button'
             >
               <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
@@ -162,6 +162,7 @@ function CollectionNameDialog({
   onRename: (collection: CollectionResponse, name: string) => Promise<void>
 }) {
   const inputId = useId()
+  const errorId = `${inputId}-error`
   const [name, setName] = useState(collection?.name ?? '')
   const [error, setError] = useState<string>()
   const isRename = mode === 'rename'
@@ -226,6 +227,8 @@ function CollectionNameDialog({
           <Field>
             <FieldLabel htmlFor={inputId}>Nome</FieldLabel>
             <Input
+              aria-describedby={error ? errorId : undefined}
+              aria-invalid={error ? true : undefined}
               autoComplete='off'
               disabled={isPending}
               id={inputId}
@@ -235,7 +238,7 @@ function CollectionNameDialog({
             />
           </Field>
           {error ? (
-            <p className='text-destructive text-xs' role='alert'>
+            <p className='text-destructive text-xs' id={errorId} role='alert'>
               {error}
             </p>
           ) : null}

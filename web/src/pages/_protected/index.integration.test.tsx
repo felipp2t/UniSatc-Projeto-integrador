@@ -229,14 +229,17 @@ describe('workspace collection navigation', () => {
     await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
     const dialog = await screen.findByRole('dialog')
     const input = within(dialog).getByLabelText('Nome')
+    expect(input).not.toHaveAttribute('aria-invalid')
+    expect(input).not.toHaveAttribute('aria-describedby')
 
     await user.type(input, '   ')
     await user.click(
       within(dialog).getByRole('button', { name: 'Criar pasta' })
     )
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'Informe um nome para a pasta.'
-    )
+    const validationMessage = await within(dialog).findByRole('alert')
+    expect(validationMessage).toHaveTextContent('Informe um nome para a pasta.')
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(input).toHaveAttribute('aria-describedby', validationMessage.id)
     expect(apiMocks.collectionsCreate).not.toHaveBeenCalled()
 
     expect(input).toHaveAttribute('maxLength', '255')
@@ -250,6 +253,9 @@ describe('workspace collection navigation', () => {
     const user = userEvent.setup()
     const { router } = await renderAt('/')
 
+    expect(
+      await screen.findByRole('link', { name: folderAName })
+    ).toBeInTheDocument()
     await user.click(
       await screen.findByRole('button', { name: 'Ações de Folder A' })
     )
