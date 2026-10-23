@@ -11,7 +11,9 @@ import com.vaulty.api.repository.UserRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,10 +29,13 @@ public class InviteService {
 
     private final EmailOutboxService emailOutboxService;
 
+    private final ActivityLogService activityLogService;
+
     private final long inviteExpirationMs;
 
     private final Clock clock;
 
+    @Autowired
     public InviteService(
             UserInviteRepository userInviteRepository,
 
@@ -40,6 +45,8 @@ public class InviteService {
 
             EmailOutboxService emailOutboxService,
 
+            ActivityLogService activityLogService,
+
             Clock clock,
 
             @Value("${invite.expiration-ms}")
@@ -48,6 +55,7 @@ public class InviteService {
         this.userRepository = userRepository;
         this.workspaceService = workspaceService;
         this.emailOutboxService = emailOutboxService;
+        this.activityLogService = activityLogService;
         this.clock = clock;
         this.inviteExpirationMs = inviteExpirationMs;
     }
@@ -70,7 +78,7 @@ public class InviteService {
 
     @Transactional
     public void inviteUser(UUID inviterId, InviteUserRequest request) {
-        workspaceService.requireOwner(inviterId);
+        var workspace = workspaceService.requireOwner(inviterId);
 
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new ConflictException("E-mail já possui uma conta");
@@ -84,6 +92,9 @@ public class InviteService {
         invite.setInvitedBy(userRepository.getReferenceById(inviterId));
         invite.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(inviteExpirationMs)));
         userInviteRepository.save(invite);
+
+        activityLogService.record(workspace.getId(), inviterId, "USER", "sent", "invite", invite.getId(),
+                Map.of("email", invite.getEmail(), "expiresAt", invite.getExpiresAt().toString()));
 
         emailOutboxService.enqueueInvite(invite.getEmail(), invite.getToken(), invite.getExpiresAt());
     }

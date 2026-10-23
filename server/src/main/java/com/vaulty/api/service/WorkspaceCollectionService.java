@@ -13,6 +13,7 @@ import com.vaulty.api.repository.PersistenceConstraints;
 import com.vaulty.api.repository.WorkspaceCollectionRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -31,6 +32,7 @@ public class WorkspaceCollectionService {
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceItemRepository itemRepository;
     private final WorkspaceContentAuthorization authorization;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public CollectionResponse create(UUID userId, UUID workspaceId, CreateCollectionRequest request) {
@@ -47,7 +49,10 @@ public class WorkspaceCollectionService {
         collection.setName(request.name());
 
         try {
-            return toResponse(collectionRepository.saveAndFlush(collection));
+            collection = collectionRepository.saveAndFlush(collection);
+            activityLogService.record(workspaceId, userId, "USER", "created", "collection", collection.getId(),
+                    Map.of("name", collection.getName()));
+            return toResponse(collection);
         } catch (DataIntegrityViolationException exception) {
             if (PersistenceConstraints.causedBy(exception, DUPLICATE_NAME_CONSTRAINT)) {
                 throw new ConflictException("Já existe uma pasta com esse nome neste nível");
@@ -63,9 +68,13 @@ public class WorkspaceCollectionService {
         authorization.require(userId, workspace, "collection", "update");
         var collection = collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
+        String previousName = collection.getName();
         collection.setName(request.name());
         try {
-            return toResponse(collectionRepository.saveAndFlush(collection));
+            collection = collectionRepository.saveAndFlush(collection);
+            activityLogService.record(workspaceId, userId, "USER", "renamed", "collection", collection.getId(),
+                    Map.of("previousName", previousName, "name", collection.getName()));
+            return toResponse(collection);
         } catch (DataIntegrityViolationException exception) {
             if (PersistenceConstraints.causedBy(exception, DUPLICATE_NAME_CONSTRAINT)) {
                 throw new ConflictException("Já existe uma pasta com esse nome neste nível");
@@ -84,6 +93,8 @@ public class WorkspaceCollectionService {
                 || itemRepository.existsByCollectionIdAndWorkspaceId(collectionId, workspaceId)) {
             throw new ConflictException("Pasta não está vazia");
         }
+        activityLogService.record(workspaceId, userId, "USER", "deleted", "collection", collectionId,
+                Map.of("name", collection.getName()));
         try {
             collectionRepository.delete(collection);
             collectionRepository.flush();

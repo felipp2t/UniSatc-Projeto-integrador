@@ -16,6 +16,7 @@ import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.repository.WorkspaceItemSecretRepository;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,6 +38,7 @@ public class WorkspaceItemService {
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceContentAuthorization authorization;
     private final SecretCipher secretCipher;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public ItemResponse create(UUID userId, UUID workspaceId, CreateItemRequest request) {
@@ -65,6 +67,8 @@ public class WorkspaceItemService {
                 secret.setValue(secretCipher.encrypt(request.value()));
                 secretRepository.saveAndFlush(secret);
             }
+            activityLogService.record(workspaceId, userId, "USER", "created", "item", item.getId(),
+                    Map.of("type", item.getType(), "title", item.getTitle()));
             return toResponse(item, true);
         } catch (DataIntegrityViolationException exception) {
             if (PersistenceConstraints.causedBy(exception, DUPLICATE_TITLE_CONSTRAINT)) {

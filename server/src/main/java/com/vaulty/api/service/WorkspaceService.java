@@ -11,7 +11,9 @@ import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
@@ -26,22 +28,26 @@ public class WorkspaceService {
     private final WorkspaceRoleRepository workspaceRoleRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceMapper workspaceMapper;
+    private final ActivityLogService activityLogService;
 
     @Transactional
-    public void addAsMember(User user) {
+    public Workspace addAsMember(User user) {
         Workspace workspace = singleton();
         WorkspaceRole memberRole = workspaceRoleRepository
                 .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
 
         workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
+        return workspace;
     }
 
     @Transactional(readOnly = true)
-    public void requireOwner(UUID userId) {
-        if (!singleton().getOwner().getId().equals(userId)) {
+    public Workspace requireOwner(UUID userId) {
+        Workspace workspace = singleton();
+        if (!workspace.getOwner().getId().equals(userId)) {
             throw new ForbiddenException("Apenas o dono do workspace pode executar esta ação");
         }
+        return workspace;
     }
 
     // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
@@ -72,8 +78,16 @@ public class WorkspaceService {
         Workspace workspace = workspaceRepository.findByIdAndOwnerId(workspaceId, ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
 
+        Map<String, Object> previous = new LinkedHashMap<>();
+        previous.put("name", workspace.getName());
+        previous.put("description", workspace.getDescription());
         workspaceMapper.update(request, workspace);
         workspaceRepository.saveAndFlush(workspace);
+        Map<String, Object> current = new LinkedHashMap<>();
+        current.put("name", workspace.getName());
+        current.put("description", workspace.getDescription());
+        activityLogService.record(workspaceId, ownerId, "USER", "updated", "workspace", workspaceId,
+                Map.of("previous", previous, "current", current));
 
         return workspaceMapper.toResponse(workspace);
     }
