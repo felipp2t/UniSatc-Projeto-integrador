@@ -6,6 +6,9 @@ import com.vaulty.api.dto.collection.CollectionResponse;
 import com.vaulty.api.dto.collection.CreateCollectionRequest;
 import com.vaulty.api.dto.collection.RenameCollectionRequest;
 import com.vaulty.api.entity.WorkspaceCollection;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ValidationException;
@@ -50,7 +53,8 @@ public class WorkspaceCollectionService {
 
         try {
             collection = collectionRepository.saveAndFlush(collection);
-            activityLogService.record(workspaceId, userId, "USER", "created", "collection", collection.getId(),
+            activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
+                    ActivityAction.FOLDER_CREATED, ActivityResourceType.FOLDER, collection.getId(),
                     Map.of("name", collection.getName()));
             return toResponse(collection);
         } catch (DataIntegrityViolationException exception) {
@@ -72,7 +76,8 @@ public class WorkspaceCollectionService {
         collection.setName(request.name());
         try {
             collection = collectionRepository.saveAndFlush(collection);
-            activityLogService.record(workspaceId, userId, "USER", "renamed", "collection", collection.getId(),
+            activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
+                    ActivityAction.FOLDER_RENAMED, ActivityResourceType.FOLDER, collection.getId(),
                     Map.of("previousName", previousName, "name", collection.getName()));
             return toResponse(collection);
         } catch (DataIntegrityViolationException exception) {
@@ -93,7 +98,8 @@ public class WorkspaceCollectionService {
                 || itemRepository.existsByCollectionIdAndWorkspaceId(collectionId, workspaceId)) {
             throw new ConflictException("Pasta não está vazia");
         }
-        activityLogService.record(workspaceId, userId, "USER", "deleted", "collection", collectionId,
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
+                ActivityAction.FOLDER_DELETED, ActivityResourceType.FOLDER, collectionId,
                 Map.of("name", collection.getName()));
         try {
             collectionRepository.delete(collection);

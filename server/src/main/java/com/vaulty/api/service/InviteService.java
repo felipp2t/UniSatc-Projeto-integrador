@@ -4,6 +4,10 @@ import com.vaulty.api.dto.invite.InviteUserRequest;
 import com.vaulty.api.dto.invite.InviteValidationRequest;
 import com.vaulty.api.dto.invite.InviteValidationResponse;
 import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.entity.UserInviteStatus;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.UserInviteRepository;
@@ -63,17 +67,21 @@ public class InviteService {
     @Transactional(readOnly = true)
     public InviteValidationResponse validate(InviteValidationRequest request) {
         OffsetDateTime now = OffsetDateTime.now(clock);
-        if (userRepository.findByEmail(request.email()).isPresent()) {
-            throw new ResourceNotFoundException("Convite indisponível");
-        }
-
-        UserInvite invite = userInviteRepository.findByEmailAndToken(request.email(), request.token())
-                .filter(candidate -> candidate.getExpiresAt().isAfter(now))
-                .orElseThrow(() -> new ResourceNotFoundException("Convite indisponível"));
+        UserInvite invite = requirePendingInvite(request, now);
 
         Duration remaining = Duration.between(now, invite.getExpiresAt());
         long remainingSeconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
         return new InviteValidationResponse(invite.getEmail(), remainingSeconds);
+    }
+
+    @Transactional
+    public void decline(InviteValidationRequest request) {
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        UserInvite invite = requirePendingInviteForUpdate(request, now);
+        invite.setStatus(UserInviteStatus.DECLINED);
+        activityLogService.recordInviteeEmail(workspaceService.singletonId(), invite.getEmail(),
+                ActivityAction.MEMBER_INVITE_DECLINED, ActivityResourceType.MEMBER, invite.getId(),
+                Map.of("email", invite.getEmail()));
     }
 
     @Transactional
@@ -93,9 +101,32 @@ public class InviteService {
         invite.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(inviteExpirationMs)));
         userInviteRepository.save(invite);
 
-        activityLogService.record(workspace.getId(), inviterId, "USER", "sent", "invite", invite.getId(),
+        activityLogService.record(workspace.getId(), inviterId, ActivityActorContext.USER,
+                ActivityAction.MEMBER_INVITED, ActivityResourceType.MEMBER, invite.getId(),
                 Map.of("email", invite.getEmail(), "expiresAt", invite.getExpiresAt().toString()));
 
         emailOutboxService.enqueueInvite(invite.getEmail(), invite.getToken(), invite.getExpiresAt());
+    }
+
+    private UserInvite requirePendingInvite(InviteValidationRequest request, OffsetDateTime now) {
+        if (userRepository.findByEmail(request.email()).isPresent()) {
+            throw new ResourceNotFoundException("Convite indisponível");
+        }
+
+        return userInviteRepository.findByEmailAndTokenAndStatus(
+                        request.email(), request.token(), UserInviteStatus.PENDING)
+                .filter(invite -> invite.getExpiresAt().isAfter(now))
+                .orElseThrow(() -> new ResourceNotFoundException("Convite indisponível"));
+    }
+
+    private UserInvite requirePendingInviteForUpdate(InviteValidationRequest request, OffsetDateTime now) {
+        if (userRepository.findByEmail(request.email()).isPresent()) {
+            throw new ResourceNotFoundException("Convite indisponível");
+        }
+
+        return userInviteRepository.findByEmailAndTokenAndStatusForUpdate(
+                        request.email(), request.token(), UserInviteStatus.PENDING)
+                .filter(invite -> invite.getExpiresAt().isAfter(now))
+                .orElseThrow(() -> new ResourceNotFoundException("Convite indisponível"));
     }
 }

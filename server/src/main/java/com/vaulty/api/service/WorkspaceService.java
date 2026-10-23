@@ -4,7 +4,11 @@ import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.Workspace;
+import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.mapper.WorkspaceMapper;
@@ -31,14 +35,13 @@ public class WorkspaceService {
     private final ActivityLogService activityLogService;
 
     @Transactional
-    public Workspace addAsMember(User user) {
+    public WorkspaceMember addAsMember(User user) {
         Workspace workspace = singleton();
         WorkspaceRole memberRole = workspaceRoleRepository
                 .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
 
-        workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
-        return workspace;
+        return workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
     }
 
     @Transactional(readOnly = true)
@@ -48,6 +51,11 @@ public class WorkspaceService {
             throw new ForbiddenException("Apenas o dono do workspace pode executar esta ação");
         }
         return workspace;
+    }
+
+    @Transactional(readOnly = true)
+    public UUID singletonId() {
+        return singleton().getId();
     }
 
     // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
@@ -86,7 +94,8 @@ public class WorkspaceService {
         Map<String, Object> current = new LinkedHashMap<>();
         current.put("name", workspace.getName());
         current.put("description", workspace.getDescription());
-        activityLogService.record(workspaceId, ownerId, "USER", "updated", "workspace", workspaceId,
+        activityLogService.record(workspaceId, ownerId, ActivityActorContext.USER,
+                ActivityAction.WORKSPACE_RENAMED, ActivityResourceType.WORKSPACE, workspaceId,
                 Map.of("previous", previous, "current", current));
 
         return workspaceMapper.toResponse(workspace);

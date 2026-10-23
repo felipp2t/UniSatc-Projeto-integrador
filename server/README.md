@@ -81,6 +81,7 @@ ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|
 | RF10 | POST | `/invites` | Sim, só o dono | `{ email }` | 201 | 400 e-mail inválido, 401 não autenticado, 403 não é o dono, 409 e-mail já cadastrado |
+| RF12 | POST | `/invites/decline` | Não | `{ email, token }` | 204 | 400 corpo inválido, 404 convite indisponível, 429 limite de tentativas |
 | RF01/RF11 | POST | `/auth/register` | Não | `{ email, token, name, password, confirmPassword }` | 200, seta cookies | 400 senhas não conferem, 404 convite não encontrado, 409 convite expirado ou e-mail já cadastrado |
 | RF02 | POST | `/auth/login` | Não | `{ email, password }` | 200, seta cookies | 401 credenciais inválidas |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` | — | 200, roda os cookies | 401 refresh token inválido/expirado |

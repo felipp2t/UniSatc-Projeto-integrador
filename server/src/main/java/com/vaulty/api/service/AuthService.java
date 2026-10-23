@@ -9,6 +9,10 @@ import com.vaulty.api.entity.PasswordResetToken;
 import com.vaulty.api.entity.RefreshToken;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
+import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.InvalidCredentialsException;
 import com.vaulty.api.exception.InvalidInviteException;
@@ -140,7 +144,8 @@ public class AuthService {
             throw new ValidationException("As senhas não conferem");
         }
 
-        UserInvite invite = userInviteRepository.findByEmailAndToken(request.email(), request.token())
+        UserInvite invite = userInviteRepository.findByEmailAndTokenAndStatusForUpdate(
+                        request.email(), request.token(), UserInviteStatus.PENDING)
                 .orElseThrow(() -> new ResourceNotFoundException("Convite não encontrado"));
 
         if (!invite.getExpiresAt().isAfter(OffsetDateTime.now(clock))) {
@@ -157,10 +162,11 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         userRepository.save(user);
 
-        var workspace = workspaceService.addAsMember(user);
+        var member = workspaceService.addAsMember(user);
 
-        activityLogService.record(workspace.getId(), user.getId(), "REGISTERED_USER", "accepted", "invite",
-                invite.getId(), Map.of("name", user.getName(), "email", user.getEmail()));
+        activityLogService.record(member.getWorkspace().getId(), user.getId(), ActivityActorContext.REGISTERED_USER,
+                ActivityAction.MEMBER_JOINED, ActivityResourceType.MEMBER, member.getId(),
+                Map.of("name", user.getName(), "email", user.getEmail(), "inviteId", invite.getId()));
 
         userInviteRepository.delete(invite);
 

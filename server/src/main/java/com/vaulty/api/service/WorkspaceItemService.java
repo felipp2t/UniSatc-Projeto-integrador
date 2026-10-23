@@ -7,6 +7,9 @@ import com.vaulty.api.dto.item.SecretValueResponse;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceItem;
 import com.vaulty.api.entity.WorkspaceItemSecret;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ValidationException;
@@ -67,7 +70,8 @@ public class WorkspaceItemService {
                 secret.setValue(secretCipher.encrypt(request.value()));
                 secretRepository.saveAndFlush(secret);
             }
-            activityLogService.record(workspaceId, userId, "USER", "created", "item", item.getId(),
+            activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_CREATED,
+                    ActivityResourceType.ITEM, item.getId(),
                     Map.of("type", item.getType(), "title", item.getTitle()));
             return toResponse(item, true);
         } catch (DataIntegrityViolationException exception) {
