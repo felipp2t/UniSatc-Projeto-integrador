@@ -6,17 +6,19 @@ import {
   KeyIcon,
   LinkIcon,
 } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
+import { isUnavailableCollectionError } from '@/api/collection-errors'
+import { itemsApi, workspaceApi } from '@/api/endpoints'
 import type {
-  CollectionPageResponse,
+  CollectionPathEntry,
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
+import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
 import { NotFoundPage } from '@/components/not-found-page'
 import { Button } from '@/components/ui/button'
@@ -36,8 +38,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  PaginationControls,
+  WorkspaceCollections,
+} from '@/components/workspace-collections'
+import { useCollectionPath } from '@/hooks/use-collection-path'
 
-const searchSchema = z.object({ collectionId: z.string().optional() })
+const searchSchema = z.object({
+  collectionId: z.guid().optional().catch(undefined),
+})
 const itemTypeOptions = ['all', 'text', 'link', 'secret'] as const
 type ItemTypeFilter = (typeof itemTypeOptions)[number]
 
@@ -78,6 +88,8 @@ function HomePage() {
   return (
     <WorkspaceBrowser
       collectionId={collectionId}
+      // Remounting per folder prevents folder-scoped state and data from leaking.
+      key={`${workspace.id}:${collectionId ?? 'root'}`}
       workspaceId={workspace.id}
       workspaceName={workspace.name ?? 'Workspace'}
     />
@@ -93,54 +105,84 @@ function WorkspaceBrowser({
   workspaceId: string
   workspaceName: string
 }) {
-  const [refreshKey, setRefreshKey] = useState(0)
-  const refreshItems = useCallback(() => setRefreshKey((key) => key + 1), [])
+  const queryClient = useQueryClient()
+  const path = useCollectionPath(workspaceId, collectionId)
+  const [createCollectionSignal, setCreateCollectionSignal] = useState(false)
+  const openCreateCollection = useCallback(
+    () => setCreateCollectionSignal(true),
+    []
+  )
+  const clearCreateCollectionSignal = useCallback(
+    () => setCreateCollectionSignal(false),
+    []
+  )
+  const pathUnavailable = isUnavailableCollectionError(path.error, 'path')
+
+  const retryPath = useCallback(async () => {
+    await path.refetch()
+  }, [path.refetch])
+  const refreshItems = useCallback(
+    () =>
+      queryClient.invalidateQueries({
+        queryKey: ['items', workspaceId],
+      }),
+    [queryClient, workspaceId]
+  )
+  if (collectionId && path.isError && !pathUnavailable) {
+    return (
+      <div className='flex flex-col items-center gap-3 p-8'>
+        <ErrorState error={path.error} onRetry={retryPath} />
+        <Link
+          className='border border-border bg-card px-2.5 py-1.5 text-primary transition-colors hover:border-primary/50 hover:text-foreground'
+          search={{ collectionId: undefined }}
+          to='/'
+        >
+          Voltar ao workspace
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <main className='mx-auto flex min-h-full w-full max-w-7xl flex-col gap-7 px-6 py-10 md:px-8 md:py-12'>
       <WorkspaceBreadcrumbs
         collectionId={collectionId}
-        workspaceId={workspaceId}
+        isLoading={path.isPending}
+        path={path.data ?? []}
         workspaceName={workspaceName}
       />
       <WorkspaceHeading
         collectionId={collectionId}
+        isLoading={path.isPending}
+        onCreateCollection={openCreateCollection}
         onItemCreated={refreshItems}
+        path={path.data ?? []}
         workspaceId={workspaceId}
         workspaceName={workspaceName}
       />
-      <CollectionsSection
+      <WorkspaceCollections
         collectionId={collectionId}
+        createCollectionSignal={createCollectionSignal}
+        onCollectionDialogOpened={clearCreateCollectionSignal}
+        pathUnavailable={pathUnavailable}
         workspaceId={workspaceId}
       />
-      <ItemsSection
-        collectionId={collectionId}
-        refreshKey={refreshKey}
-        workspaceId={workspaceId}
-      />
+      <ItemsSection collectionId={collectionId} workspaceId={workspaceId} />
     </main>
   )
 }
 
 function WorkspaceBreadcrumbs({
   collectionId,
-  workspaceId,
+  isLoading,
+  path,
   workspaceName,
 }: {
   collectionId: string | undefined
-  workspaceId: string
+  isLoading: boolean
+  path: CollectionPathEntry[]
   workspaceName: string
 }) {
-  const path = useQuery({
-    enabled: Boolean(collectionId),
-    queryFn: async () => {
-      if (!collectionId) return []
-      return (await collectionsApi.path(workspaceId, collectionId)).data
-    },
-    queryKey: ['collection-path', workspaceId, collectionId],
-  })
-  const entries = path.data ?? []
-
   return (
     <nav
       aria-label='breadcrumb'
@@ -153,12 +195,15 @@ function WorkspaceBreadcrumbs({
       >
         {workspaceName}
       </Link>
-      {entries.map((folder, index) => (
+      {isLoading && collectionId ? (
+        <Skeleton aria-label='Carregando caminho' className='h-4 w-32' />
+      ) : null}
+      {path.map((folder, index) => (
         <span className='flex items-center gap-2' key={folder.id}>
           <span aria-hidden='true' className='text-muted-foreground'>
             /
           </span>
-          {index === entries.length - 1 ? (
+          {index === path.length - 1 ? (
             <span aria-current='page' className='text-foreground'>
               {folder.name}
             </span>
@@ -179,24 +224,22 @@ function WorkspaceBreadcrumbs({
 
 function WorkspaceHeading({
   collectionId,
+  isLoading,
+  onCreateCollection,
+  path,
   onItemCreated,
   workspaceId,
   workspaceName,
 }: {
   collectionId: string | undefined
-  workspaceId: string
+  isLoading: boolean
+  onCreateCollection: () => void
+  path: CollectionPathEntry[]
   workspaceName: string
+  workspaceId: string
   onItemCreated: () => void
 }) {
-  const currentCollection = useQuery({
-    enabled: Boolean(collectionId),
-    queryFn: async () => {
-      if (!collectionId) return []
-      return (await collectionsApi.path(workspaceId, collectionId)).data
-    },
-    queryKey: ['workspace-heading-path', workspaceId, collectionId],
-  })
-  const title = currentCollection.data?.at(-1)?.name ?? workspaceName
+  const title = path.at(-1)?.name ?? workspaceName
 
   return (
     <header className='flex flex-wrap items-center justify-between gap-5 border-border border-b pb-6'>
@@ -209,94 +252,33 @@ function WorkspaceHeading({
           <p className='mb-1 font-mono text-[10px] text-muted-foreground uppercase tracking-[0.18em]'>
             {collectionId ? 'Collection' : 'Workspace'}
           </p>
-          <h1 className='truncate font-bold font-display text-3xl uppercase tracking-tight'>
-            {title}
-          </h1>
+          {isLoading && collectionId ? (
+            <Skeleton aria-label='Carregando pasta' className='h-8 w-48' />
+          ) : (
+            <h1 className='truncate font-bold font-display text-3xl uppercase tracking-tight'>
+              {title}
+            </h1>
+          )}
         </div>
       </div>
-      <CreateItemDialog
-        collectionId={collectionId}
-        onItemCreated={onItemCreated}
-        workspaceId={workspaceId}
-        workspaceName={workspaceName}
-      />
-    </header>
-  )
-}
-
-function CollectionsSection({
-  collectionId,
-  workspaceId,
-}: {
-  collectionId: string | undefined
-  workspaceId: string
-}) {
-  const collections = useQuery({
-    queryFn: async () =>
-      (await collectionsApi.list(workspaceId, collectionId, 0, 100)).data,
-    queryKey: ['collections', workspaceId, collectionId],
-  })
-  const retryCollections = useCallback(async () => {
-    await collections.refetch()
-  }, [collections.refetch])
-
-  if (collections.isError) {
-    return <ErrorState error={collections.error} onRetry={retryCollections} />
-  }
-  if (collections.isPending) return <LoadingState label='Carregando pastas…' />
-  if (collections.data.items.length === 0) return null
-
-  return (
-    <section aria-labelledby='collections-heading' className='space-y-3'>
-      <h2
-        className='font-mono font-semibold text-muted-foreground text-xs uppercase tracking-widest'
-        id='collections-heading'
-      >
-        Pastas
-      </h2>
-      <div className='grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-4'>
-        {collections.data.items.map((folder) => (
-          <CollectionCard collection={folder} key={folder.id} />
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function CollectionCard({
-  collection,
-}: {
-  collection: CollectionPageResponse['items'][number]
-}) {
-  return (
-    <Link
-      className='group flex min-h-24 flex-col justify-between gap-4 border-2 border-border bg-card p-4 transition-colors hover:border-primary/50'
-      search={{ collectionId: collection.id }}
-      to='/'
-    >
-      <div className='flex min-w-0 items-center gap-2'>
-        <FolderIcon
-          aria-hidden='true'
-          className='size-5 shrink-0 text-muted-foreground group-hover:text-primary'
+      <div className='flex flex-wrap items-center gap-2'>
+        <CreateCollectionButton onClick={onCreateCollection} />
+        <CreateItemDialog
+          collectionId={collectionId}
+          onItemCreated={onItemCreated}
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
         />
-        <span className='truncate font-bold font-mono text-sm uppercase tracking-wide'>
-          {collection.name}
-        </span>
       </div>
-      <span className='font-mono text-[10px] text-muted-foreground uppercase tracking-wider'>
-        Pasta
-      </span>
-    </Link>
+    </header>
   )
 }
 
 function ItemsSection({
   collectionId,
-  refreshKey,
   workspaceId,
 }: {
   collectionId: string | undefined
-  refreshKey: number
   workspaceId: string
 }) {
   const [itemType, setItemType] = useState<ItemTypeFilter>('all')
@@ -305,8 +287,21 @@ function ItemsSection({
   const items = useQuery({
     queryFn: async () =>
       (await itemsApi.list(workspaceId, collectionId, page, 100)).data,
-    queryKey: ['items', workspaceId, collectionId, page, refreshKey],
+    queryKey: ['items', workspaceId, collectionId, page],
   })
+  const isInvalidPage =
+    items.isSuccess &&
+    !items.isFetching &&
+    !items.isPlaceholderData &&
+    page > 0 &&
+    items.data.items.length === 0 &&
+    page >= items.data.totalPages
+
+  useEffect(() => {
+    if (!(isInvalidPage && items.data)) return
+    setPage(Math.max(0, items.data.totalPages - 1))
+  }, [isInvalidPage, items.data])
+
   const changeItemType = useCallback((value: ItemTypeFilter) => {
     setItemType(value)
     setPage(0)
@@ -352,6 +347,7 @@ function ItemsSection({
         error={items.error}
         isError={items.isError}
         isFetching={items.isFetching}
+        isInvalidPage={isInvalidPage}
         isPending={items.isPending}
         items={items.data}
         onCopyTitle={copyTitle}
@@ -428,6 +424,7 @@ function ItemsContent({
   error,
   isError,
   isFetching,
+  isInvalidPage,
   isPending,
   items,
   onCopyTitle,
@@ -440,6 +437,7 @@ function ItemsContent({
   error: Error | null
   isError: boolean
   isFetching: boolean
+  isInvalidPage: boolean
   isPending: boolean
   items: ItemPageResponse | undefined
   onCopyTitle: (title: string) => void
@@ -450,18 +448,17 @@ function ItemsContent({
   visibleItems: ItemResponse[]
 }) {
   if (isError) return <ErrorState error={error} />
+  if (isInvalidPage) return <LoadingState label='Carregando itens…' />
   if (isPending) return <LoadingState label='Carregando itens…' />
   if (visibleItems.length === 0) {
     return (
-      <EmptyState
-        description={
-          typeFilter === 'all'
-            ? 'Esta pasta ainda não tem itens.'
-            : 'Nenhum item deste tipo foi encontrado nesta página.'
-        }
-        icon={<FileIcon aria-hidden='true' className='size-6' />}
-        title='Nenhum item encontrado'
-        variant='compact'
+      <EmptyItemsContent
+        isFetching={isFetching}
+        items={items}
+        onNextPage={onNextPage}
+        onPreviousPage={onPreviousPage}
+        page={page}
+        typeFilter={typeFilter}
       />
     )
   }
@@ -474,7 +471,55 @@ function ItemsContent({
         ))}
       </div>
       {items && items.totalPages > 1 ? (
-        <ItemPagination
+        <PaginationControls
+          isFetching={isFetching}
+          onNext={onNextPage}
+          onPrevious={onPreviousPage}
+          page={page}
+          totalPages={items.totalPages}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function EmptyItemsContent({
+  isFetching,
+  items,
+  onNextPage,
+  onPreviousPage,
+  page,
+  typeFilter,
+}: {
+  isFetching: boolean
+  items: ItemPageResponse | undefined
+  onNextPage: () => void
+  onPreviousPage: () => void
+  page: number
+  typeFilter: ItemTypeFilter
+}) {
+  const hasOtherPages = Boolean(items && items.totalPages > 1)
+  const isEmptyCollection = typeFilter === 'all' && page === 0 && !hasOtherPages
+  const description = isEmptyCollection
+    ? 'Esta pasta ainda não tem itens.'
+    : hasOtherPages
+      ? 'Nenhum item encontrado nesta página. Use a paginação para consultar outras páginas.'
+      : typeFilter === 'all'
+        ? 'Nenhum item encontrado nesta página.'
+        : 'Nenhum item deste tipo foi encontrado nesta página.'
+  const shouldShowPagination =
+    Boolean(items && items.totalPages > 1) || page > 0
+
+  return (
+    <>
+      <EmptyState
+        description={description}
+        icon={<FileIcon aria-hidden='true' className='size-6' />}
+        title='Nenhum item encontrado'
+        variant='compact'
+      />
+      {items && shouldShowPagination ? (
+        <PaginationControls
           isFetching={isFetching}
           onNext={onNextPage}
           onPrevious={onPreviousPage}
@@ -556,45 +601,5 @@ function ItemListCard({
         </p>
       ) : null}
     </article>
-  )
-}
-
-function ItemPagination({
-  isFetching,
-  onNext,
-  onPrevious,
-  page,
-  totalPages,
-}: {
-  isFetching: boolean
-  onNext: () => void
-  onPrevious: () => void
-  page: number
-  totalPages: number
-}) {
-  return (
-    <div className='flex items-center justify-between border-border border-t pt-4'>
-      <span className='font-mono text-muted-foreground text-xs'>
-        Página {page + 1} de {totalPages}
-      </span>
-      <div className='flex gap-2'>
-        <Button
-          disabled={page === 0 || isFetching}
-          onClick={onPrevious}
-          size='sm'
-          variant='outline'
-        >
-          Anterior
-        </Button>
-        <Button
-          disabled={page + 1 >= totalPages || isFetching}
-          onClick={onNext}
-          size='sm'
-          variant='outline'
-        >
-          Próxima
-        </Button>
-      </div>
-    </div>
   )
 }

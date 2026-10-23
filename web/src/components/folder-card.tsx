@@ -1,8 +1,6 @@
 import { FolderIcon, TrashIcon } from '@phosphor-icons/react'
-import { useForm, useSelector } from '@tanstack/react-form'
 import { cn } from 'cn'
-import { useCallback, useId, useState } from 'react'
-import { z } from 'zod'
+import { useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,13 +12,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { ErrorState } from '@/components/ui/error-state'
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
 
 export interface FolderCardProps extends React.ComponentProps<'div'> {
   error?: string
@@ -121,111 +112,6 @@ export function FolderCard({
   )
 }
 
-export interface NewFolderCardProps {
-  error?: string
-  isCreating?: boolean
-  onCreate: (input: {
-    workspaceId: string
-    parentId?: string
-    name: string
-  }) => Promise<void> | void
-  parentId?: string
-  trigger: React.ReactElement
-  workspaceId: string
-}
-export function NewFolderCard({
-  workspaceId,
-  parentId,
-  onCreate,
-  error,
-  isCreating = false,
-  trigger,
-}: NewFolderCardProps) {
-  const [open, setOpen] = useState(false)
-  const [internalError, setInternalError] = useState<string>()
-  const formId = useId()
-  const form = useForm({
-    defaultValues: { name: '' },
-    onSubmit: async ({ value, formApi }) => {
-      setInternalError(undefined)
-      try {
-        await onCreate({ name: value.name.trim(), parentId, workspaceId })
-        formApi.reset()
-        setOpen(false)
-      } catch (cause) {
-        setInternalError(errorMessage(cause))
-      }
-    },
-    validators: {
-      onSubmit: z.object({
-        name: z
-          .string()
-          .trim()
-          .min(3, 'O nome deve ter pelo menos 3 caracteres.'),
-      }),
-    },
-  })
-  const formSubmitting = useSelector(form.store, (state) => state.isSubmitting)
-  const submitting = isCreating || formSubmitting
-  const displayedError = error ?? internalError
-  const closeDialog = useCallback(() => setOpen(false), [])
-  const submit = useCallback(
-    (event: React.SubmitEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      form.handleSubmit().catch(() => undefined)
-    },
-    [form]
-  )
-  return (
-    <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Nova pasta</DialogTitle>
-          <DialogDescription>
-            Crie uma pasta para organizar seus itens.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submit}>
-          <FieldGroup>
-            <form.Field name='name'>
-              {(field) => {
-                const errorId = `${formId}-${field.name}-error`
-                const invalid = field.state.meta.errors.length > 0
-                return (
-                  <Field invalid={invalid}>
-                    <FieldLabel htmlFor='folder-name'>Nome</FieldLabel>
-                    <Input
-                      aria-describedby={invalid ? errorId : undefined}
-                      aria-invalid={invalid}
-                      disabled={submitting}
-                      id='folder-name'
-                      onBlur={field.handleBlur}
-                      onValueChange={field.handleChange}
-                      value={field.state.value}
-                    />
-                    <FieldError errors={field.state.meta.errors} id={errorId} />
-                  </Field>
-                )
-              }}
-            </form.Field>
-          </FieldGroup>
-          <DialogFooter className='mt-4'>
-            {displayedError ? (
-              <p className='text-destructive text-xs'>{displayedError}</p>
-            ) : null}
-            <Button onClick={closeDialog} type='button' variant='outline'>
-              Cancelar
-            </Button>
-            <Button disabled={submitting} type='submit'>
-              {submitting ? 'Criando...' : 'Criar pasta'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
 export function FolderCardSkeleton({ className }: { className?: string }) {
   return (
     <div
