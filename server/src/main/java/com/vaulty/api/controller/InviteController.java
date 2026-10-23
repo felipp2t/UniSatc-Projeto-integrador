@@ -42,4 +42,11 @@ public class InviteController implements InviteControllerDocs {
             @Valid @RequestBody InviteValidationRequest request) {
         return ResponseEntity.ok(inviteService.validate(request));
     }
+
+    @PostMapping("/decline")
+    @Override
+    public ResponseEntity<Void> decline(@Valid @RequestBody InviteValidationRequest request) {
+        inviteService.decline(request);
+        return ResponseEntity.noContent().build();
+    }
 }
