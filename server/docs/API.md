@@ -66,6 +66,20 @@ O que a função faz, em ordem:
 | `403` | autenticado, mas não é o dono do workspace |
 | `409` | já existe uma conta com esse e-mail |
 
+**`GET /invites`** — autenticado (cookie `accessToken`), **somente o dono do workspace**.
+
+Lista convites pendentes e utilizáveis. A resposta é uma lista, inclusive vazia, com os campos
+`id`, `email`, `invitedByUserId`, `invitedByName`, `createdAt` e `expiresAt`. A consulta inclui
+somente convites cuja validade ainda não terminou e cujo e-mail ainda não pertence a uma conta.
+Os itens são ordenados por `createdAt` decrescente e, em caso de empate, por `id` decrescente.
+
+| | |
+|---|---|
+| Auth | Cookie `accessToken`, apenas o dono do workspace |
+| Sucesso | `200`, lista de convites (pode ser vazia) |
+| `401` | não autenticado |
+| `403` | autenticado, mas não é o dono do workspace |
+
 **`POST /invites/validate`** — público, sem autenticação.
 
 Valida o par `email` + `token` antes da tela de cadastro. O corpo contém ambos os campos; eles não são enviados na query string. Para um convite pendente e válido, responde `200` com o e-mail canônico do convite e `remainingSeconds`, calculado pelo servidor. A resposta usa `Cache-Control: no-store`.

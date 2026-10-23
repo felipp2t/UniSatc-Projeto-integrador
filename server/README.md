@@ -80,6 +80,7 @@ ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|
+| — | GET | `/invites` | Sim, só o dono | — | 200, lista `{ id, email, invitedByUserId, invitedByName, createdAt, expiresAt }` | 401 não autenticado, 403 não é o dono |
 | RF10 | POST | `/invites` | Sim, só o dono | `{ email }` | 201 | 400 e-mail inválido, 401 não autenticado, 403 não é o dono, 409 e-mail já cadastrado |
 | RF01/RF11 | POST | `/auth/register` | Não | `{ email, token, name, password, confirmPassword }` | 200, seta cookies | 400 senhas não conferem, 404 convite não encontrado, 409 convite expirado ou e-mail já cadastrado |
 | RF02 | POST | `/auth/login` | Não | `{ email, password }` | 200, seta cookies | 401 credenciais inválidas |
@@ -94,6 +95,9 @@ ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 Trocar a senha (RF05) e redefini-la via e-mail (RF49) invalidam todos os refresh tokens e todos os
 tokens de redefinição pendentes do usuário, forçando novo login em outras sessões e impedindo o
 reuso de links antigos.
+
+`GET /invites` lista apenas convites ainda não expirados cujo e-mail não pertence a uma conta; a
+resposta inclui `id`, `email`, `invitedByUserId`, `invitedByName`, `createdAt` e `expiresAt`.
 
 ## Workspace (em andamento)
 

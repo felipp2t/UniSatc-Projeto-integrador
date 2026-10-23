@@ -1,5 +1,6 @@
 package com.vaulty.api.controller.docs;
 
+import com.vaulty.api.dto.invite.InviteResponse;
 import com.vaulty.api.dto.invite.InviteUserRequest;
 import com.vaulty.api.dto.invite.InviteValidationRequest;
 import com.vaulty.api.dto.invite.InviteValidationResponse;
@@ -11,11 +12,16 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 @Tag(name = "Convites")
 public interface InviteControllerDocs {
+
+    @Operation(summary = "Lista convites pendentes")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403")})
+    List<InviteResponse> list(@Parameter(hidden = true) UUID ownerId);
 
     @Operation(summary = "Envia convite para um novo usuário")
     @ApiResponses({@ApiResponse(responseCode = "201"), @ApiResponse(responseCode = "409")})
