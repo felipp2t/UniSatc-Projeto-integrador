@@ -17,9 +17,16 @@ import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
 import type {
   CollectionPageResponse,
   CollectionPathEntry,
+  CollectionResponse,
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
+import {
+  CollectionCard,
+  CollectionDialogHost,
+  type CollectionDialogState,
+  CreateCollectionButton,
+} from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
 import { NotFoundPage } from '@/components/not-found-page'
 import { Button } from '@/components/ui/button'
@@ -40,6 +47,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { appToast } from '@/components/ui/toast'
+import { useCollectionMutations } from '@/hooks/use-collection-mutations'
 import { useCollectionPath } from '@/hooks/use-collection-path'
 
 const searchSchema = z.object({
@@ -105,6 +114,9 @@ function WorkspaceBrowser({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const path = useCollectionPath(workspaceId, collectionId)
+  const collectionMutations = useCollectionMutations()
+  const [collectionDialog, setCollectionDialog] =
+    useState<CollectionDialogState>(null)
   const [collectionsPage, setCollectionsPage] = useState(0)
   const collections = useQuery({
     placeholderData: (previousData) => previousData,
@@ -189,6 +201,65 @@ function WorkspaceBrowser({
   const nextCollectionsPage = useCallback(() => {
     setCollectionsPage((current) => current + 1)
   }, [])
+  const openCreateCollection = useCallback(
+    () => setCollectionDialog({ type: 'create' }),
+    []
+  )
+  const openRenameCollection = useCallback((collection: CollectionResponse) => {
+    setCollectionDialog({ collection: { ...collection }, type: 'rename' })
+  }, [])
+  const openDeleteCollection = useCallback((collection: CollectionResponse) => {
+    setCollectionDialog({ collection: { ...collection }, type: 'delete' })
+  }, [])
+  const closeCollectionDialog = useCallback(() => setCollectionDialog(null), [])
+  const createCollection = useCallback(
+    async (name: string) => {
+      await collectionMutations.create.mutateAsync({
+        request: { name, parentId: collectionId },
+        workspaceId,
+      })
+      appToast.success('Pasta criada.')
+      closeCollectionDialog()
+    },
+    [
+      closeCollectionDialog,
+      collectionId,
+      collectionMutations.create,
+      workspaceId,
+    ]
+  )
+  const renameCollection = useCallback(
+    async (collection: CollectionResponse, name: string) => {
+      await collectionMutations.rename.mutateAsync({
+        collectionId: collection.id,
+        name,
+        parentId: collection.parentId ?? undefined,
+        workspaceId,
+      })
+      appToast.success('Pasta renomeada.')
+      closeCollectionDialog()
+    },
+    [closeCollectionDialog, collectionMutations.rename, workspaceId]
+  )
+  const deleteCollection = useCallback(
+    async (collection: CollectionResponse) => {
+      await collectionMutations.remove.mutateAsync({
+        collectionId: collection.id,
+        parentId: collection.parentId ?? undefined,
+        workspaceId,
+      })
+      appToast.success('Pasta excluída.')
+      closeCollectionDialog()
+    },
+    [closeCollectionDialog, collectionMutations.remove, workspaceId]
+  )
+  const collectionMutationPending =
+    (collectionDialog?.type === 'create' &&
+      collectionMutations.create.isPending) ||
+    (collectionDialog?.type === 'rename' &&
+      collectionMutations.rename.isPending) ||
+    (collectionDialog?.type === 'delete' &&
+      collectionMutations.remove.isPending)
 
   if (unavailableCollection) {
     return <LoadingState label='Voltando ao workspace…' />
@@ -219,10 +290,19 @@ function WorkspaceBrowser({
       <WorkspaceHeading
         collectionId={collectionId}
         isLoading={path.isPending}
+        onCreateCollection={openCreateCollection}
         onItemCreated={refreshItems}
         path={path.data ?? []}
         workspaceId={workspaceId}
         workspaceName={workspaceName}
+      />
+      <CollectionDialogHost
+        dialog={collectionDialog}
+        isPending={collectionMutationPending}
+        onClose={closeCollectionDialog}
+        onCreate={createCollection}
+        onDelete={deleteCollection}
+        onRename={renameCollection}
       />
       <CollectionsSection
         collectionId={collectionId}
@@ -231,8 +311,10 @@ function WorkspaceBrowser({
         isError={collections.isError}
         isFetching={collections.isFetching}
         isPlaceholderData={collections.isPlaceholderData}
+        onDelete={openDeleteCollection}
         onNextPage={nextCollectionsPage}
         onPreviousPage={previousCollectionsPage}
+        onRename={openRenameCollection}
         onRetry={retryCollections}
         page={collectionsPage}
       />
@@ -294,6 +376,7 @@ function WorkspaceBreadcrumbs({
 function WorkspaceHeading({
   collectionId,
   isLoading,
+  onCreateCollection,
   path,
   onItemCreated,
   workspaceId,
@@ -301,6 +384,7 @@ function WorkspaceHeading({
 }: {
   collectionId: string | undefined
   isLoading: boolean
+  onCreateCollection: () => void
   path: CollectionPathEntry[]
   workspaceName: string
   workspaceId: string
@@ -328,12 +412,15 @@ function WorkspaceHeading({
           )}
         </div>
       </div>
-      <CreateItemDialog
-        collectionId={collectionId}
-        onItemCreated={onItemCreated}
-        workspaceId={workspaceId}
-        workspaceName={workspaceName}
-      />
+      <div className='flex flex-wrap items-center gap-2'>
+        <CreateCollectionButton onClick={onCreateCollection} />
+        <CreateItemDialog
+          collectionId={collectionId}
+          onItemCreated={onItemCreated}
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+        />
+      </div>
     </header>
   )
 }
@@ -346,7 +433,9 @@ function CollectionsSection({
   isFetching,
   isPlaceholderData,
   onNextPage,
+  onDelete,
   onPreviousPage,
+  onRename,
   onRetry,
   page,
 }: {
@@ -357,7 +446,9 @@ function CollectionsSection({
   isFetching: boolean
   isPlaceholderData: boolean
   onNextPage: () => void
+  onDelete: (collection: CollectionResponse) => void
   onPreviousPage: () => void
+  onRename: (collection: CollectionResponse) => void
   onRetry: () => void | Promise<void>
   page: number
 }) {
@@ -401,7 +492,12 @@ function CollectionsSection({
       </h2>
       <div className='grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-4'>
         {collections.items.map((folder) => (
-          <CollectionCard collection={folder} key={folder.id} />
+          <CollectionCard
+            collection={folder}
+            key={folder.id}
+            onDelete={onDelete}
+            onRename={onRename}
+          />
         ))}
       </div>
       {collections.totalPages > 1 ? (
@@ -414,33 +510,6 @@ function CollectionsSection({
         />
       ) : null}
     </section>
-  )
-}
-
-function CollectionCard({
-  collection,
-}: {
-  collection: CollectionPageResponse['items'][number]
-}) {
-  return (
-    <Link
-      className='group flex min-h-24 flex-col justify-between gap-4 border-2 border-border bg-card p-4 transition-colors hover:border-primary/50'
-      search={{ collectionId: collection.id }}
-      to='/'
-    >
-      <div className='flex min-w-0 items-center gap-2'>
-        <FolderIcon
-          aria-hidden='true'
-          className='size-5 shrink-0 text-muted-foreground group-hover:text-primary'
-        />
-        <span className='truncate font-bold font-mono text-sm uppercase tracking-wide'>
-          {collection.name}
-        </span>
-      </div>
-      <span className='font-mono text-[10px] text-muted-foreground uppercase tracking-wider'>
-        Pasta
-      </span>
-    </Link>
   )
 }
 

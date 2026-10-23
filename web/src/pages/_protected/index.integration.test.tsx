@@ -5,7 +5,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createElement } from 'react'
 import { toast } from 'sonner'
@@ -28,8 +28,11 @@ const secondPageFolderName = /Second page folder/i
 const workspaceId = 'workspace-1'
 
 const apiMocks = vi.hoisted(() => ({
+  collectionsCreate: vi.fn(),
   collectionsList: vi.fn(),
   collectionsPath: vi.fn(),
+  collectionsRemove: vi.fn(),
+  collectionsRename: vi.fn(),
   itemsList: vi.fn(),
   workspaceList: vi.fn(),
 }))
@@ -40,8 +43,11 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
     ...actual,
     collectionsApi: {
       ...actual.collectionsApi,
+      create: apiMocks.collectionsCreate,
       list: apiMocks.collectionsList,
       path: apiMocks.collectionsPath,
+      remove: apiMocks.collectionsRemove,
+      rename: apiMocks.collectionsRename,
     },
     itemsApi: { ...actual.itemsApi, list: apiMocks.itemsList },
     workspaceApi: { ...actual.workspaceApi, list: apiMocks.workspaceList },
@@ -140,6 +146,13 @@ async function renderAt(entry: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  apiMocks.collectionsCreate.mockResolvedValue({
+    data: { id: 'created-folder', name: 'New folder', parentId: null },
+  })
+  apiMocks.collectionsRename.mockResolvedValue({
+    data: { id: folderAId, name: 'Renamed folder', parentId: null },
+  })
+  apiMocks.collectionsRemove.mockResolvedValue({ data: undefined })
   apiMocks.workspaceList.mockResolvedValue({
     data: [{ id: workspaceId, name: 'Workspace' }],
   })
@@ -158,6 +171,314 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('workspace collection navigation', () => {
+  it('creates a root folder from the header and trims the name', async () => {
+    const user = userEvent.setup()
+    await renderAt('/')
+
+    await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Nome'), {
+      target: { value: '  A  ' },
+    })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Criar pasta' })
+    )
+
+    await waitFor(() => {
+      expect(apiMocks.collectionsCreate).toHaveBeenCalledWith(workspaceId, {
+        name: 'A',
+        parentId: undefined,
+      })
+    })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  }, 15_000)
+
+  it('creates a subfolder with the current collection as parent', async () => {
+    apiMocks.collectionsList.mockImplementation(async (_id, collectionId) =>
+      collectionId
+        ? collectionPage([])
+        : collectionPage([{ id: folderAId, name: 'Folder A', parentId: null }])
+    )
+    const user = userEvent.setup()
+    const { router } = await renderAt('/')
+    await user.click(await screen.findByRole('link', { name: folderAName }))
+    await waitFor(() => {
+      expect(router.state.location.search.collectionId).toBe(folderAId)
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Nome'), {
+      target: { value: 'Child' },
+    })
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Criar pasta' })
+    )
+
+    await waitFor(() => {
+      expect(apiMocks.collectionsCreate).toHaveBeenCalledWith(workspaceId, {
+        name: 'Child',
+        parentId: folderAId,
+      })
+    })
+  })
+
+  it('validates a nonblank name and limits the input to 255 characters', async () => {
+    const user = userEvent.setup()
+    await renderAt('/')
+    await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByLabelText('Nome')
+
+    await user.type(input, '   ')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Criar pasta' })
+    )
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Informe um nome para a pasta.'
+    )
+    expect(apiMocks.collectionsCreate).not.toHaveBeenCalled()
+
+    expect(input).toHaveAttribute('maxLength', '255')
+    expect(apiMocks.collectionsCreate).not.toHaveBeenCalled()
+  })
+
+  it('opens the folder menu without navigating and preloads the current name', async () => {
+    apiMocks.collectionsList.mockResolvedValue(
+      collectionPage([{ id: folderAId, name: 'Folder A', parentId: null }])
+    )
+    const user = userEvent.setup()
+    const { router } = await renderAt('/')
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Ações de Folder A' })
+    )
+    await user.click(await screen.findByRole('menuitem', { name: 'Renomear' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(router.state.location.search.collectionId).toBeUndefined()
+    expect(within(dialog).getByLabelText('Nome')).toHaveValue('Folder A')
+  })
+
+  it('closes rename without an API call when the trimmed name is unchanged', async () => {
+    apiMocks.collectionsList.mockResolvedValue(
+      collectionPage([{ id: folderAId, name: 'Folder A', parentId: null }])
+    )
+    const user = userEvent.setup()
+    await renderAt('/')
+    await user.click(
+      await screen.findByRole('button', { name: 'Ações de Folder A' })
+    )
+    await user.click(await screen.findByRole('menuitem', { name: 'Renomear' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(apiMocks.collectionsRename).not.toHaveBeenCalled()
+  })
+
+  it('renames a folder and submits the trimmed name', async () => {
+    apiMocks.collectionsList
+      .mockResolvedValueOnce(
+        collectionPage([{ id: folderAId, name: 'Folder A', parentId: null }])
+      )
+      .mockResolvedValue(
+        collectionPage([{ id: folderAId, name: 'Renamed', parentId: null }])
+      )
+    const user = userEvent.setup()
+    await renderAt('/')
+    await user.click(
+      await screen.findByRole('button', { name: 'Ações de Folder A' })
+    )
+    await user.click(await screen.findByRole('menuitem', { name: 'Renomear' }))
+    const dialog = await screen.findByRole('dialog')
+    const input = within(dialog).getByLabelText('Nome')
+    await user.clear(input)
+    await user.type(input, '  Renamed  ')
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }))
+
+    await waitFor(() => {
+      expect(apiMocks.collectionsRename).toHaveBeenCalledWith(
+        workspaceId,
+        folderAId,
+        { name: 'Renamed' }
+      )
+      expect(screen.getByRole('link', { name: 'Renamed' })).toBeInTheDocument()
+    })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('keeps the delete dialog open when an optimistic delete rolls back on 409', async () => {
+    let rejectDelete: ((error: ApiError) => void) | undefined
+    apiMocks.collectionsList.mockResolvedValue(
+      collectionPage([{ id: folderAId, name: 'Folder A', parentId: null }])
+    )
+    apiMocks.collectionsRemove.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectDelete = reject
+        })
+    )
+    const user = userEvent.setup()
+    await renderAt('/')
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Ações de Folder A' })
+    )
+    await user.click(await screen.findByRole('menuitem', { name: 'Excluir' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('“Folder A” será excluída')
+    await user.click(within(dialog).getByRole('button', { name: 'Excluir' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: folderAName })).toBeNull()
+    )
+    act(() => {
+      rejectDelete?.(new ApiError('Not empty', 409))
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Esta pasta contém itens ou subpastas e não pode ser excluída.'
+    )
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { hidden: true, name: folderAName })
+      ).toBeInTheDocument()
+    })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('blocks escape and outside closing while a collection mutation is pending', async () => {
+    let resolveCreate: (() => void) | undefined
+    apiMocks.collectionsCreate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCreate = () =>
+            resolve({ data: { id: 'id', name: 'Name', parentId: null } })
+        })
+    )
+    const user = userEvent.setup()
+    await renderAt('/')
+    await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Nome'), 'Pending')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Criar pasta' })
+    )
+
+    await waitFor(() => expect(resolveCreate).toBeDefined())
+    expect(
+      within(dialog).getByRole('button', { name: 'Criando…' })
+    ).toBeDisabled()
+    expect(apiMocks.collectionsCreate).toHaveBeenCalledTimes(1)
+    await user.keyboard('{Escape}')
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(document.body)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await act(async () => resolveCreate?.())
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('leaves the page interactive after closing a collection dialog', async () => {
+    const user = userEvent.setup()
+    await renderAt('/')
+    await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+
+  it.each([
+    [
+      '403',
+      new ApiError('Forbidden', 403),
+      'Você não tem permissão para esta ação.',
+    ],
+    [
+      '409',
+      new ApiError('Conflict', 409),
+      'Já existe uma pasta com esse nome nesta localização.',
+    ],
+  ])('shows a clear create error for %s', async (_label, error, message) => {
+    apiMocks.collectionsCreate.mockRejectedValue(error)
+    const user = userEvent.setup()
+    await renderAt('/')
+    await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Nome'), 'Folder')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Criar pasta' })
+    )
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(message)
+  })
+
+  it.each([403, 404, 409])(
+    'shows a clear rename error for HTTP %s',
+    async (status) => {
+      apiMocks.collectionsList.mockResolvedValue(
+        collectionPage([{ id: folderAId, name: 'Folder A', parentId: null }])
+      )
+      apiMocks.collectionsRename.mockRejectedValue(
+        new ApiError('Request failed', status)
+      )
+      const user = userEvent.setup()
+      await renderAt('/')
+      await user.click(
+        await screen.findByRole('button', { name: 'Ações de Folder A' })
+      )
+      await user.click(
+        await screen.findByRole('menuitem', { name: 'Renomear' })
+      )
+      const dialog = await screen.findByRole('dialog')
+      const input = within(dialog).getByLabelText('Nome')
+      await user.clear(input)
+      await user.type(input, 'Renamed')
+      await user.click(within(dialog).getByRole('button', { name: 'Salvar' }))
+
+      const expected =
+        status === 403
+          ? 'Você não tem permissão para esta ação.'
+          : status === 404
+            ? 'Esta pasta não está mais disponível. A listagem foi atualizada.'
+            : 'Já existe uma pasta com esse nome nesta localização.'
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        expected
+      )
+    }
+  )
+
+  it.each([403, 404])(
+    'shows a clear delete error for HTTP %s',
+    async (status) => {
+      apiMocks.collectionsList.mockResolvedValue(
+        collectionPage([{ id: folderAId, name: 'Folder A', parentId: null }])
+      )
+      apiMocks.collectionsRemove.mockRejectedValue(
+        new ApiError('Request failed', status)
+      )
+      const user = userEvent.setup()
+      await renderAt('/')
+      await user.click(
+        await screen.findByRole('button', { name: 'Ações de Folder A' })
+      )
+      await user.click(await screen.findByRole('menuitem', { name: 'Excluir' }))
+      const dialog = await screen.findByRole('dialog')
+      await user.click(within(dialog).getByRole('button', { name: 'Excluir' }))
+
+      const expected =
+        status === 403
+          ? 'Você não tem permissão para esta ação.'
+          : 'Esta pasta não está mais disponível. A listagem foi atualizada.'
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        expected
+      )
+    }
+  )
+
   it('normalizes a malformed collection id to the workspace root', async () => {
     const { router } = await renderAt('/?collectionId=not-a-guid')
 
