@@ -9,6 +9,7 @@ import com.vaulty.api.entity.PasswordResetToken;
 import com.vaulty.api.entity.RefreshToken;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.InvalidCredentialsException;
 import com.vaulty.api.exception.InvalidInviteException;
@@ -134,7 +135,8 @@ public class AuthService {
             throw new ValidationException("As senhas não conferem");
         }
 
-        UserInvite invite = userInviteRepository.findByEmailAndToken(request.email(), request.token())
+        UserInvite invite = userInviteRepository.findByEmailAndTokenAndStatusForUpdate(
+                        request.email(), request.token(), UserInviteStatus.PENDING)
                 .orElseThrow(() -> new ResourceNotFoundException("Convite não encontrado"));
 
         if (!invite.getExpiresAt().isAfter(OffsetDateTime.now(clock))) {

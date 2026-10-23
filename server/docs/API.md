@@ -84,9 +84,18 @@ Os itens são ordenados por `createdAt` decrescente e, em caso de empate, por `i
 
 Valida o par `email` + `token` antes da tela de cadastro. O corpo contém ambos os campos; eles não são enviados na query string. Para um convite pendente e válido, responde `200` com o e-mail canônico do convite e `remainingSeconds`, calculado pelo servidor. A resposta usa `Cache-Control: no-store`.
 
-Convites inexistentes, expirados, revogados, substituídos ou já utilizados retornam a mesma resposta genérica `404` (“Convite indisponível”), sem revelar o motivo. A validação é apenas informativa: `POST /auth/register` volta a validar o convite dentro da transação que cria conta e vínculo.
+Convites inexistentes, expirados, recusados, revogados, substituídos ou já utilizados retornam a mesma resposta genérica `404` (“Convite indisponível”), sem revelar o motivo. A validação é apenas informativa: `POST /auth/register` volta a validar o convite dentro da transação que cria conta e vínculo.
 
 O endpoint usa o limite existente de cinco requisições por minuto por IP e caminho, com contador separado de `/auth/register`.
+
+**`POST /invites/decline`** — público, sem autenticação.
+
+Recebe o mesmo corpo `{ "email": string, "token": string }` da validação. Recusa somente um
+convite pendente e válido, marcando `user_invite.status` como `DECLINED`; convites inexistentes,
+expirados, já usados ou já recusados respondem `404` com a mensagem genérica “Convite indisponível”.
+O cadastro também consulta somente convites pendentes, então um convite recusado não pode ser aceito.
+O endpoint retorna `204`, usa `Cache-Control: no-store` e tem limite de cinco requisições por minuto
+por IP e caminho.
 
 ---
 
@@ -368,6 +377,7 @@ do workspace responde `404`.
 |---|---|---|---|
 | RF10 | POST | `/invites` | Cookie `accessToken` |
 | RF11 | POST | `/invites/validate` | Não |
+| RF12 | POST | `/invites/decline` | Não |
 | RF01/RF11 | POST | `/auth/register` | Não |
 | RF02 | POST | `/auth/login` | Não |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` |
