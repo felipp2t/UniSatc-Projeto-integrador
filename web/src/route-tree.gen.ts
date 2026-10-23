@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './pages/__root'
 import { Route as ProtectedLayoutRouteImport } from './pages/_protected/layout'
+import { Route as CadastroRouteImport } from './pages/cadastro'
 import { Route as EsqueciSenhaRouteImport } from './pages/esqueci-senha'
 import { Route as LoginRouteImport } from './pages/login'
 import { Route as RedefinirSenhaRouteImport } from './pages/redefinir-senha'
@@ -17,10 +18,14 @@ import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
 import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
 import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
 import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
-import { Route as ConviteTokenRouteImport } from './pages/convite/$token'
 
 const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
   id: '/_protected',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CadastroRoute = CadastroRouteImport.update({
+  id: '/cadastro',
+  path: '/cadastro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EsqueciSenhaRoute = EsqueciSenhaRouteImport.update({
@@ -58,84 +63,79 @@ const ProtectedConfiguracoesRoute = ProtectedConfiguracoesRouteImport.update({
   path: '/configuracoes',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
-const ConviteTokenRoute = ConviteTokenRouteImport.update({
-  id: '/convite/$token',
-  path: '/convite/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ProtectedIndexRoute
+  '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
   '/components': typeof ProtectedComponentsRoute
   '/configuracoes': typeof ProtectedConfiguracoesRoute
-  '/convite/$token': typeof ConviteTokenRoute
 }
 export interface FileRoutesByTo {
+  '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
   '/components': typeof ProtectedComponentsRoute
   '/configuracoes': typeof ProtectedConfiguracoesRoute
-  '/convite/$token': typeof ConviteTokenRoute
   '/': typeof ProtectedIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_protected': typeof ProtectedLayoutRouteWithChildren
+  '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/_protected/$': typeof ProtectedSplatRoute
   '/_protected/components': typeof ProtectedComponentsRoute
   '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
-  '/convite/$token': typeof ConviteTokenRoute
   '/_protected/': typeof ProtectedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cadastro'
     | '/esqueci-senha'
     | '/login'
     | '/redefinir-senha'
     | '/$'
     | '/components'
     | '/configuracoes'
-    | '/convite/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/cadastro'
     | '/esqueci-senha'
     | '/login'
     | '/redefinir-senha'
     | '/$'
     | '/components'
     | '/configuracoes'
-    | '/convite/$token'
     | '/'
   id:
     | '__root__'
     | '/_protected'
+    | '/cadastro'
     | '/esqueci-senha'
     | '/login'
     | '/redefinir-senha'
     | '/_protected/$'
     | '/_protected/components'
     | '/_protected/configuracoes'
-    | '/convite/$token'
     | '/_protected/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   ProtectedLayoutRoute: typeof ProtectedLayoutRouteWithChildren
+  CadastroRoute: typeof CadastroRoute
   EsqueciSenhaRoute: typeof EsqueciSenhaRoute
   LoginRoute: typeof LoginRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
-  ConviteTokenRoute: typeof ConviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -145,6 +145,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ProtectedLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastro': {
+      id: '/cadastro'
+      path: '/cadastro'
+      fullPath: '/cadastro'
+      preLoaderRoute: typeof CadastroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/esqueci-senha': {
@@ -196,13 +203,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedConfiguracoesRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/convite/$token': {
-      id: '/convite/$token'
-      path: '/convite/$token'
-      fullPath: '/convite/$token'
-      preLoaderRoute: typeof ConviteTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -226,10 +226,10 @@ const ProtectedLayoutRouteWithChildren = ProtectedLayoutRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   ProtectedLayoutRoute: ProtectedLayoutRouteWithChildren,
+  CadastroRoute: CadastroRoute,
   EsqueciSenhaRoute: EsqueciSenhaRoute,
   LoginRoute: LoginRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
-  ConviteTokenRoute: ConviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
