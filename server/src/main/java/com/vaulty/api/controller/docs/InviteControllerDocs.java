@@ -38,4 +38,22 @@ public interface InviteControllerDocs {
                 content = @Content(schema = @Schema(implementation = ApiErrorBody.class)))
     })
     ResponseEntity<InviteValidationResponse> validate(InviteValidationRequest request);
+
+    @Operation(summary = "Recusa convite recebido")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Convite recusado"),
+        @ApiResponse(
+                responseCode = "400",
+                description = "E-mail ou token em formato inválido",
+                content = @Content(schema = @Schema(implementation = ApiErrorBody.class))),
+        @ApiResponse(
+                responseCode = "404",
+                description = "Convite indisponível",
+                content = @Content(schema = @Schema(implementation = ApiErrorBody.class))),
+        @ApiResponse(
+                responseCode = "429",
+                description = "Limite de tentativas excedido",
+                content = @Content(schema = @Schema(implementation = ApiErrorBody.class)))
+    })
+    ResponseEntity<Void> decline(InviteValidationRequest request);
 }
