@@ -36,13 +36,10 @@ export interface CollectionResponse {
   name: string
   parentId: string | null
 }
-export interface CreateCollectionRequest {
-  name: string
-  parentId?: string
-}
-export interface RenameCollectionRequest {
-  name: string
-}
+export type CreateCollectionRequest =
+  components['schemas']['CreateCollectionRequest']
+export type RenameCollectionRequest =
+  components['schemas']['RenameCollectionRequest']
 export interface CollectionPageResponse {
   items: CollectionResponse[]
   page: number

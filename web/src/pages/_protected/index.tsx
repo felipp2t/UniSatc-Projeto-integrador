@@ -7,26 +7,18 @@ import {
   LinkIcon,
 } from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { isUnavailableCollectionError } from '@/api/collection-errors'
-import { collectionKeys } from '@/api/collection-keys'
-import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
+import { itemsApi, workspaceApi } from '@/api/endpoints'
 import type {
-  CollectionPageResponse,
   CollectionPathEntry,
-  CollectionResponse,
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
-import {
-  CollectionCard,
-  CollectionDialogHost,
-  type CollectionDialogState,
-  CreateCollectionButton,
-} from '@/components/collection-management'
+import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
 import { NotFoundPage } from '@/components/not-found-page'
 import { Button } from '@/components/ui/button'
@@ -47,8 +39,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { appToast } from '@/components/ui/toast'
-import { useCollectionMutations } from '@/hooks/use-collection-mutations'
+import {
+  PaginationControls,
+  WorkspaceCollections,
+} from '@/components/workspace-collections'
 import { useCollectionPath } from '@/hooks/use-collection-path'
 
 const searchSchema = z.object({
@@ -111,83 +105,22 @@ function WorkspaceBrowser({
   workspaceId: string
   workspaceName: string
 }) {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const path = useCollectionPath(workspaceId, collectionId)
-  const collectionMutations = useCollectionMutations()
-  const [collectionDialog, setCollectionDialog] =
-    useState<CollectionDialogState>(null)
-  const [collectionsPage, setCollectionsPage] = useState(0)
-  const collections = useQuery({
-    placeholderData: (previousData) => previousData,
-    queryFn: async () =>
-      (
-        await collectionsApi.list(
-          workspaceId,
-          collectionId,
-          collectionsPage,
-          100
-        )
-      ).data,
-    queryKey: collectionKeys.list(workspaceId, collectionId, collectionsPage),
-  })
-  const {
-    data: collectionsData,
-    isFetching: isFetchingCollections,
-    isPlaceholderData: isPlaceholderCollections,
-    isSuccess: isCollectionsSuccess,
-  } = collections
-  const lastNotifiedCollectionId = useRef<string | undefined>(undefined)
-  const pathUnavailable = isUnavailableCollectionError(path.error, 'path')
-  const collectionsUnavailable = isUnavailableCollectionError(
-    collections.error,
-    'list',
-    collectionsPage
+  const [createCollectionSignal, setCreateCollectionSignal] = useState(false)
+  const openCreateCollection = useCallback(
+    () => setCreateCollectionSignal(true),
+    []
   )
-  const unavailableCollection =
-    Boolean(collectionId) && (pathUnavailable || collectionsUnavailable)
-
-  useEffect(() => {
-    if (!(collectionId && unavailableCollection)) return
-    if (lastNotifiedCollectionId.current === collectionId) return
-
-    lastNotifiedCollectionId.current = collectionId
-    toast.error('Esta pasta não está disponível ou você não tem acesso.')
-    navigate({
-      replace: true,
-      search: (previous) => ({ ...previous, collectionId: undefined }),
-      to: '/',
-    }).catch(() => undefined)
-  }, [collectionId, navigate, unavailableCollection])
-
-  useEffect(() => {
-    if (
-      !isCollectionsSuccess ||
-      isFetchingCollections ||
-      isPlaceholderCollections ||
-      !collectionsData ||
-      collectionsPage === 0 ||
-      collectionsData.items.length > 0 ||
-      collectionsPage < collectionsData.totalPages
-    ) {
-      return
-    }
-
-    setCollectionsPage(Math.max(0, collectionsData.totalPages - 1))
-  }, [
-    collectionsData,
-    isFetchingCollections,
-    isPlaceholderCollections,
-    isCollectionsSuccess,
-    collectionsPage,
-  ])
+  const clearCreateCollectionSignal = useCallback(
+    () => setCreateCollectionSignal(false),
+    []
+  )
+  const pathUnavailable = isUnavailableCollectionError(path.error, 'path')
 
   const retryPath = useCallback(async () => {
     await path.refetch()
   }, [path.refetch])
-  const retryCollections = useCallback(async () => {
-    await collections.refetch()
-  }, [collections.refetch])
   const refreshItems = useCallback(
     () =>
       queryClient.invalidateQueries({
@@ -195,76 +128,7 @@ function WorkspaceBrowser({
       }),
     [queryClient, workspaceId]
   )
-  const previousCollectionsPage = useCallback(() => {
-    setCollectionsPage((current) => Math.max(0, current - 1))
-  }, [])
-  const nextCollectionsPage = useCallback(() => {
-    setCollectionsPage((current) => current + 1)
-  }, [])
-  const openCreateCollection = useCallback(
-    () => setCollectionDialog({ type: 'create' }),
-    []
-  )
-  const openRenameCollection = useCallback((collection: CollectionResponse) => {
-    setCollectionDialog({ collection: { ...collection }, type: 'rename' })
-  }, [])
-  const openDeleteCollection = useCallback((collection: CollectionResponse) => {
-    setCollectionDialog({ collection: { ...collection }, type: 'delete' })
-  }, [])
-  const closeCollectionDialog = useCallback(() => setCollectionDialog(null), [])
-  const createCollection = useCallback(
-    async (name: string) => {
-      await collectionMutations.create.mutateAsync({
-        request: { name, parentId: collectionId },
-        workspaceId,
-      })
-      appToast.success('Pasta criada.')
-      closeCollectionDialog()
-    },
-    [
-      closeCollectionDialog,
-      collectionId,
-      collectionMutations.create,
-      workspaceId,
-    ]
-  )
-  const renameCollection = useCallback(
-    async (collection: CollectionResponse, name: string) => {
-      await collectionMutations.rename.mutateAsync({
-        collectionId: collection.id,
-        name,
-        parentId: collection.parentId ?? undefined,
-        workspaceId,
-      })
-      appToast.success('Pasta renomeada.')
-      closeCollectionDialog()
-    },
-    [closeCollectionDialog, collectionMutations.rename, workspaceId]
-  )
-  const deleteCollection = useCallback(
-    async (collection: CollectionResponse) => {
-      await collectionMutations.remove.mutateAsync({
-        collectionId: collection.id,
-        parentId: collection.parentId ?? undefined,
-        workspaceId,
-      })
-      appToast.success('Pasta excluída.')
-      closeCollectionDialog()
-    },
-    [closeCollectionDialog, collectionMutations.remove, workspaceId]
-  )
-  const collectionMutationPending =
-    (collectionDialog?.type === 'create' &&
-      collectionMutations.create.isPending) ||
-    (collectionDialog?.type === 'rename' &&
-      collectionMutations.rename.isPending) ||
-    (collectionDialog?.type === 'delete' &&
-      collectionMutations.remove.isPending)
-
-  if (unavailableCollection) {
-    return <LoadingState label='Voltando ao workspace…' />
-  }
-  if (collectionId && path.isError) {
+  if (collectionId && path.isError && !pathUnavailable) {
     return (
       <div className='flex flex-col items-center gap-3 p-8'>
         <ErrorState error={path.error} onRetry={retryPath} />
@@ -296,27 +160,12 @@ function WorkspaceBrowser({
         workspaceId={workspaceId}
         workspaceName={workspaceName}
       />
-      <CollectionDialogHost
-        dialog={collectionDialog}
-        isPending={collectionMutationPending}
-        onClose={closeCollectionDialog}
-        onCreate={createCollection}
-        onDelete={deleteCollection}
-        onRename={renameCollection}
-      />
-      <CollectionsSection
+      <WorkspaceCollections
         collectionId={collectionId}
-        collections={collections.data}
-        error={collections.error}
-        isError={collections.isError}
-        isFetching={collections.isFetching}
-        isPlaceholderData={collections.isPlaceholderData}
-        onDelete={openDeleteCollection}
-        onNextPage={nextCollectionsPage}
-        onPreviousPage={previousCollectionsPage}
-        onRename={openRenameCollection}
-        onRetry={retryCollections}
-        page={collectionsPage}
+        createCollectionSignal={createCollectionSignal}
+        onCollectionDialogOpened={clearCreateCollectionSignal}
+        pathUnavailable={pathUnavailable}
+        workspaceId={workspaceId}
       />
       <ItemsSection collectionId={collectionId} workspaceId={workspaceId} />
     </main>
@@ -422,94 +271,6 @@ function WorkspaceHeading({
         />
       </div>
     </header>
-  )
-}
-
-function CollectionsSection({
-  collectionId,
-  collections,
-  error,
-  isError,
-  isFetching,
-  isPlaceholderData,
-  onNextPage,
-  onDelete,
-  onPreviousPage,
-  onRename,
-  onRetry,
-  page,
-}: {
-  collectionId: string | undefined
-  collections: CollectionPageResponse | undefined
-  error: Error | null
-  isError: boolean
-  isFetching: boolean
-  isPlaceholderData: boolean
-  onNextPage: () => void
-  onDelete: (collection: CollectionResponse) => void
-  onPreviousPage: () => void
-  onRename: (collection: CollectionResponse) => void
-  onRetry: () => void | Promise<void>
-  page: number
-}) {
-  if (isError) return <ErrorState error={error} onRetry={onRetry} />
-  if (!collections) return <LoadingState label='Carregando pastas…' />
-
-  if (collections.items.length === 0) {
-    if (isPlaceholderData || (page > 0 && page >= collections.totalPages)) {
-      return <LoadingState label='Carregando pastas…' />
-    }
-
-    return (
-      <section aria-labelledby='collections-heading' className='space-y-3'>
-        <h2
-          className='font-mono font-semibold text-muted-foreground text-xs uppercase tracking-widest'
-          id='collections-heading'
-        >
-          Pastas
-        </h2>
-        <EmptyState
-          description={
-            collectionId
-              ? 'Esta pasta ainda não tem subpastas.'
-              : 'Este workspace ainda não tem pastas.'
-          }
-          icon={<FolderIcon aria-hidden='true' className='size-6' />}
-          title='Nenhuma pasta encontrada'
-          variant='compact'
-        />
-      </section>
-    )
-  }
-
-  return (
-    <section aria-labelledby='collections-heading' className='space-y-3'>
-      <h2
-        className='font-mono font-semibold text-muted-foreground text-xs uppercase tracking-widest'
-        id='collections-heading'
-      >
-        Pastas
-      </h2>
-      <div className='grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-4'>
-        {collections.items.map((folder) => (
-          <CollectionCard
-            collection={folder}
-            key={folder.id}
-            onDelete={onDelete}
-            onRename={onRename}
-          />
-        ))}
-      </div>
-      {collections.totalPages > 1 ? (
-        <PaginationControls
-          isFetching={isFetching || isPlaceholderData}
-          onNext={onNextPage}
-          onPrevious={onPreviousPage}
-          page={page}
-          totalPages={collections.totalPages}
-        />
-      ) : null}
-    </section>
   )
 }
 
@@ -840,45 +601,5 @@ function ItemListCard({
         </p>
       ) : null}
     </article>
-  )
-}
-
-function PaginationControls({
-  isFetching,
-  onNext,
-  onPrevious,
-  page,
-  totalPages,
-}: {
-  isFetching: boolean
-  onNext: () => void
-  onPrevious: () => void
-  page: number
-  totalPages: number
-}) {
-  return (
-    <div className='flex items-center justify-between border-border border-t pt-4'>
-      <span className='font-mono text-muted-foreground text-xs'>
-        Página {page + 1} de {totalPages}
-      </span>
-      <div className='flex gap-2'>
-        <Button
-          disabled={page === 0 || isFetching}
-          onClick={onPrevious}
-          size='sm'
-          variant='outline'
-        >
-          Anterior
-        </Button>
-        <Button
-          disabled={page + 1 >= totalPages || isFetching}
-          onClick={onNext}
-          size='sm'
-          variant='outline'
-        >
-          Próxima
-        </Button>
-      </div>
-    </div>
   )
 }
