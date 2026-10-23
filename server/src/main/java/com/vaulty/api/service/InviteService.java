@@ -1,5 +1,6 @@
 package com.vaulty.api.service;
 
+import com.vaulty.api.dto.invite.InviteResponse;
 import com.vaulty.api.dto.invite.InviteUserRequest;
 import com.vaulty.api.dto.invite.InviteValidationRequest;
 import com.vaulty.api.dto.invite.InviteValidationResponse;
@@ -15,6 +16,7 @@ import com.vaulty.api.repository.UserRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +74,12 @@ public class InviteService {
         Duration remaining = Duration.between(now, invite.getExpiresAt());
         long remainingSeconds = remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);
         return new InviteValidationResponse(invite.getEmail(), remainingSeconds);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InviteResponse> listPending(UUID ownerId) {
+        workspaceService.requireOwner(ownerId);
+        return userInviteRepository.findPendingUsable(OffsetDateTime.now(clock), UserInviteStatus.PENDING);
     }
 
     @Transactional
