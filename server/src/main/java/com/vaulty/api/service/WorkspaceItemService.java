@@ -179,7 +179,7 @@ public class WorkspaceItemService {
         return new ItemResponse(item.getId(), item.getType(), item.getTitle(),
                 item.getCollection() == null ? null : item.getCollection().getId(),
                 includeContent ? item.getTextContent() : null,
-                includeContent ? item.getLinkUrl() : null, preview);
+                includeContent ? item.getLinkUrl() : null, preview, item.getDescription());
     }
 
     private String truncate(String value) {
