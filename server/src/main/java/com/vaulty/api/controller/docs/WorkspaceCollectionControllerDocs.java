@@ -21,7 +21,7 @@ public interface WorkspaceCollectionControllerDocs {
     @ApiResponses({
         @ApiResponse(responseCode = "201"),
         @ApiResponse(responseCode = "400"),
-        @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "401"),
         @ApiResponse(responseCode = "404"),
         @ApiResponse(responseCode = "409")
     })
@@ -40,14 +40,14 @@ public interface WorkspaceCollectionControllerDocs {
 
     @Operation(summary = "Renomeia uma pasta")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
-        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
+        @ApiResponse(responseCode = "401"), @ApiResponse(responseCode = "404"),
         @ApiResponse(responseCode = "409")})
     ResponseEntity<CollectionResponse> rename(
             @Parameter(hidden = true) UUID userId, UUID workspaceId, UUID collectionId,
             RenameCollectionRequest request);
 
     @Operation(summary = "Exclui uma pasta vazia")
-    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "403"),
+    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "401"),
         @ApiResponse(responseCode = "404"), @ApiResponse(responseCode = "409")})
     ResponseEntity<Void> delete(@Parameter(hidden = true) UUID userId,
                                 UUID workspaceId, UUID collectionId);

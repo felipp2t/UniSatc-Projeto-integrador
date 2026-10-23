@@ -72,7 +72,7 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void memberReadsNormalItemsButCannotCreateOrSeeSecrets() throws Exception {
+    void memberCanReadCreateAndRevealSecrets() throws Exception {
         User owner = createUser();
         User member = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
@@ -93,24 +93,22 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId)
                         .cookie(authCookie(member)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalItems").value(1));
+                .andExpect(jsonPath("$.totalItems").value(2));
         mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
                         .cookie(authCookie(member)).param("q", "chave"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalItems").value(0));
+                .andExpect(jsonPath("$.totalItems").value(1));
         mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId)
                         .cookie(authCookie(member)))
-                .andExpect(status().isForbidden());
-        for (UUID unavailableId : new UUID[] {secretId, UUID.randomUUID()}) {
-            mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, unavailableId)
-                            .cookie(authCookie(member)))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.message").value("Item indisponível"));
-        }
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.value").value("valor-privado"));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, UUID.randomUUID())
+                        .cookie(authCookie(member)))
+                .andExpect(status().isNotFound());
         mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
                         .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"text\",\"title\":\"Proibido\",\"textContent\":\"x\"}"))
-                .andExpect(status().isForbidden());
+                        .content("{\"type\":\"text\",\"title\":\"Novo\",\"textContent\":\"x\"}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -276,7 +274,7 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void rolePermissionsControlSecretSearchAndReveal() throws Exception {
+    void memberCanUseSecretsWithoutRolePermissions() throws Exception {
         User owner = createUser();
         User developer = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
@@ -289,9 +287,6 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
         var membership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, developer.getId()).orElseThrow();
         membership.setRole(role);
         workspaceMemberRepository.saveAndFlush(membership);
-        jdbcTemplate.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'item', 'read')", role.getId());
-        jdbcTemplate.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'secret', 'read')", role.getId());
-        jdbcTemplate.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'item', 'create')", role.getId());
 
         mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
                         .cookie(authCookie(developer)).param("q", "token"))
@@ -304,9 +299,7 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
                         .cookie(authCookie(developer)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"secret\",\"title\":\"Sem criação\",\"value\":\"x\"}"))
-                .andExpect(status().isForbidden());
-
-        jdbcTemplate.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'secret', 'create')", role.getId());
+                .andExpect(status().isCreated());
         UUID createdId = createItem(developer, workspaceId, "secret", "Nova chave", null, null, null, "novo-valor");
         mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, createdId)
                         .cookie(authCookie(developer)))

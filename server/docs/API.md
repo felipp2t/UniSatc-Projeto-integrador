@@ -287,12 +287,12 @@ O que a função faz:
 
 ## RF23, RF26 e RF27 — Pastas e navegação
 
-As rotas exigem autenticação pelo cookie `accessToken` e vínculo ao workspace. O papel `Member`
-recebe acesso somente de leitura nesta etapa; a criação é permitida apenas ao proprietário.
+As rotas exigem autenticação pelo cookie `accessToken` e vínculo ativo ao workspace. Nesta etapa,
+todos os membros podem criar, listar, renomear e excluir pastas vazias.
 
 ### Criar pasta
 
-**`POST /workspaces/{workspaceId}/collections`** — somente o proprietário.
+**`POST /workspaces/{workspaceId}/collections`** — qualquer membro ativo.
 
 Request:
 ```json
@@ -344,9 +344,42 @@ do workspace responde `404`.
 |---|---|
 | `400` | nome ausente, vazio ou maior que 255 caracteres |
 | `401` | não autenticado |
-| `403` | membro sem permissão para criar (nesta etapa, não é o proprietário) |
 | `404` | workspace sem vínculo, pasta pai ausente ou pasta fora do workspace |
 | `409` | nome já utilizado no mesmo nível |
+
+## Itens e anexos
+
+Todas as rotas abaixo exigem `accessToken` válido e vínculo ativo com o workspace. Enquanto não
+há controle de acesso por ação para conteúdo, qualquer membro pode criar, editar, arquivar,
+restaurar, excluir e consultar itens, inclusive segredos. O valor secreto só é devolvido pela
+rota `/secret` e nunca aparece em metadados, listagens ou busca.
+
+| Método | Rota | Corpo ou parâmetros | Resultado |
+|---|---|---|---|
+| POST | `/workspaces/{workspaceId}/items` | JSON `type` (`text`, `link`, `secret`), `title`, `description?`, `collectionId?` e conteúdo do tipo | `201` com metadados |
+| POST | `/workspaces/{workspaceId}/items/documents` | Multipart: `metadata` JSON com `title`, `description?`, `collectionId?`; `file` obrigatório | `201` com anexo |
+| GET | `/workspaces/{workspaceId}/items` | `collectionId?`, `includeArchived=false`, `page=0`, `size=20` | Página de metadados |
+| GET | `/workspaces/{workspaceId}/items/search` | `q`, `includeArchived=false`, `page=0`, `size=20` | Busca paginada por título |
+| GET | `/workspaces/{workspaceId}/items/{itemId}` | — | Item, sem valor secreto |
+| GET | `/workspaces/{workspaceId}/items/{itemId}/secret` | — | `{ "value": "..." }`, sem cache |
+| PUT | `/workspaces/{workspaceId}/items/{itemId}` | JSON `title`, `description?`, conteúdo conforme tipo | `200` com item atualizado |
+| POST | `/workspaces/{workspaceId}/items/{itemId}/archive` | — | `200` com `archivedAt` |
+| POST | `/workspaces/{workspaceId}/items/{itemId}/restore` | — | `200` com `archivedAt: null` |
+| DELETE | `/workspaces/{workspaceId}/items/{itemId}` | `confirm=true`; item deve estar arquivado | `204` |
+| PUT | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Multipart: `file` obrigatório | `200` com novo anexo |
+| GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | `download=false` | Conteúdo do anexo, sem cache |
+
+Descrição aceita até 2.000 caracteres. Para edição, `type` e `collectionId` não mudam;
+`description: null` remove a descrição. Texto e link exigem seu conteúdo no `PUT`. Em segredo,
+`value` omitido preserva o valor atual; se informado, deve ser não vazio e é cifrado novamente.
+Item arquivado continua consultável e reserva o título, mas precisa ser restaurado antes de
+edição ou substituição do anexo. `includeArchived=true` soma arquivados aos resultados comuns.
+
+Cada documento contém um arquivo privado de 1 a 20.000.000 bytes. PDF, TXT, MD, DOCX, XLSX,
+PPTX, PNG, JPG e JPEG são aceitos; imagens recebem tipo `image`, os demais `file`. PDFs e imagens
+são servidos inline quando suportados; `download=true` força download. A substituição usa uma
+nova chave no storage e só troca a referência no banco após upload bem sucedido. A exclusão
+definitiva exige arquivamento prévio e confirmação explícita.
 
 ## Tabela-resumo
 

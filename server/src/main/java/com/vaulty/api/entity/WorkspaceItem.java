@@ -41,6 +41,9 @@ public class WorkspaceItem {
     @Column(nullable = false, length = 255)
     private String title;
 
+    @Column(length = 2000)
+    private String description;
+
     @Column(name = "text_content", columnDefinition = "text")
     private String textContent;
 

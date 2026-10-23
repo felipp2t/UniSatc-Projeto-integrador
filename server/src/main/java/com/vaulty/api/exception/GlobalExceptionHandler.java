@@ -8,6 +8,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -39,5 +40,13 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorBody.of(
                         HttpStatus.BAD_REQUEST.value(), HttpStatus.BAD_REQUEST.getReasonPhrase(),
                         "Corpo da requisição inválido", request.getRequestURI()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorBody> handleOversizedUpload(HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ApiErrorBody.of(HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                        HttpStatus.PAYLOAD_TOO_LARGE.getReasonPhrase(),
+                        "Anexo excede 20.000.000 bytes", request.getRequestURI()));
     }
 }

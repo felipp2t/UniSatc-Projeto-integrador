@@ -35,7 +35,6 @@ public class WorkspaceCollectionService {
     @Transactional
     public CollectionResponse create(UUID userId, UUID workspaceId, CreateCollectionRequest request) {
         var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "collection", "create");
         var parent = (request.parentId() == null)
                 ? null
                 : collectionRepository.findByIdAndWorkspaceId(request.parentId(), workspaceId)
@@ -59,8 +58,7 @@ public class WorkspaceCollectionService {
     @Transactional
     public CollectionResponse rename(UUID userId, UUID workspaceId, UUID collectionId,
                                      RenameCollectionRequest request) {
-        var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "collection", "update");
+        authorization.requireWorkspace(userId, workspaceId);
         var collection = collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
         collection.setName(request.name());
@@ -76,8 +74,7 @@ public class WorkspaceCollectionService {
 
     @Transactional
     public void delete(UUID userId, UUID workspaceId, UUID collectionId) {
-        var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "collection", "delete");
+        authorization.requireWorkspace(userId, workspaceId);
         var collection = collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
         if (collectionRepository.existsByParentIdAndWorkspaceId(collectionId, workspaceId)
@@ -97,8 +94,7 @@ public class WorkspaceCollectionService {
 
     @Transactional(readOnly = true)
     public CollectionPageResponse list(UUID userId, UUID workspaceId, UUID parentId, int page, int size) {
-        var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "collection", "read");
+        authorization.requireWorkspace(userId, workspaceId);
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE || (long) page * size > Integer.MAX_VALUE) {
             throw new ValidationException(
                     "Página deve ser maior ou igual a zero, tamanho deve estar entre 1 e 100 "
@@ -122,8 +118,7 @@ public class WorkspaceCollectionService {
 
     @Transactional(readOnly = true)
     public List<CollectionPathEntry> path(UUID userId, UUID workspaceId, UUID collectionId) {
-        var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "collection", "read");
+        authorization.requireWorkspace(userId, workspaceId);
         var path = collectionRepository.findPath(workspaceId, collectionId);
         if (path.isEmpty()) {
             throw new ResourceNotFoundException("Pasta não encontrada");

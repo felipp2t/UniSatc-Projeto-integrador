@@ -23,15 +23,17 @@ de redefinição de uso único.
 
 ## Como rodar
 
-1. Inicie o PostgreSQL:
+1. Copie `.env.example` para `.env`. Preencha `DB_USERNAME=vaulty`, `DB_PASSWORD=vaulty`,
+   `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `JWT_SECRET` e `SECRET_ENCRYPTION_KEY`. Gere a chave de
+   anexos com valor aleatório e não publique o `.env`. Inicie PostgreSQL e RustFS:
 
    ```bash
    docker compose up -d
    ```
 
-   O Compose cria o banco `vaulty`, exposto em `localhost:5432`, com usuário e senha `vaulty`.
-2. Copie `.env.example` para `.env` e ajuste as variáveis. Para o banco iniciado pelo Compose,
-   use `DB_USERNAME=vaulty` e `DB_PASSWORD=vaulty`. Gere um valor aleatório de pelo menos 32 bytes
+   O Compose cria o banco `vaulty`, exposto em `localhost:5432`, e o storage S3 compatível em
+   `localhost:9000`. O bucket é criado pela aplicação no primeiro upload local.
+2. Gere um valor aleatório de pelo menos 32 bytes
    para `JWT_SECRET`; a aplicação não inicia se essa variável estiver ausente. O `.env` é carregado
    automaticamente pelo Spring Boot, sem precisar exportar as variáveis no terminal.
    Para criar e consultar segredos, configure `SECRET_ENCRYPTION_KEY` com 32 bytes aleatórios
@@ -111,11 +113,11 @@ segunda linha impossível, inclusive sob concorrência.
 | GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
 | GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
 | PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |
-| POST | `/workspaces/{workspaceId}/collections` | Sim | 201 com a pasta criada | Exige `collection/create`; pasta pai deve pertencer ao mesmo workspace. |
+| POST | `/workspaces/{workspaceId}/collections` | Sim | 201 com a pasta criada | Qualquer membro ativo; pasta pai deve pertencer ao mesmo workspace. |
 | GET | `/workspaces/{workspaceId}/collections` | Sim | 200 com página de pastas do nível | Exige vínculo de membro; `parentId` omitido lista a raiz. `page` começa em 0 e `size` tem padrão 20 e máximo 100. |
 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Sim | 200 com o caminho da raiz à pasta | Exige vínculo de membro; pasta fora do workspace retorna 404. |
-| PUT | `/workspaces/{workspaceId}/collections/{collectionId}` | Sim | 200 com a pasta renomeada | Exige `collection/update`; título repetido no nível retorna 409. |
-| DELETE | `/workspaces/{workspaceId}/collections/{collectionId}` | Sim | 204 | Exige `collection/delete`; subpasta ou item bloqueia com 409. |
+| PUT | `/workspaces/{workspaceId}/collections/{collectionId}` | Sim | 200 com a pasta renomeada | Qualquer membro ativo; título repetido no nível retorna 409. |
+| DELETE | `/workspaces/{workspaceId}/collections/{collectionId}` | Sim | 204 | Qualquer membro ativo; subpasta ou item bloqueia com 409. |
 
 Pastas são persistidas na tabela `collection`. A raiz é o workspace e não possui registro: `parent_id = NULL` identifica pastas da raiz. Nomes são únicos dentro do mesmo nível e nomes de pais precisam pertencer ao mesmo workspace.
 
@@ -123,15 +125,26 @@ Pastas são persistidas na tabela `collection`. A raiz é o workspace e não pos
 
 | Método | Rota | Sucesso | Regra |
 |---|---|---|---|
-| POST | `/workspaces/{workspaceId}/items` | 201 | `item/create`; segredos exigem também `secret/create`. |
-| GET | `/workspaces/{workspaceId}/items` | 200 | Lista metadados paginados da raiz ou da pasta indicada por `collectionId`; segredos só aparecem para quem tem `secret/read`. |
-| GET | `/workspaces/{workspaceId}/items/search?q=...` | 200 | Busca paginada por todas as palavras do título, em qualquer ordem, ignorando caixa e acentos; aplica as mesmas permissões. |
-| GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Retorna texto ou link; segredos retornam apenas metadados com `secret/read` e ficam indisponíveis sem essa permissão. |
-| GET | `/workspaces/{workspaceId}/items/{itemId}/secret` | 200 | Revela o valor somente com `item/read` e `secret/read`. |
+| POST | `/workspaces/{workspaceId}/items` | 201 | Cria texto, link ou segredo. |
+| POST | `/workspaces/{workspaceId}/items/documents` | 201 | Cria documento com um anexo. |
+| GET | `/workspaces/{workspaceId}/items` | 200 | Lista metadados paginados da raiz ou pasta; `includeArchived=true` inclui arquivados. |
+| GET | `/workspaces/{workspaceId}/items/search?q=...` | 200 | Busca paginada por todas as palavras do título; `includeArchived=true` inclui arquivados. |
+| GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Consulta conteúdo comum ou metadados do segredo/anexo. |
+| GET | `/workspaces/{workspaceId}/items/{itemId}/secret` | 200 | Revela o valor do segredo. |
+| PUT | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Edita item ativo sem mudar seu tipo ou localização. |
+| POST | `/workspaces/{workspaceId}/items/{itemId}/archive` | 200 | Arquiva item ativo. |
+| POST | `/workspaces/{workspaceId}/items/{itemId}/restore` | 200 | Restaura item arquivado. |
+| DELETE | `/workspaces/{workspaceId}/items/{itemId}?confirm=true` | 204 | Exclui definitivamente item arquivado. |
+| PUT | `/workspaces/{workspaceId}/items/{itemId}/attachment` | 200 | Substitui o anexo de documento ativo. |
+| GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | 200 | Visualiza PDF/imagem ou baixa o arquivo; `download=true` força download. |
 
 Na criação, informe `type` (`text`, `link` ou `secret`), `title`, `collectionId` opcional e
 respectivamente `textContent` (até 100.000 caracteres e não apenas espaços), `linkUrl` HTTP(S)
 completa (até 2.048 caracteres) ou `value` (até 8.192 caracteres e não apenas espaços).
+`description` é opcional e aceita até 2.000 caracteres. Documentos usam `multipart/form-data`
+com `metadata` JSON (`title`, `description`, `collectionId`) e um `file`. PDF, TXT, MD, DOCX,
+XLSX, PPTX, PNG e JPEG são aceitos até 20.000.000 bytes; imagens usam tipo `image`, os demais
+tipo `file`. O arquivo fica em storage S3 compatível privado, com metadados em `item_file`.
 Texto/Markdown e valor secreto são preservados exatamente, incluindo espaços significativos. As listagens retornam `items`,
 `page`, `size`, `totalItems` e `totalPages`; `page` começa em 0 e `size` vai de 1 a 100.
 O valor de um segredo é criptografado com AES-256-GCM antes da gravação e nunca aparece nas
@@ -140,8 +153,8 @@ respostas de criação, listagem, busca ou consulta comum.
 Títulos de itens e nomes de pastas são únicos por localização, ignorando caixa, acentos e
 espaços nas extremidades. Itens arquivados continuam reservando o título. A busca considera
 palavras completas, usa todas as palavras da consulta e ordena por título normalizado e ID;
-não pesquisa o conteúdo. A migração `V11` registra as permissões iniciais de `Member`
-(`item/read` e `collection/read`), mantendo segredos e ações de escrita restritos.
+não pesquisa o conteúdo. Por enquanto, qualquer membro ativo pode executar ações de itens e
+pastas, inclusive consultar segredos. O valor nunca aparece em listagem, busca ou consulta comum.
 
 A migração `V12` recalcula as identidades e a busca dos registros existentes. Caso encontre
 nomes equivalentes na mesma localização, interrompe a atualização para regularização manual;
@@ -155,5 +168,6 @@ Camadas técnicas em `src/main/java/com/vaulty/api`: `controller`, `service`, `r
 
 Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken`,
 `EmailOutbox`, `Workspace`, `WorkspaceRole`, `WorkspaceMember`, `WorkspaceCollection`,
-`WorkspaceItem`, `WorkspaceItemSecret` e `RolePermission`. Notificações, histórico de atividades,
-anexos, compartilhamento granular de conteúdo e gestão de papéis ainda não foram implementados.
+`WorkspaceItem`, `WorkspaceItemSecret`, `WorkspaceItemFile`, `WorkspaceItemMedia` e
+`RolePermission`. Notificações, histórico de atividades, compartilhamento granular de conteúdo
+e gestão de papéis ainda não foram implementados.

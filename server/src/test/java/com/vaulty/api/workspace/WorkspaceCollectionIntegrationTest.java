@@ -153,7 +153,7 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void memberCanReadButCannotCreateFolders() throws Exception {
+    void memberCanReadAndCreateFolders() throws Exception {
         User owner = createUser();
         User member = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
@@ -174,9 +174,9 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
                         .cookie(authCookie(member))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"Proibida"}
+                                {"name":"Nova"}
                                 """))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -289,7 +289,7 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void memberCannotRenameOrDeleteFolder() throws Exception {
+    void memberCanRenameAndDeleteEmptyFolder() throws Exception {
         User owner = createUser();
         User member = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
@@ -299,10 +299,10 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(put("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, folderId)
                         .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Alterada\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
         mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, folderId)
                         .cookie(authCookie(member)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNoContent());
     }
 
     @ParameterizedTest
