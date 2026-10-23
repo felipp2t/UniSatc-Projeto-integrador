@@ -1,2 +1,7 @@
 minimumReleaseAgeExclude:
   - knip@6.34.0
+
+auditConfig:
+  ignoreGhsas:
+    # GHSA-vfj7-8cjw-p6xm: sem versão corrigida publicada para braces; reavaliar após lançamento ou mudança da cadeia.
+    - GHSA-vfj7-8cjw-p6xm

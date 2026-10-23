@@ -48,8 +48,8 @@
     "openapi-typescript": "^7.13.0",
     "typescript": "~6.0.2",
     "ultracite": "7.10.7",
-    "vite": "^8.2.2",
-    "vitest": "^5.0.1"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@11.10.0"
 }
