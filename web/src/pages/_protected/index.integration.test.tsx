@@ -111,6 +111,7 @@ function createSession(): SessionService {
     logout: vi.fn().mockResolvedValue(undefined),
     setNavigateToLogin: vi.fn(),
     status: 'authenticated',
+    updateUser: vi.fn(),
     user: { email: 'user@example.com', id: 'user-1', name: 'User' },
   }
 }

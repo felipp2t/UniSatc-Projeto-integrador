@@ -42,6 +42,7 @@ function createSession(
     logout: vi.fn(),
     setNavigateToLogin: vi.fn(),
     status,
+    updateUser: vi.fn(),
     user:
       status === 'authenticated'
         ? { email: 'user@example.com', id: 'user-id', name: 'User' }
