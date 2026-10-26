@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 
 public record UpdateProfileRequest(
         @NotBlank(message = "Nome é obrigatório")
-        @Size(min = 3, max = 255, message = "Nome deve ter entre 3 e 255 caracteres")
+        @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
         String name) {
 
     public UpdateProfileRequest {
