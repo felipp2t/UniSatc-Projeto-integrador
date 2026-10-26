@@ -66,13 +66,36 @@ O que a função faz, em ordem:
 | `403` | autenticado, mas não é o dono do workspace |
 | `409` | já existe uma conta com esse e-mail |
 
+**`GET /invites`** — autenticado (cookie `accessToken`), **somente o dono do workspace**.
+
+Lista convites pendentes e utilizáveis. A resposta é uma lista, inclusive vazia, com os campos
+`id`, `email`, `invitedByUserId`, `invitedByName`, `createdAt` e `expiresAt`. A consulta inclui
+somente convites cuja validade ainda não terminou e cujo e-mail ainda não pertence a uma conta.
+Os itens são ordenados por `createdAt` decrescente e, em caso de empate, por `id` decrescente.
+
+| | |
+|---|---|
+| Auth | Cookie `accessToken`, apenas o dono do workspace |
+| Sucesso | `200`, lista de convites (pode ser vazia) |
+| `401` | não autenticado |
+| `403` | autenticado, mas não é o dono do workspace |
+
 **`POST /invites/validate`** — público, sem autenticação.
 
 Valida o par `email` + `token` antes da tela de cadastro. O corpo contém ambos os campos; eles não são enviados na query string. Para um convite pendente e válido, responde `200` com o e-mail canônico do convite e `remainingSeconds`, calculado pelo servidor. A resposta usa `Cache-Control: no-store`.
 
-Convites inexistentes, expirados, revogados, substituídos ou já utilizados retornam a mesma resposta genérica `404` (“Convite indisponível”), sem revelar o motivo. A validação é apenas informativa: `POST /auth/register` volta a validar o convite dentro da transação que cria conta e vínculo.
+Convites inexistentes, expirados, recusados, revogados, substituídos ou já utilizados retornam a mesma resposta genérica `404` (“Convite indisponível”), sem revelar o motivo. A validação é apenas informativa: `POST /auth/register` volta a validar o convite dentro da transação que cria conta e vínculo.
 
 O endpoint usa o limite existente de cinco requisições por minuto por IP e caminho, com contador separado de `/auth/register`.
+
+**`POST /invites/decline`** — público, sem autenticação.
+
+Recebe o mesmo corpo `{ "email": string, "token": string }` da validação. Recusa somente um
+convite pendente e válido, marcando `user_invite.status` como `DECLINED`; convites inexistentes,
+expirados, já usados ou já recusados respondem `404` com a mensagem genérica “Convite indisponível”.
+O cadastro também consulta somente convites pendentes, então um convite recusado não pode ser aceito.
+O endpoint retorna `204`, usa `Cache-Control: no-store` e tem limite de cinco requisições por minuto
+por IP e caminho.
 
 ---
 
@@ -348,12 +371,101 @@ do workspace responde `404`.
 | `404` | workspace sem vínculo, pasta pai ausente ou pasta fora do workspace |
 | `409` | nome já utilizado no mesmo nível |
 
+## RF30 — Anexos de documentos e imagens
+
+O arquivo é enviado ao storage compatível com S3; o banco guarda somente sua chave opaca e
+metadados. Cada item `file` ou `image` possui exatamente um anexo. A primeira entrega aceita PDF,
+TXT, Markdown, DOCX, XLSX, PPTX, PNG e JPEG (`.jpg`/`.jpeg`), com até **20.000.000 bytes** por
+arquivo. Vídeos não são aceitos.
+
+**`POST /workspaces/{workspaceId}/items/attachments`** — autenticado; exige `item/create`.
+
+Recebe `multipart/form-data` com `title`, `file`, `description` opcional (até 2.000 caracteres) e
+`collectionId` opcional. Cria um novo item do tipo `file` ou `image` e seu único anexo. A pasta,
+quando informada, precisa pertencer ao mesmo workspace. Títulos seguem a unicidade normalizada de
+itens.
+
+**`PUT /workspaces/{workspaceId}/items/{itemId}/attachment`** — autenticado; exige `item/update`.
+
+Substitui o anexo por um arquivo novo. O sistema mantém o arquivo anterior se o envio ou a gravação
+falhar. Após a confirmação, o arquivo anterior é removido; não há histórico de versões recuperáveis.
+Itens arquivados não podem ser alterados até serem restaurados.
+
+**`PUT /workspaces/{workspaceId}/items/{itemId}/metadata`** — autenticado; exige `item/update`.
+
+Atualiza `{ "title": string, "description": string | null, "collectionId": UUID | null }` sem
+alterar o conteúdo do anexo. `title` é obrigatório (1–255 caracteres); `description` é opcional
+(até 2.000 caracteres). `collectionId: null` coloca o item na raiz. Conflito de título retorna `409`.
+
+**`GET /workspaces/{workspaceId}/items/{itemId}/attachment`** — autenticado; exige `item/read`.
+
+Entrega o arquivo com seu MIME type e nome original. PDF e imagens usam `inline` por padrão quando
+o navegador oferece suporte; `?download=true` força `attachment`. O download não expõe a chave nem
+uma URL pública do storage e usa `Cache-Control: no-store`. Itens arquivados permanecem consultáveis
+conforme as permissões atuais.
+
+As operações de criação, substituição e edição de metadados são registradas no histórico de
+atividades sem incluir bytes nem chave do storage.
+
+Se `app.storage.s3.bucket` não estiver configurado, a aplicação inicia sem storage e as rotas de
+upload, substituição e download retornam `503 Service Unavailable`.
+
+## Histórico de atividades
+
+**`GET /workspaces/{workspaceId}/activity`** — autenticado pelo cookie `accessToken`; exige
+vínculo ao workspace e a permissão `activity/read`.
+
+Aceita `page` (padrão `0`), `size` (padrão `20`, entre `1` e `100`), `from` e `to` (instantes
+ISO-8601 inclusivos), `actorId`, `action` e `resourceType`. A ordenação é da atividade mais nova
+para a mais antiga, com ID como desempate. O total e as páginas contam apenas eventos visíveis ao
+usuário. `action` aceita `folder_created`, `folder_renamed`, `folder_deleted`, `item_created`,
+`item_updated`, `item_archived`, `item_restored`, `item_deleted`, `member_invited`, `member_joined`,
+`member_role_changed`, `member_removed`, `member_invite_revoked`, `member_invite_declined`,
+`workspace_renamed`, `role_created`, `role_deleted` ou `role_permissions_changed`; `resourceType`
+aceita `folder`, `item`, `member`, `workspace` ou `role`. Os valores são sensíveis a maiúsculas e
+minúsculas. Valor desconhecido, intervalo invertido ou paginação inválida responde `400`.
+
+O proprietário vê todo o histórico do workspace. Para os demais usuários, são retornados somente
+eventos de itens e pastas ainda existentes no mesmo workspace, respeitando `item/read` ou
+`collection/read` atuais; eventos de itens secretos exigem também `secret/read`. Eventos de
+membros, workspace, papéis, exclusões e recursos que já não existem são exclusivos do proprietário.
+Itens arquivados continuam contando como existentes.
+
+Sucesso (`200`):
+```json
+{
+  "activities": [{
+    "id": "uuid",
+    "actorId": "uuid",
+    "actorName": "Ana",
+    "actorContext": "USER",
+    "action": "item_created",
+    "resourceType": "item",
+    "resourceId": "uuid",
+    "snapshot": { "type": "text", "title": "Runbook" },
+    "createdAt": "2026-10-23T12:00:00Z"
+  }],
+  "page": 0,
+  "size": 20,
+  "totalItems": 1,
+  "totalPages": 1
+}
+```
+
+| | |
+|---|---|
+| `400` | período ou paginação inválida |
+| `401` | não autenticado |
+| `403` | sem `activity/read` |
+| `404` | workspace não encontrado ou sem vínculo |
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
 |---|---|---|---|
 | RF10 | POST | `/invites` | Cookie `accessToken` |
 | RF11 | POST | `/invites/validate` | Não |
+| RF12 | POST | `/invites/decline` | Não |
 | RF01/RF11 | POST | `/auth/register` | Não |
 | RF02 | POST | `/auth/login` | Não |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` |
@@ -366,3 +478,8 @@ do workspace responde `404`.
 | RF23 | POST | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
 | RF26 | GET | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
 | RF27 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Cookie `accessToken` |
+| RF30 | POST | `/workspaces/{workspaceId}/items/attachments` | Cookie `accessToken` |
+| RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
+| RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
+| RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
+| RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |

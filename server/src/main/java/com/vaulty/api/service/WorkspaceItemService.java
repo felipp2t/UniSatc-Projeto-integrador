@@ -7,6 +7,9 @@ import com.vaulty.api.dto.item.SecretValueResponse;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceItem;
 import com.vaulty.api.entity.WorkspaceItemSecret;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ValidationException;
@@ -16,6 +19,7 @@ import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.repository.WorkspaceItemSecretRepository;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,6 +41,7 @@ public class WorkspaceItemService {
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceContentAuthorization authorization;
     private final SecretCipher secretCipher;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public ItemResponse create(UUID userId, UUID workspaceId, CreateItemRequest request) {
@@ -65,6 +70,9 @@ public class WorkspaceItemService {
                 secret.setValue(secretCipher.encrypt(request.value()));
                 secretRepository.saveAndFlush(secret);
             }
+            activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_CREATED,
+                    ActivityResourceType.ITEM, item.getId(),
+                    Map.of("type", item.getType(), "title", item.getTitle()));
             return toResponse(item, true);
         } catch (DataIntegrityViolationException exception) {
             if (PersistenceConstraints.causedBy(exception, DUPLICATE_TITLE_CONSTRAINT)) {
@@ -171,7 +179,7 @@ public class WorkspaceItemService {
         return new ItemResponse(item.getId(), item.getType(), item.getTitle(),
                 item.getCollection() == null ? null : item.getCollection().getId(),
                 includeContent ? item.getTextContent() : null,
-                includeContent ? item.getLinkUrl() : null, preview);
+                includeContent ? item.getLinkUrl() : null, preview, item.getDescription());
     }
 
     private String truncate(String value) {

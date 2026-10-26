@@ -6,6 +6,9 @@ import com.vaulty.api.dto.collection.CollectionResponse;
 import com.vaulty.api.dto.collection.CreateCollectionRequest;
 import com.vaulty.api.dto.collection.RenameCollectionRequest;
 import com.vaulty.api.entity.WorkspaceCollection;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ValidationException;
@@ -13,6 +16,7 @@ import com.vaulty.api.repository.PersistenceConstraints;
 import com.vaulty.api.repository.WorkspaceCollectionRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -31,6 +35,7 @@ public class WorkspaceCollectionService {
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceItemRepository itemRepository;
     private final WorkspaceContentAuthorization authorization;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public CollectionResponse create(UUID userId, UUID workspaceId, CreateCollectionRequest request) {
@@ -47,7 +52,11 @@ public class WorkspaceCollectionService {
         collection.setName(request.name());
 
         try {
-            return toResponse(collectionRepository.saveAndFlush(collection));
+            collection = collectionRepository.saveAndFlush(collection);
+            activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
+                    ActivityAction.FOLDER_CREATED, ActivityResourceType.FOLDER, collection.getId(),
+                    Map.of("name", collection.getName()));
+            return toResponse(collection);
         } catch (DataIntegrityViolationException exception) {
             if (PersistenceConstraints.causedBy(exception, DUPLICATE_NAME_CONSTRAINT)) {
                 throw new ConflictException("Já existe uma pasta com esse nome neste nível");
@@ -63,9 +72,14 @@ public class WorkspaceCollectionService {
         authorization.require(userId, workspace, "collection", "update");
         var collection = collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
+        String previousName = collection.getName();
         collection.setName(request.name());
         try {
-            return toResponse(collectionRepository.saveAndFlush(collection));
+            collection = collectionRepository.saveAndFlush(collection);
+            activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
+                    ActivityAction.FOLDER_RENAMED, ActivityResourceType.FOLDER, collection.getId(),
+                    Map.of("previousName", previousName, "name", collection.getName()));
+            return toResponse(collection);
         } catch (DataIntegrityViolationException exception) {
             if (PersistenceConstraints.causedBy(exception, DUPLICATE_NAME_CONSTRAINT)) {
                 throw new ConflictException("Já existe uma pasta com esse nome neste nível");
@@ -84,6 +98,9 @@ public class WorkspaceCollectionService {
                 || itemRepository.existsByCollectionIdAndWorkspaceId(collectionId, workspaceId)) {
             throw new ConflictException("Pasta não está vazia");
         }
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
+                ActivityAction.FOLDER_DELETED, ActivityResourceType.FOLDER, collectionId,
+                Map.of("name", collection.getName()));
         try {
             collectionRepository.delete(collection);
             collectionRepository.flush();
