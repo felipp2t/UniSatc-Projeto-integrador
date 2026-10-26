@@ -9,68 +9,227 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './pages/__root'
-import { Route as IndexRouteImport } from './pages/index'
-import { Route as ComponentsRouteImport } from './pages/components'
+import { Route as ProtectedLayoutRouteImport } from './pages/_protected/layout'
+import { Route as CadastroRouteImport } from './pages/cadastro'
+import { Route as EsqueciSenhaRouteImport } from './pages/esqueci-senha'
+import { Route as LoginRouteImport } from './pages/login'
+import { Route as RedefinirSenhaRouteImport } from './pages/redefinir-senha'
+import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
+import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
+import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
+import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
+  id: '/_protected',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ComponentsRoute = ComponentsRouteImport.update({
+const CadastroRoute = CadastroRouteImport.update({
+  id: '/cadastro',
+  path: '/cadastro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EsqueciSenhaRoute = EsqueciSenhaRouteImport.update({
+  id: '/esqueci-senha',
+  path: '/esqueci-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProtectedIndexRoute = ProtectedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
+const ProtectedSplatRoute = ProtectedSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
+const ProtectedComponentsRoute = ProtectedComponentsRouteImport.update({
   id: '/components',
   path: '/components',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
+const ProtectedConfiguracoesRoute = ProtectedConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => ProtectedLayoutRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/components': typeof ComponentsRoute
+  '/': typeof ProtectedIndexRoute
+  '/cadastro': typeof CadastroRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
+  '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/$': typeof ProtectedSplatRoute
+  '/components': typeof ProtectedComponentsRoute
+  '/configuracoes': typeof ProtectedConfiguracoesRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/components': typeof ComponentsRoute
+  '/cadastro': typeof CadastroRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
+  '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/$': typeof ProtectedSplatRoute
+  '/components': typeof ProtectedComponentsRoute
+  '/configuracoes': typeof ProtectedConfiguracoesRoute
+  '/': typeof ProtectedIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/components': typeof ComponentsRoute
+  '/_protected': typeof ProtectedLayoutRouteWithChildren
+  '/cadastro': typeof CadastroRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
+  '/login': typeof LoginRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/_protected/$': typeof ProtectedSplatRoute
+  '/_protected/components': typeof ProtectedComponentsRoute
+  '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
+  '/_protected/': typeof ProtectedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/components'
+  fullPaths:
+    | '/'
+    | '/cadastro'
+    | '/esqueci-senha'
+    | '/login'
+    | '/redefinir-senha'
+    | '/$'
+    | '/components'
+    | '/configuracoes'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/components'
-  id: '__root__' | '/' | '/components'
+  to:
+    | '/cadastro'
+    | '/esqueci-senha'
+    | '/login'
+    | '/redefinir-senha'
+    | '/$'
+    | '/components'
+    | '/configuracoes'
+    | '/'
+  id:
+    | '__root__'
+    | '/_protected'
+    | '/cadastro'
+    | '/esqueci-senha'
+    | '/login'
+    | '/redefinir-senha'
+    | '/_protected/$'
+    | '/_protected/components'
+    | '/_protected/configuracoes'
+    | '/_protected/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  ComponentsRoute: typeof ComponentsRoute
+  ProtectedLayoutRoute: typeof ProtectedLayoutRouteWithChildren
+  CadastroRoute: typeof CadastroRoute
+  EsqueciSenhaRoute: typeof EsqueciSenhaRoute
+  LoginRoute: typeof LoginRoute
+  RedefinirSenhaRoute: typeof RedefinirSenhaRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_protected': {
+      id: '/_protected'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof ProtectedLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/components': {
-      id: '/components'
+    '/cadastro': {
+      id: '/cadastro'
+      path: '/cadastro'
+      fullPath: '/cadastro'
+      preLoaderRoute: typeof CadastroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/esqueci-senha': {
+      id: '/esqueci-senha'
+      path: '/esqueci-senha'
+      fullPath: '/esqueci-senha'
+      preLoaderRoute: typeof EsqueciSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_protected/': {
+      id: '/_protected/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof ProtectedIndexRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
+    '/_protected/$': {
+      id: '/_protected/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof ProtectedSplatRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
+    '/_protected/components': {
+      id: '/_protected/components'
       path: '/components'
       fullPath: '/components'
-      preLoaderRoute: typeof ComponentsRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof ProtectedComponentsRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
+    '/_protected/configuracoes': {
+      id: '/_protected/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ProtectedConfiguracoesRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
     }
   }
 }
 
+interface ProtectedLayoutRouteChildren {
+  ProtectedSplatRoute: typeof ProtectedSplatRoute
+  ProtectedComponentsRoute: typeof ProtectedComponentsRoute
+  ProtectedConfiguracoesRoute: typeof ProtectedConfiguracoesRoute
+  ProtectedIndexRoute: typeof ProtectedIndexRoute
+}
+
+const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
+  ProtectedSplatRoute: ProtectedSplatRoute,
+  ProtectedComponentsRoute: ProtectedComponentsRoute,
+  ProtectedConfiguracoesRoute: ProtectedConfiguracoesRoute,
+  ProtectedIndexRoute: ProtectedIndexRoute,
+}
+
+const ProtectedLayoutRouteWithChildren = ProtectedLayoutRoute._addFileChildren(
+  ProtectedLayoutRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  ComponentsRoute: ComponentsRoute,
+  ProtectedLayoutRoute: ProtectedLayoutRouteWithChildren,
+  CadastroRoute: CadastroRoute,
+  EsqueciSenhaRoute: EsqueciSenhaRoute,
+  LoginRoute: LoginRoute,
+  RedefinirSenhaRoute: RedefinirSenhaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -27,14 +27,24 @@ export function DropdownMenuContent({
   )
 }
 
+const dropdownMenuItemVariants = {
+  default: 'focus:bg-primary/10 focus:text-primary',
+  destructive:
+    'text-destructive focus:bg-destructive/10 focus:text-destructive',
+} as const
+
 export function DropdownMenuItem({
   className,
+  variant = 'default',
   ...props
-}: ComponentProps<typeof DropdownMenuPrimitive.Item>) {
+}: ComponentProps<typeof DropdownMenuPrimitive.Item> & {
+  variant?: keyof typeof dropdownMenuItemVariants
+}) {
   return (
     <DropdownMenuPrimitive.Item
       className={cn(
-        'relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2.5 py-2 font-mono text-xs uppercase outline-none transition-colors focus:bg-primary/10 focus:text-primary data-disabled:pointer-events-none data-disabled:opacity-50',
+        'relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2.5 py-2 font-mono text-xs uppercase outline-none transition-colors data-disabled:pointer-events-none data-disabled:opacity-50',
+        dropdownMenuItemVariants[variant],
         className
       )}
       {...props}
