@@ -3,8 +3,10 @@ package com.vaulty.api.controller;
 import com.vaulty.api.controller.docs.WorkspaceControllerDocs;
 import com.vaulty.api.dto.activity.ActivityPageResponse;
 import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
+import com.vaulty.api.dto.workspace.WorkspacePermissionsResponse;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.service.WorkspaceActivityService;
+import com.vaulty.api.service.WorkspaceContentAuthorization;
 import com.vaulty.api.service.WorkspaceService;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
@@ -28,6 +30,14 @@ public class WorkspaceController implements WorkspaceControllerDocs {
 
     private final WorkspaceService workspaceService;
     private final WorkspaceActivityService activityService;
+    private final WorkspaceContentAuthorization authorization;
+
+    @GetMapping("/{workspaceId}/me/permissions")
+    @Override
+    public WorkspacePermissionsResponse permissions(
+            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId) {
+        return authorization.permissions(userId, workspaceId);
+    }
 
     @GetMapping
     @Override

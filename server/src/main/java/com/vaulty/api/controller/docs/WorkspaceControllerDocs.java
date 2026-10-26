@@ -3,6 +3,7 @@ package com.vaulty.api.controller.docs;
 import com.vaulty.api.dto.activity.ActivityPageResponse;
 import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
+import com.vaulty.api.dto.workspace.WorkspacePermissionsResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -14,6 +15,11 @@ import java.util.UUID;
 
 @Tag(name = "Workspaces")
 public interface WorkspaceControllerDocs {
+
+    @Operation(summary = "Consulta as permissões do usuário no workspace")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "401"),
+            @ApiResponse(responseCode = "404")})
+    WorkspacePermissionsResponse permissions(@Parameter(hidden = true) UUID userId, UUID workspaceId);
 
     @Operation(summary = "Lista os workspaces do usuário")
     @ApiResponse(responseCode = "200")
