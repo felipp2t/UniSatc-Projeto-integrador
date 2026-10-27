@@ -22,7 +22,8 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isOwner").value(true))
                 .andExpect(jsonPath("$.roleName").value("Owner"))
-                .andExpect(jsonPath("$.permissions.length()").value(30));
+                .andExpect(jsonPath("$.permissions.length()").value(31))
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'group' && @.action == 'manage')]").isNotEmpty());
     }
 
     @Test
@@ -38,6 +39,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(jsonPath("$.roleName").value("Member"))
                 .andExpect(jsonPath("$.permissions.length()").value(2))
                 .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'read')]").isNotEmpty())
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'group')]").isEmpty())
                 .andExpect(jsonPath("$.permissions[?(@.action == 'create')]").isEmpty());
     }
 
@@ -55,6 +57,11 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         permission.setResource("collection");
         permission.setAction("all");
         rolePermissionRepository.saveAndFlush(permission);
+        RolePermission groupPermission = new RolePermission();
+        groupPermission.setRole(role);
+        groupPermission.setResource("group");
+        groupPermission.setAction("all");
+        rolePermissionRepository.saveAndFlush(groupPermission);
         addMember(member, workspace.id());
         var membership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace.id(), member.getId())
                 .orElseThrow();
@@ -63,22 +70,24 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
 
         mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id()).cookie(authCookie(member)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions.length()").value(5))
+                .andExpect(jsonPath("$.permissions.length()").value(6))
                 .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'read')]").isNotEmpty())
                 .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'create')]").isNotEmpty())
                 .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'update')]").isNotEmpty())
                 .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'delete')]").isNotEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'invite')]").isNotEmpty());
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'invite')]").isNotEmpty())
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'group' && @.action == 'manage')]").isNotEmpty());
     }
 
     @Test
-    void userWithoutMembershipGetsNotFoundAndAnonymousGetsUnauthorized() throws Exception {
+    void legacyTokenWithoutMembershipAndAnonymousRequestAreUnauthorized() throws Exception {
         User owner = createUser("Proprietário");
         User unrelated = createUser("Externo");
         WorkspaceResponse workspace = configureWorkspace(owner);
 
-        mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id()).cookie(authCookie(unrelated)))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id())
+                        .cookie(authCookieWithoutMembership(unrelated)))
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id()))
                 .andExpect(status().isUnauthorized());
     }
@@ -118,8 +127,8 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         WorkspaceResponse workspace = configureWorkspace(owner);
 
         mockMvc.perform(get("/workspaces/{workspaceId}/members", workspace.id())
-                        .cookie(authCookie(unrelatedUser)))
-                .andExpect(status().isNotFound());
+                        .cookie(authCookieWithoutMembership(unrelatedUser)))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
