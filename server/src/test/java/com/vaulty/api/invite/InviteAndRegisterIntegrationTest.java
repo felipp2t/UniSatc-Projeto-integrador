@@ -70,6 +70,88 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void ownerCanRevokeInviteAndItCannotBeValidatedOrRegistered() throws Exception {
+        UserInvite invite = createInvite("revogado@example.com");
+        User member = createMember();
+        var memberId = member.getId();
+        var memberCount = workspaceMemberRepository.count();
+
+        mockMvc.perform(post("/invites/{id}/revoke", invite.getId()).cookie(authCookie(admin())))
+                .andExpect(status().isNoContent());
+
+        assertThat(userInviteRepository.findById(invite.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserInviteStatus.REVOKED);
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT action, actor_id, actor_context, resource_id, snapshot::text AS snapshot FROM activity_log WHERE resource_id = ?",
+                        invite.getId()))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.get("action")).isEqualTo("member_invite_revoked");
+                    assertThat(event.get("actor_id")).isEqualTo(admin().getId());
+                    assertThat(event.get("actor_context")).isEqualTo("USER");
+                    assertThat(event.get("resource_id")).isEqualTo(invite.getId());
+                    assertThat(event.get("snapshot").toString()).contains("revogado@example.com");
+                });
+
+        String body = """
+                { "email": "%s", "token": "%s" }
+                """.formatted(invite.getEmail(), invite.getToken());
+        mockMvc.perform(post("/invites/validate").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/auth/register").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "token": "%s", "name": "Revogado",
+                                  "password": "password123", "confirmPassword": "password123" }
+                                """.formatted(invite.getEmail(), invite.getToken())))
+                .andExpect(status().isNotFound());
+
+        assertThat(userRepository.findByEmail(invite.getEmail())).isEmpty();
+        assertThat(workspaceMemberRepository.count()).isEqualTo(memberCount);
+        assertThat(workspaceMemberRepository.findByUserId(memberId)).isPresent();
+    }
+
+    @Test
+    void onlyAnOwnerCanRevokeAndAnonymousRequestsAreRejected() throws Exception {
+        UserInvite invite = createInvite("protegido@example.com");
+
+        mockMvc.perform(post("/invites/{id}/revoke", invite.getId()).cookie(authCookie(createMember())))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/invites/{id}/revoke", invite.getId()))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(userInviteRepository.findById(invite.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserInviteStatus.PENDING);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM activity_log WHERE resource_id = ? AND action = 'member_invite_revoked'",
+                Long.class, invite.getId())).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DECLINED", "REVOKED"})
+    void cannotRevokeAnInviteThatIsNoLongerPending(String statusName) throws Exception {
+        UserInvite invite = createInvite("terminal@example.com");
+        invite.setStatus(UserInviteStatus.valueOf(statusName));
+        userInviteRepository.save(invite);
+
+        mockMvc.perform(post("/invites/{id}/revoke", invite.getId()).cookie(authCookie(admin())))
+                .andExpect(status().isNotFound());
+
+        assertThat(userInviteRepository.findById(invite.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserInviteStatus.valueOf(statusName));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM activity_log WHERE resource_id = ? AND action = 'member_invite_revoked'",
+                Long.class, invite.getId())).isZero();
+    }
+
+    @Test
+    void revokingAnUnknownInviteReturnsNotFound() throws Exception {
+        mockMvc.perform(post("/invites/{id}/revoke", UUID.randomUUID()).cookie(authCookie(admin())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void nonOwnerMemberCannotInviteAnyone() throws Exception {
         User member = createMember();
 
@@ -244,7 +326,8 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/invites/decline'].post.responses['204']").exists())
-                .andExpect(jsonPath("$.paths['/invites/decline'].post.requestBody").exists());
+                .andExpect(jsonPath("$.paths['/invites/decline'].post.requestBody").exists())
+                .andExpect(jsonPath("$.paths['/invites/{id}/revoke'].post.responses['204']").exists());
     }
 
     @Test

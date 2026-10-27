@@ -62,6 +62,14 @@ export interface CollectionPathEntry {
 export type ForgotPasswordRequest =
   components['schemas']['ForgotPasswordRequest']
 export type InviteUserRequest = components['schemas']['InviteUserRequest']
+export interface InviteResponse {
+  createdAt: string
+  email: string
+  expiresAt: string
+  id: string
+  invitedByName: string
+  invitedByUserId: string
+}
 export type InviteValidationRequest =
   components['schemas']['InviteValidationRequest']
 export type InviteValidationResponse =

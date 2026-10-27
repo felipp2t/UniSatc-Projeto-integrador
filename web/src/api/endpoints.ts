@@ -7,6 +7,7 @@ import type {
   CreateCollectionRequest,
   CreateItemRequest,
   ForgotPasswordRequest,
+  InviteResponse,
   InviteUserRequest,
   InviteValidationRequest,
   InviteValidationResponse,
@@ -59,6 +60,9 @@ export const workspaceApi = {
 export const inviteApi = {
   create: (request: InviteUserRequest) =>
     apiClient.post<void>('/invites', request),
+  list: () => apiClient.get<InviteResponse[]>('/invites'),
+  revoke: (inviteId: string) =>
+    apiClient.post<void>(`/invites/${inviteId}/revoke`),
   validate: (request: InviteValidationRequest) =>
     apiClient.post<InviteValidationResponse>('/invites/validate', request),
 }

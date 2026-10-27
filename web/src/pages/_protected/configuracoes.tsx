@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
-import { userApi } from '@/api/endpoints'
+import { userApi, workspaceApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { ChangePasswordForm } from '@/components/change-password-form'
+import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/ui/error-state'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
@@ -35,6 +36,20 @@ function AccountSettingsPage() {
     queryFn: async () => (await userApi.getMe()).data,
     queryKey: ['profile'],
   })
+  const workspaces = useQuery({
+    enabled: Boolean(session.user?.id),
+    queryFn: async () => (await workspaceApi.list()).data,
+    queryKey: ['workspaces'],
+    refetchOnMount: 'always',
+  })
+  const isWorkspaceOwner = Boolean(
+    session.user?.id &&
+      workspaces.isSuccess &&
+      !workspaces.isFetching &&
+      workspaces.data.some(
+        (workspace) => workspace.ownerId === session.user?.id
+      )
+  )
   const currentName = profile.data?.name ?? ''
   const editedName = name ?? currentName
   const isNameValid = profileNameSchema.safeParse(editedName).success
@@ -192,6 +207,28 @@ function AccountSettingsPage() {
             </section>
             <Separator />
             <ChangePasswordForm />
+            {isWorkspaceOwner ? (
+              <>
+                <Separator />
+                <section
+                  aria-labelledby='pending-invites-title'
+                  className='space-y-4'
+                >
+                  <div>
+                    <h2
+                      className='font-bold font-mono text-sm uppercase tracking-wide'
+                      id='pending-invites-title'
+                    >
+                      Convites pendentes
+                    </h2>
+                    <p className='mt-1 text-muted-foreground text-xs'>
+                      Consulte e revogue os convites enviados ao workspace.
+                    </p>
+                  </div>
+                  <PendingInvitesSection />
+                </section>
+              </>
+            ) : null}
           </div>
         </div>
       </div>
