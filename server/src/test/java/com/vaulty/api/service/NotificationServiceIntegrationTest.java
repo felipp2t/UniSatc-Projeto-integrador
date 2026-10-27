@@ -12,9 +12,14 @@ import com.vaulty.api.PostgresIntegrationTest;
 import com.vaulty.api.dto.user.UpdateProfileRequest;
 import com.vaulty.api.entity.Notification;
 import com.vaulty.api.entity.User;
+import com.vaulty.api.entity.WorkspaceMember;
+import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.exception.TooManyRequestsException;
 import com.vaulty.api.repository.NotificationRepository;
 import com.vaulty.api.repository.UserRepository;
+import com.vaulty.api.repository.WorkspaceMemberRepository;
+import com.vaulty.api.repository.WorkspaceRepository;
+import com.vaulty.api.repository.WorkspaceRoleRepository;
 import jakarta.servlet.http.Cookie;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +50,9 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired private NotificationRepository notificationRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
+    @Autowired private WorkspaceRepository workspaceRepository;
+    @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
     @Autowired private NotificationService notificationService;
     @Autowired private UserService userService;
     @Autowired private JwtService jwtService;
@@ -287,10 +295,21 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
         user.setName("Notification Test");
         user.setEmail(UUID.randomUUID() + "@example.com");
         user.setPasswordHash(passwordEncoder.encode("old-password"));
-        return userRepository.save(user);
+        userRepository.saveAndFlush(user);
+
+        var workspace = workspaceRepository.findSingleton().orElseThrow();
+        var role = workspaceRoleRepository.findByWorkspaceIdAndName(
+                workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
+        var membership = new WorkspaceMember();
+        membership.setUser(user);
+        membership.setWorkspace(workspace);
+        membership.setRole(role);
+        workspaceMemberRepository.saveAndFlush(membership);
+        return user;
     }
 
     private Cookie accessCookie(User user) {
-        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), null));
+        UUID membershipId = workspaceMemberRepository.findByUserId(user.getId()).orElseThrow().getId();
+        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), membershipId, null));
     }
 }
