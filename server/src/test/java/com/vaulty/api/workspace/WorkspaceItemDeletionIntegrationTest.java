@@ -230,8 +230,9 @@ class WorkspaceItemDeletionIntegrationTest extends PostgresIntegrationTest {
     }
 
     private Cookie cookie(User user) {
-        String role = memberRepository.findByUserId(user.getId()).map(m -> m.getRole().getName()).orElse(null);
-        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), role));
+        WorkspaceMember membership = memberRepository.findByUserId(user.getId()).orElseThrow();
+        return new Cookie("accessToken", jwtService.generateAccessToken(
+                user.getId(), membership.getId(), membership.getRole().getName()));
     }
 
     private UUID createText(User owner, UUID workspaceId, String title, String text) throws Exception {
