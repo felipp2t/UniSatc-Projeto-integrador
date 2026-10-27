@@ -405,7 +405,7 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
                         .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isForbidden());
         mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
-                        .cookie(authCookie(outsider)).contentType(MediaType.APPLICATION_JSON).content(body))
+                        .cookie(authCookieWithoutMembership(outsider)).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
