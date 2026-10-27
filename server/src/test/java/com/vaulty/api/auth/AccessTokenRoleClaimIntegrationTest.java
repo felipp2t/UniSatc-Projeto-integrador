@@ -15,6 +15,7 @@ import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
+import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
 import jakarta.persistence.EntityManager;
@@ -39,6 +40,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
     @Autowired private UserInviteRepository userInviteRepository;
     @Autowired private JwtService jwtService;
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
+    @Autowired private WorkspaceRepository workspaceRepository;
     @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
     @Autowired private RolePermissionRepository rolePermissionRepository;
     @Autowired private EntityManager entityManager;
@@ -119,6 +121,9 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
         MvcResult login = loginAsAdmin();
         User user = userRepository.findByEmail(ADMIN_EMAIL).orElseThrow();
         var oldMember = workspaceMemberRepository.findByUserId(user.getId()).orElseThrow();
+        UUID userId = user.getId();
+        UUID workspaceId = oldMember.getWorkspace().getId();
+        UUID roleId = oldMember.getRole().getId();
         String accessToken = login.getResponse().getCookie("accessToken").getValue();
         var refreshCookie = login.getResponse().getCookie("refreshToken");
 
@@ -127,11 +132,12 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
         entityManager.clear();
         mockMvc.perform(get("/me").cookie(login.getResponse().getCookie("accessToken")))
                 .andExpect(status().isUnauthorized());
+        entityManager.clear();
 
         var newMember = new com.vaulty.api.entity.WorkspaceMember();
-        newMember.setUser(user);
-        newMember.setWorkspace(oldMember.getWorkspace());
-        newMember.setRole(oldMember.getRole());
+        newMember.setUser(userRepository.findById(userId).orElseThrow());
+        newMember.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
+        newMember.setRole(workspaceRoleRepository.findById(roleId).orElseThrow());
         newMember = workspaceMemberRepository.saveAndFlush(newMember);
         assertThat(newMember.getId()).isNotEqualTo(oldMember.getId());
         mockMvc.perform(get("/me").cookie(new jakarta.servlet.http.Cookie("accessToken", accessToken)))
