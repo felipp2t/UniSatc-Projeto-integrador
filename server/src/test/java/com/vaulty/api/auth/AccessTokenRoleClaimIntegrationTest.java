@@ -122,12 +122,14 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
         User user = userRepository.findByEmail(ADMIN_EMAIL).orElseThrow();
         var oldMember = workspaceMemberRepository.findByUserId(user.getId()).orElseThrow();
         UUID userId = user.getId();
+        UUID oldMemberId = oldMember.getId();
         UUID workspaceId = oldMember.getWorkspace().getId();
         UUID roleId = oldMember.getRole().getId();
         String accessToken = login.getResponse().getCookie("accessToken").getValue();
         var refreshCookie = login.getResponse().getCookie("refreshToken");
 
-        workspaceMemberRepository.delete(oldMember);
+        entityManager.clear();
+        workspaceMemberRepository.delete(workspaceMemberRepository.findById(oldMemberId).orElseThrow());
         workspaceMemberRepository.flush();
         entityManager.clear();
         mockMvc.perform(get("/me").cookie(login.getResponse().getCookie("accessToken")))
