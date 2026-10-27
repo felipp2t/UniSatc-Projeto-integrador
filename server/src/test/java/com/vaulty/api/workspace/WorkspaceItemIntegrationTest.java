@@ -13,17 +13,32 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaulty.api.dto.item.CreateItemRequest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.WorkspaceRole;
-import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Autowired private ObjectMapper objectMapper;
+    private final List<UUID> committedConflictTestItems = new ArrayList<>();
+
+    @AfterEach
+    void cleanupCommittedConflictTestItems() {
+        for (UUID itemId : committedConflictTestItems) {
+            jdbcTemplate.update("DELETE FROM activity_log WHERE resource_id = ?", itemId);
+            jdbcTemplate.update("DELETE FROM item WHERE id = ?", itemId);
+        }
+        committedConflictTestItems.clear();
+    }
 
     @Test
     void createsAndPaginatesTextsAndLinksInRootAndFolder() throws Exception {
@@ -311,20 +326,22 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
         assertThat(stored).isNotEqualTo(secretValue).doesNotContain(secretValue);
         mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId).cookie(cookie))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.value").value(secretValue));
-        String history = jdbcTemplate.queryForObject("SELECT action || snapshot::text FROM activity_log WHERE resource_id = ? ORDER BY created_at DESC LIMIT 1", String.class, secretId);
+        String history = jdbcTemplate.queryForObject("SELECT action || snapshot::text FROM activity_log WHERE resource_id = ? AND action = 'item_updated' ORDER BY created_at DESC LIMIT 1", String.class, secretId);
         assertThat(history).contains("item_updated", "contentChanged").doesNotContain(secretValue);
-        String textHistory = jdbcTemplate.queryForObject("SELECT snapshot::text FROM activity_log WHERE resource_id = ? ORDER BY created_at DESC LIMIT 1", String.class, textId);
-        String linkHistory = jdbcTemplate.queryForObject("SELECT snapshot::text FROM activity_log WHERE resource_id = ? ORDER BY created_at DESC LIMIT 1", String.class, linkId);
+        String textHistory = jdbcTemplate.queryForObject("SELECT snapshot::text FROM activity_log WHERE resource_id = ? AND action = 'item_updated' ORDER BY created_at DESC LIMIT 1", String.class, textId);
+        String linkHistory = jdbcTemplate.queryForObject("SELECT snapshot::text FROM activity_log WHERE resource_id = ? AND action = 'item_updated' ORDER BY created_at DESC LIMIT 1", String.class, linkId);
         assertThat(textHistory).doesNotContain("Depois", "Antes");
         assertThat(linkHistory).doesNotContain("https://old.example", "https://new.example/path");
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void rejectsInvalidUpdatesAndConflictsWithArchivedTitle() throws Exception {
         User owner = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
         UUID textId = createItem(owner, workspaceId, "text", "Atual", null, "Antes", null, null);
         UUID archivedId = createItem(owner, workspaceId, "text", "Título usado", null, "x", null, null);
+        committedConflictTestItems.addAll(List.of(textId, archivedId));
         jdbcTemplate.update("UPDATE item SET archived_at = now() WHERE id = ?", archivedId);
         var cookie = authCookie(owner);
 
@@ -352,11 +369,13 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void secretTitleConflictWithArchivedItemRollsBackTitleAndValue() throws Exception {
         User owner = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
         UUID secretId = createItem(owner, workspaceId, "secret", "Credencial", null, null, null, "original-secret");
         UUID archivedId = createItem(owner, workspaceId, "text", "Nome reservado", null, "x", null, null);
+        committedConflictTestItems.addAll(List.of(secretId, archivedId));
         jdbcTemplate.update("UPDATE item SET archived_at = now() WHERE id = ?", archivedId);
         String encryptedBefore = jdbcTemplate.queryForObject(
                 "SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId);
