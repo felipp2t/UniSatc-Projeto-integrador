@@ -17,6 +17,7 @@ import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
+import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
     @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
     @Autowired private RolePermissionRepository rolePermissionRepository;
+    @Autowired private EntityManager entityManager;
 
     @Test
     void loginAsOwnerEmbedsTheOwnerRoleInTheAccessToken() throws Exception {
@@ -122,6 +124,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
 
         workspaceMemberRepository.delete(oldMember);
         workspaceMemberRepository.flush();
+        entityManager.clear();
         mockMvc.perform(get("/me").cookie(login.getResponse().getCookie("accessToken")))
                 .andExpect(status().isUnauthorized());
 
