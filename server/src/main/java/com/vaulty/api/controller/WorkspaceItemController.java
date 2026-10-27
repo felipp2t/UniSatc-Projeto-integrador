@@ -67,6 +67,14 @@ public class WorkspaceItemController implements WorkspaceItemControllerDocs {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{itemId}/archive")
+    public ResponseEntity<Void> archive(@AuthenticationPrincipal UUID userId,
+                                        @PathVariable UUID workspaceId,
+                                        @PathVariable UUID itemId) {
+        itemService.archive(userId, workspaceId, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{itemId}")
     public ResponseEntity<ItemResponse> update(@AuthenticationPrincipal UUID userId,
                                                @PathVariable UUID workspaceId,

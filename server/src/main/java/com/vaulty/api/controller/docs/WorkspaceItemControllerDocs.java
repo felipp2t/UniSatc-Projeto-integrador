@@ -41,6 +41,11 @@ public interface WorkspaceItemControllerDocs {
                                                   UUID workspaceId, UUID itemId,
                                                   UpdateItemMetadataRequest request);
 
+    @Operation(summary = "Arquiva um item")
+    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404"), @ApiResponse(responseCode = "409")})
+    ResponseEntity<Void> archive(@Parameter(hidden = true) UUID userId, UUID workspaceId, UUID itemId);
+
     @Operation(summary = "Atualiza título e conteúdo de um item de texto, link ou segredo")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
         @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),

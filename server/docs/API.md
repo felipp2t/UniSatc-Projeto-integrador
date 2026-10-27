@@ -428,6 +428,21 @@ atividades sem incluir bytes nem chave do storage.
 Se `app.storage.s3.bucket` não estiver configurado, a aplicação inicia sem storage e as rotas de
 upload, substituição e download retornam `503 Service Unavailable`.
 
+## RF31 — Arquivar item
+
+**`POST /workspaces/{workspaceId}/items/{itemId}/archive`** — autenticado; exige `item/update`.
+Para itens do tipo `secret`, também exige `secret/update` e o usuário precisa ter `secret/read`;
+sem `secret/read`, o item retorna `404` para manter sua existência oculta. A operação marca o
+item como arquivado sem remover seus dados. Itens arquivados deixam de aparecer nas listagens e
+buscas padrão; continuam acessíveis por consulta, revelação de segredo e download de anexo conforme
+as permissões atuais. O título permanece reservado na mesma localização.
+
+Sucesso retorna `204`. Repetir a operação em item já arquivado retorna `409`. Item ausente, fora
+do workspace ou oculto por falta de `secret/read` retorna `404`; ausência de permissão retorna
+`403`. O histórico registra `item_archived` com tipo e título, sem incluir conteúdo de texto,
+URL, valor do segredo nem dados do anexo. Arquivar/restaurar usa `item/update` (e também
+`secret/update` para segredos); `item/delete` fica reservado à exclusão permanente.
+
 ## Gestão de grupos de acesso
 
 Todas as rotas abaixo exigem autenticação pelo cookie `accessToken`, vínculo atual ao workspace e
@@ -620,6 +635,7 @@ eventos role-permission end-to-end (CA01).
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
 | RF29 | PUT | `/workspaces/{workspaceId}/items/{itemId}` | Cookie `accessToken` |
 | RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
+| RF31 | POST | `/workspaces/{workspaceId}/items/{itemId}/archive` | Cookie `accessToken` |
 | RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
 | RF— | GET | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |
 | RF— | POST | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |
