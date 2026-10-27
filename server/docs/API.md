@@ -402,9 +402,18 @@ Itens arquivados não podem ser alterados até serem restaurados.
 
 **`PUT /workspaces/{workspaceId}/items/{itemId}/metadata`** — autenticado; exige `item/update`.
 
-Atualiza `{ "title": string, "description": string | null, "collectionId": UUID | null }` sem
-alterar o conteúdo do anexo. `title` é obrigatório (1–255 caracteres); `description` é opcional
-(até 2.000 caracteres). `collectionId: null` coloca o item na raiz. Conflito de título retorna `409`.
+Atualiza `{ "title": string, "description": string | null }` sem alterar o conteúdo do anexo nem
+a pasta. `title` é obrigatório (1–255 caracteres); `description` é opcional (até 2.000 caracteres).
+Conflito de título retorna `409`.
+
+**`PUT /workspaces/{workspaceId}/items/{itemId}`** — autenticado; exige `item/update`.
+
+Atualiza título e conteúdo de itens `text`, `link` ou `secret`, preservando tipo e pasta. O corpo
+contém `title` e exatamente um campo de conteúdo conforme o tipo (`textContent`, `linkUrl` ou
+`value`). Texto aceita até 100.000 caracteres e não pode ser vazio ou conter apenas espaços; URLs
+HTTP/HTTPS aceitam até 2.048 caracteres; segredos aceitam até 8.192 caracteres e são armazenados
+cifrados. Itens arquivados não podem ser alterados. Conflito de título retorna `409`; sucesso
+retorna o item atualizado e registra `ITEM_UPDATED` sem incluir o valor do segredo.
 
 **`GET /workspaces/{workspaceId}/items/{itemId}/attachment`** — autenticado; exige `item/read`.
 
@@ -609,6 +618,7 @@ eventos role-permission end-to-end (CA01).
 | RF30 | POST | `/workspaces/{workspaceId}/items/attachments` | Cookie `accessToken` |
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
+| RF29 | PUT | `/workspaces/{workspaceId}/items/{itemId}` | Cookie `accessToken` |
 | RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
 | RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
 | RF— | GET | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |
