@@ -78,6 +78,20 @@ Todos os cookies (`accessToken`, `refreshToken`) são `httpOnly` + `secure` + `s
 não são enviados pelo navegador em HTTP, os testes autenticados em `http://localhost` exigem HTTPS
 ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 
+Cada par de tokens é associado ao registro `workspace_member` do usuário. O JWT de acesso inclui
+o ID desse vínculo; a cada requisição autenticada, o servidor confirma que o vínculo ainda existe
+para o mesmo usuário e obtém dele o papel atual. Remover o membro invalida imediatamente o acesso
+por JWT e, pela FK `ON DELETE CASCADE`, remove também seus refresh tokens. Uma readmissão cria outro
+vínculo, sem revalidar sessões antigas. O access token legado sem `membershipId` recebe `401`;
+refresh tokens existentes são associados ao vínculo atual pela V20, e os sem vínculo são
+descartados. Login de usuário sem vínculo não emite sessão; um refresh migrado de membro atual pode
+rotacionar e emitir um novo par.
+
+A V20 mantém a política existente de workspace, membros e proprietário. O papel é consultado no
+banco por requisição, mas grupos, concessões e herança de permissões não existem nesta branch e
+seguem para as issues #132/#133. Isso não representa atendimento integral ao RNF04 nem validação
+completa de conteúdo granular.
+
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|
 | — | GET | `/invites` | Sim, só o dono | — | 200, lista `{ id, email, invitedByUserId, invitedByName, createdAt, expiresAt }` | 401 não autenticado, 403 não é o dono |

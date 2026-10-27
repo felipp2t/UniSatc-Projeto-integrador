@@ -29,12 +29,12 @@ public class JwtService {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
     }
 
-    // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
-    public String generateAccessToken(UUID userId, String role) {
+    public String generateAccessToken(UUID userId, UUID membershipId, String role) {
         Instant now = Instant.now();
 
         var builder = Jwts.builder()
                 .subject(userId.toString())
+                .claim("membershipId", membershipId.toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)));
 
@@ -45,11 +45,24 @@ public class JwtService {
         return builder.signWith(key).compact();
     }
 
+    // Mantido para compatibilidade com chamadas legadas; tokens sem vínculo não autenticam.
+    public String generateAccessToken(UUID userId, String role) {
+        Instant now = Instant.now();
+        var builder = Jwts.builder()
+                .subject(userId.toString())
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)));
+        if (role != null) {
+            builder.claim("role", role);
+        }
+        return builder.signWith(key).compact();
+    }
+
     public int getAccessTokenExpirationSeconds() {
         return (int) (accessTokenExpirationMs / 1000);
     }
 
-    public record AccessTokenClaims(UUID userId, String role) {}
+    public record AccessTokenClaims(UUID userId, UUID membershipId, String role) {}
 
     // Tokens antigos sem role continuam autenticados, mas não recebem authorities.
     public Optional<AccessTokenClaims> validateAccessToken(String token) {
@@ -60,11 +73,14 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload();
             String subject = claims.getSubject();
+            String membershipId = claims.get("membershipId", String.class);
             String role = claims.get("role", String.class);
-            if (subject == null || (role != null && role.isBlank())) {
+            if (subject == null || membershipId == null || membershipId.isBlank()
+                    || (role != null && role.isBlank())) {
                 return Optional.empty();
             }
-            return Optional.of(new AccessTokenClaims(UUID.fromString(subject), role));
+            return Optional.of(new AccessTokenClaims(
+                    UUID.fromString(subject), UUID.fromString(membershipId), role));
         } catch (JwtException | IllegalArgumentException ex) {
             return Optional.empty();
         }

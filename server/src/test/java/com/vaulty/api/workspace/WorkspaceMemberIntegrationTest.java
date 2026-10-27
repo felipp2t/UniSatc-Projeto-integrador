@@ -80,13 +80,14 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void userWithoutMembershipGetsNotFoundAndAnonymousGetsUnauthorized() throws Exception {
+    void legacyTokenWithoutMembershipAndAnonymousRequestAreUnauthorized() throws Exception {
         User owner = createUser("Proprietário");
         User unrelated = createUser("Externo");
         WorkspaceResponse workspace = configureWorkspace(owner);
 
-        mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id()).cookie(authCookie(unrelated)))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id())
+                        .cookie(authCookieWithoutMembership(unrelated)))
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id()))
                 .andExpect(status().isUnauthorized());
     }
@@ -126,8 +127,8 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         WorkspaceResponse workspace = configureWorkspace(owner);
 
         mockMvc.perform(get("/workspaces/{workspaceId}/members", workspace.id())
-                        .cookie(authCookie(unrelatedUser)))
-                .andExpect(status().isNotFound());
+                        .cookie(authCookieWithoutMembership(unrelatedUser)))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

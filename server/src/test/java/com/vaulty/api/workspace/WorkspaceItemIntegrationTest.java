@@ -330,11 +330,11 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
-                        .cookie(authCookie(outsider)))
-                .andExpect(status().isNotFound());
+                        .cookie(authCookieWithoutMembership(outsider)))
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
-                        .cookie(authCookie(outsider)).param("q", "Privado"))
-                .andExpect(status().isNotFound());
+                        .cookie(authCookieWithoutMembership(outsider)).param("q", "Privado"))
+                .andExpect(status().isUnauthorized());
     }
 
     private UUID createFolder(User owner, UUID workspaceId, String name) throws Exception {

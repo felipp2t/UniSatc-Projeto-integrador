@@ -22,6 +22,7 @@ import com.vaulty.api.repository.PasswordResetTokenRepository;
 import com.vaulty.api.repository.RefreshTokenRepository;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
+import com.vaulty.api.repository.WorkspaceMemberRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -53,6 +54,8 @@ public class AuthService {
 
     private final WorkspaceService workspaceService;
 
+    private final WorkspaceMemberRepository workspaceMemberRepository;
+
     private final ActivityLogService activityLogService;
 
     private final Clock clock;
@@ -80,6 +83,8 @@ public class AuthService {
 
             WorkspaceService workspaceService,
 
+            WorkspaceMemberRepository workspaceMemberRepository,
+
             ActivityLogService activityLogService,
 
             Clock clock,
@@ -98,6 +103,7 @@ public class AuthService {
         this.emailOutboxService = emailOutboxService;
         this.credentialService = credentialService;
         this.workspaceService = workspaceService;
+        this.workspaceMemberRepository = workspaceMemberRepository;
         this.activityLogService = activityLogService;
         this.clock = clock;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
@@ -126,6 +132,10 @@ public class AuthService {
         }
 
         UUID userId = refreshToken.getUser().getId();
+        UUID membershipId = refreshToken.getWorkspaceMember().getId();
+        if (workspaceMemberRepository.findByIdAndUserId(membershipId, userId).isEmpty()) {
+            throw new InvalidCredentialsException("Token de atualização inválido");
+        }
         refreshTokenRepository.delete(refreshToken);
         return issueTokenPair(userId);
     }
@@ -209,14 +219,17 @@ public class AuthService {
     }
 
     private TokenPair issueTokenPair(UUID userId) {
+        var membership = workspaceMemberRepository.findByUserId(userId)
+                .orElseThrow(() -> new InvalidCredentialsException("Vínculo com workspace não encontrado"));
+
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(UUID.randomUUID().toString());
         refreshToken.setUser(userRepository.getReferenceById(userId));
+        refreshToken.setWorkspaceMember(membership);
         refreshToken.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(refreshTokenExpirationMs)));
         refreshTokenRepository.save(refreshToken);
 
-        String role = workspaceService.getRoleName(userId);
-        String accessToken = jwtService.generateAccessToken(userId, role);
+        String accessToken = jwtService.generateAccessToken(userId, membership.getId(), membership.getRole().getName());
 
         return new TokenPair(accessToken, refreshToken.getToken());
     }
