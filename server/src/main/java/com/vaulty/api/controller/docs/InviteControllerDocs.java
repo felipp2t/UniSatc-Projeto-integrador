@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 
 @Tag(name = "Convites")
 public interface InviteControllerDocs {
@@ -62,4 +63,15 @@ public interface InviteControllerDocs {
                 content = @Content(schema = @Schema(implementation = ApiErrorBody.class)))
     })
     ResponseEntity<Void> decline(InviteValidationRequest request);
+
+    @Operation(summary = "Revoga convite pendente")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Convite revogado"),
+        @ApiResponse(responseCode = "401", description = "Não autenticado"),
+        @ApiResponse(responseCode = "403", description = "Somente o dono do workspace pode revogar convites"),
+        @ApiResponse(responseCode = "404", description = "Convite indisponível")
+    })
+    ResponseEntity<Void> revoke(
+            @Parameter(hidden = true) UUID ownerId,
+            @PathVariable UUID id);
 }

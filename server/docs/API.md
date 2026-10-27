@@ -97,6 +97,22 @@ O cadastro também consulta somente convites pendentes, então um convite recusa
 O endpoint retorna `204`, usa `Cache-Control: no-store` e tem limite de cinco requisições por minuto
 por IP e caminho.
 
+**`POST /invites/{id}/revoke`** — autenticado (cookie `accessToken`), somente o dono atual do
+workspace.
+
+Revoga um convite pendente pelo seu `id` (UUID), marcando-o como `REVOKED`. Um convite revogado
+deixa de ser aceito por `POST /invites/validate` e `POST /auth/register`. A operação não altera
+contas existentes nem vínculos de membros já criados. Convites que não existem ou não estão mais
+pendentes respondem `404` com a mensagem genérica “Convite indisponível”.
+
+| | |
+|---|---|
+| Auth | Cookie `accessToken`, apenas o dono atual do workspace |
+| Sucesso | `204`, corpo vazio |
+| `401` | não autenticado |
+| `403` | autenticado, mas não é o dono do workspace |
+| `404` | convite inexistente ou indisponível (não pendente) |
+
 ---
 
 ## RF01/RF11 — Cadastro via convite
