@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,6 +14,7 @@ import com.vaulty.api.dto.item.CreateItemRequest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.WorkspaceRole;
 import java.util.UUID;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -273,6 +275,147 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
                         .cookie(authCookie(owner)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Chave de Produção"));
+    }
+
+    @Test
+    void updatesTextLinkAndSecretWithoutChangingTypeOrFolder() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID folderId = createFolder(owner, workspaceId, "Documentos");
+        UUID textId = createItem(owner, workspaceId, "text", "Texto", folderId, "Antes", null, null);
+        UUID linkId = createItem(owner, workspaceId, "link", "Link", folderId, null, "https://old.example", null);
+        UUID secretId = createItem(owner, workspaceId, "secret", "Segredo", folderId, null, null, "old-secret");
+        var cookie = authCookie(owner);
+        String secretValue = "  exact secret value  ";
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, textId)
+                        .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\" Texto novo \",\"textContent\":\"Depois\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("text"))
+                .andExpect(jsonPath("$.title").value("Texto novo")).andExpect(jsonPath("$.textContent").value("Depois"));
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, linkId)
+                        .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Link novo\",\"linkUrl\":\"https://new.example/path\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("link"))
+                .andExpect(jsonPath("$.linkUrl").value("https://new.example/path"));
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, secretId)
+                        .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("title", "Segredo novo", "value", secretValue))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.type").value("secret"))
+                .andExpect(jsonPath("$.title").value("Segredo novo")).andExpect(jsonPath("$.value").doesNotExist());
+
+        assertThat(jdbcTemplate.queryForObject("SELECT collection_id FROM item WHERE id = ?", UUID.class, textId)).isEqualTo(folderId);
+        assertThat(jdbcTemplate.queryForObject("SELECT collection_id FROM item WHERE id = ?", UUID.class, linkId)).isEqualTo(folderId);
+        assertThat(jdbcTemplate.queryForObject("SELECT collection_id FROM item WHERE id = ?", UUID.class, secretId)).isEqualTo(folderId);
+        String stored = jdbcTemplate.queryForObject("SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId);
+        assertThat(stored).isNotEqualTo(secretValue).doesNotContain(secretValue);
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId).cookie(cookie))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.value").value(secretValue));
+        String history = jdbcTemplate.queryForObject("SELECT action || snapshot::text FROM activity_log WHERE resource_id = ? ORDER BY created_at DESC LIMIT 1", String.class, secretId);
+        assertThat(history).contains("item_updated", "contentChanged").doesNotContain(secretValue);
+        String textHistory = jdbcTemplate.queryForObject("SELECT snapshot::text FROM activity_log WHERE resource_id = ? ORDER BY created_at DESC LIMIT 1", String.class, textId);
+        String linkHistory = jdbcTemplate.queryForObject("SELECT snapshot::text FROM activity_log WHERE resource_id = ? ORDER BY created_at DESC LIMIT 1", String.class, linkId);
+        assertThat(textHistory).doesNotContain("Depois", "Antes");
+        assertThat(linkHistory).doesNotContain("https://old.example", "https://new.example/path");
+    }
+
+    @Test
+    void rejectsInvalidUpdatesAndConflictsWithArchivedTitle() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID textId = createItem(owner, workspaceId, "text", "Atual", null, "Antes", null, null);
+        UUID archivedId = createItem(owner, workspaceId, "text", "Título usado", null, "x", null, null);
+        jdbcTemplate.update("UPDATE item SET archived_at = now() WHERE id = ?", archivedId);
+        var cookie = authCookie(owner);
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, textId)
+                        .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Atualizado\",\"textContent\":\"\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, textId)
+                        .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Atualizado\",\"linkUrl\":\"ftp://bad\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, textId)
+                        .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("title", "x".repeat(256), "textContent", "v"))))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, textId)
+                        .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"  título usado  \",\"textContent\":\"Novo\"}"))
+                .andExpect(status().isConflict());
+        assertThat(jdbcTemplate.queryForObject("SELECT title FROM item WHERE id = ?", String.class, textId)).isEqualTo("Atual");
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, archivedId)
+                        .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Não editar\",\"textContent\":\"novo\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void secretTitleConflictWithArchivedItemRollsBackTitleAndValue() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID secretId = createItem(owner, workspaceId, "secret", "Credencial", null, null, null, "original-secret");
+        UUID archivedId = createItem(owner, workspaceId, "text", "Nome reservado", null, "x", null, null);
+        jdbcTemplate.update("UPDATE item SET archived_at = now() WHERE id = ?", archivedId);
+        String encryptedBefore = jdbcTemplate.queryForObject(
+                "SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId);
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, secretId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Nome reservado\",\"value\":\"replacement-secret\"}"))
+                .andExpect(status().isConflict());
+
+        assertThat(jdbcTemplate.queryForObject("SELECT title FROM item WHERE id = ?", String.class, secretId))
+                .isEqualTo("Credencial");
+        assertThat(jdbcTemplate.queryForObject("SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId))
+                .isEqualTo(encryptedBefore);
+    }
+
+    @Test
+    void updateRequiresWorkspaceAccessAndItemUpdatePermission() throws Exception {
+        User owner = createUser();
+        User member = createUser();
+        User outsider = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(member, workspaceId);
+        UUID itemId = createItem(owner, workspaceId, "text", "Privado", null, "Antes", null, null);
+        String body = "{\"title\":\"Depois\",\"textContent\":\"Novo\"}";
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
+                        .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
+                        .cookie(authCookie(outsider)).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void secretUpdateAlsoRequiresSecretUpdatePermission() throws Exception {
+        User owner = createUser();
+        User member = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(member, workspaceId);
+        UUID secretId = createItem(owner, workspaceId, "secret", "Credencial", null, null, null, "original-secret");
+        var role = new WorkspaceRole();
+        role.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
+        role.setName("Item updater");
+        role = workspaceRoleRepository.saveAndFlush(role);
+        var membership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, member.getId()).orElseThrow();
+        membership.setRole(role);
+        workspaceMemberRepository.saveAndFlush(membership);
+        jdbcTemplate.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'item', 'update')", role.getId());
+        String before = jdbcTemplate.queryForObject("SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId);
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, secretId)
+                        .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Alterada\",\"value\":\"replacement-secret\"}"))
+                .andExpect(status().isForbidden());
+        assertThat(jdbcTemplate.queryForObject("SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId))
+                .isEqualTo(before);
     }
 
     @Test
