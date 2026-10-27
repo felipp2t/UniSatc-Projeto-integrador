@@ -53,12 +53,14 @@ public class WorkspaceContentAuthorization {
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
         List<WorkspacePermission> permissions;
         if (isOwner) {
-            permissions = RESOURCES.stream().flatMap(resource -> ACTIONS.stream()
-                    .map(action -> new WorkspacePermission(resource, action))).toList();
+            permissions = Stream.concat(RESOURCES.stream().flatMap(resource -> ACTIONS.stream()
+                            .map(action -> new WorkspacePermission(resource, action))),
+                    Stream.of(new WorkspacePermission("group", "manage"))).toList();
         } else {
             permissions = permissionRepository.findAllByRoleId(member.getRole().getId()).stream()
                     .flatMap(permission -> ("all".equals(permission.getAction())
-                            ? ACTIONS.stream() : Stream.of(permission.getAction()))
+                            ? ("group".equals(permission.getResource()) ? Stream.of("manage") : ACTIONS.stream())
+                            : Stream.of(permission.getAction()))
                             .map(action -> new WorkspacePermission(permission.getResource(), action)))
                     .distinct().toList();
         }

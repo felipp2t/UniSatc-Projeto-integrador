@@ -29,6 +29,15 @@ public interface UserInviteRepository extends JpaRepository<UserInvite, UUID> {
             @Param("token") String token,
             @Param("status") UserInviteStatus status);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select invite from UserInvite invite
+            where invite.id = :id and invite.status = :status
+            """)
+    Optional<UserInvite> findByIdAndStatusForUpdate(
+            @Param("id") UUID id,
+            @Param("status") UserInviteStatus status);
+
     @Query("""
             select new com.vaulty.api.dto.invite.InviteResponse(
                 invite.id, invite.email, inviter.id, inviter.name, invite.createdAt, invite.expiresAt)

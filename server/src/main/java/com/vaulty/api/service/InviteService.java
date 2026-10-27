@@ -116,6 +116,18 @@ public class InviteService {
         emailOutboxService.enqueueInvite(invite.getEmail(), invite.getToken(), invite.getExpiresAt());
     }
 
+    @Transactional
+    public void revoke(UUID ownerId, UUID inviteId) {
+        var workspace = workspaceService.requireOwner(ownerId);
+        UserInvite invite = userInviteRepository.findByIdAndStatusForUpdate(inviteId, UserInviteStatus.PENDING)
+                .orElseThrow(() -> new ResourceNotFoundException("Convite indisponível"));
+
+        invite.setStatus(UserInviteStatus.REVOKED);
+        activityLogService.record(workspace.getId(), ownerId, ActivityActorContext.USER,
+                ActivityAction.MEMBER_INVITE_REVOKED, ActivityResourceType.MEMBER, invite.getId(),
+                Map.of("email", invite.getEmail()));
+    }
+
     private UserInvite requirePendingInvite(InviteValidationRequest request, OffsetDateTime now) {
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new ResourceNotFoundException("Convite indisponível");
