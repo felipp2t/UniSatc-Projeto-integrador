@@ -3,7 +3,7 @@
 Referência detalhada de cada endpoint implementado no backend Java. Para instruções de setup e
 bootstrap do banco, veja [`../README.md`](../README.md).
 
-Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados; decisões novas de grupos, compartilhamento, remoção e readmissão ainda exigem conferência de implementação e não são presumidas como concluídas.
+Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados. A gestão de grupos de acesso está disponível e cada sessão é vinculada ao vínculo atual do membro no workspace; tokens antigos não são reativados por readmissão. Compartilhamento/herança de pastas com grupos (#132/#133) e rotas de remoção de usuários continuam fora deste contrato.
 
 Convenções gerais:
 - Todas as respostas de erro seguem o mesmo formato JSON (`GlobalExceptionHandler`):
@@ -28,14 +28,20 @@ Convenções gerais:
 - Não existe cadastro público: uma conta só nasce quando o dono do workspace envia um convite
   (RF10) e o convidado conclui o cadastro com o token recebido por e-mail (RF01/RF11), entrando no
   workspace único da empresa com o papel `Member` (acesso inicial, sem RBAC granular ainda).
-- **Início do RNF04** (autorização por permissão no próprio token): o `accessToken` carrega uma
-  claim `role` com o nome do papel do usuário no workspace (`Owner` ou `Member`, por enquanto —
-  ainda não existem papéis customizados nem permissões granulares por recurso/ação). A claim é
-  calculada a cada emissão/renovação de token (login, registro, refresh), nunca lida do banco a
-  cada requisição. `JwtAuthenticationFilter` expõe isso como uma `GrantedAuthority` do Spring
-  Security, pronta para checagens futuras (`hasAuthority(...)`) quando RBAC granular existir.
-  Identidade e papel são extraídos de uma única validação do JWT. Tokens antigos sem `role`
-  continuam autenticados, mas não recebem authorities.
+- Cada sessão está vinculada a um `workspace_member.id`: o JWT de acesso contém `membershipId` e
+  o refresh token persistido referencia o mesmo vínculo. Em cada requisição autenticada,
+  `JwtAuthenticationFilter` confirma no banco que o vínculo ainda existe para o usuário do JWT e
+  usa o papel atual do vínculo como authority. O access token legado sem `membershipId` não
+  autentica e recebe `401`; o papel do banco é atualizado efetivamente por requisição, sem esperar
+  o limite de validade de até 15 minutos do JWT.
+- Excluir um vínculo invalida imediatamente os access tokens associados e a FK com `ON DELETE
+  CASCADE` remove seus refresh tokens. Uma readmissão cria outro vínculo e não recupera a sessão
+  anterior. A migration V20 associa refresh tokens existentes ao vínculo atual do usuário e
+  descarta os que não têm vínculo. Portanto, um refresh migrado ainda válido de um membro atual
+  pode emitir novo par de tokens; login sem vínculo não emite sessão.
+- Isso documenta somente o comportamento implementado nesta branch. Grupos, concessões, herança e
+  validação granular completa de conteúdo não existem aqui e pertencem às issues #132/#133; não se
+  afirma atendimento integral ao RNF04.
 
 ---
 
@@ -164,8 +170,11 @@ O que a função faz:
 2. Busca esse token na tabela `refresh_token` (`401` se não existir).
 3. Confere se ele expirou (`401` se sim, sem tentar apagar dentro da transação que será revertida).
 4. Se estiver válido, deleta o token encontrado (uso único — todo refresh invalida o anterior).
-5. Emite um novo access token + um novo refresh token (rotação), devolvidos como cookies. Tokens
-   expirados são removidos pela manutenção agendada.
+5. Confirma que o vínculo de workspace associado ao refresh token ainda existe para o usuário.
+   Se existir, emite um novo access token com `membershipId` e um novo refresh token ligado ao
+   vínculo atual (rotação), devolvidos como cookies. Isso também permite migrar um refresh token
+   pré-V20 que a migration associou ao vínculo atual. Vínculo removido ou inexistente resulta em
+   `401`; tokens expirados são removidos pela manutenção agendada.
 
 | | |
 |---|---|
@@ -393,9 +402,18 @@ Itens arquivados não podem ser alterados até serem restaurados.
 
 **`PUT /workspaces/{workspaceId}/items/{itemId}/metadata`** — autenticado; exige `item/update`.
 
-Atualiza `{ "title": string, "description": string | null, "collectionId": UUID | null }` sem
-alterar o conteúdo do anexo. `title` é obrigatório (1–255 caracteres); `description` é opcional
-(até 2.000 caracteres). `collectionId: null` coloca o item na raiz. Conflito de título retorna `409`.
+Atualiza `{ "title": string, "description": string | null }` sem alterar o conteúdo do anexo nem
+a pasta. `title` é obrigatório (1–255 caracteres); `description` é opcional (até 2.000 caracteres).
+Conflito de título retorna `409`.
+
+**`PUT /workspaces/{workspaceId}/items/{itemId}`** — autenticado; exige `item/update`.
+
+Atualiza título e conteúdo de itens `text`, `link` ou `secret`, preservando tipo e pasta. O corpo
+contém `title` e exatamente um campo de conteúdo conforme o tipo (`textContent`, `linkUrl` ou
+`value`). Texto aceita até 100.000 caracteres e não pode ser vazio ou conter apenas espaços; URLs
+HTTP/HTTPS aceitam até 2.048 caracteres; segredos aceitam até 8.192 caracteres e são armazenados
+cifrados. Itens arquivados não podem ser alterados. Conflito de título retorna `409`; sucesso
+retorna o item atualizado e registra `ITEM_UPDATED` sem incluir o valor do segredo.
 
 **`GET /workspaces/{workspaceId}/items/{itemId}/attachment`** — autenticado; exige `item/read`.
 
@@ -425,6 +443,54 @@ do workspace ou oculto por falta de `secret/read` retorna `404`; ausência de pe
 URL, valor do segredo nem dados do anexo. Arquivar/restaurar usa `item/update` (e também
 `secret/update` para segredos); `item/delete` fica reservado à exclusão permanente.
 
+## Gestão de grupos de acesso
+
+Todas as rotas abaixo exigem autenticação pelo cookie `accessToken`, vínculo atual ao workspace e
+a permissão global `group/manage`. Essa permissão administra grupos e integrantes; ela não concede
+leitura nem acesso a conteúdo. A permissão pode ser atribuída pelo modelo `role_permission`, mas a
+API de administração de papéis ainda não está disponível.
+
+**`GET /workspaces/{workspaceId}/groups`** lista os grupos do workspace, ordenados por nome e ID.
+Responde `200` com uma lista de `{ "id": "uuid", "name": "Equipe" }`, inclusive quando vazia.
+
+**`POST /workspaces/{workspaceId}/groups`** cria um grupo e responde `201` com `{ "id": "uuid",
+"name": "Equipe" }`. O corpo é `{ "name": string }`: o nome é obrigatório, tem de 1 a 50
+caracteres e espaços nas pontas são removidos. Nomes que conflitam após normalização de caixa,
+acentos e espaços retornam `409` dentro do mesmo workspace.
+
+**`PUT /workspaces/{workspaceId}/groups/{groupId}`** renomeia o grupo usando o mesmo corpo e as
+mesmas regras de validação. Responde `200` com o grupo atualizado; conflito de nome retorna `409`.
+Renomear não altera seus integrantes. Enviar o nome atual não cria evento de histórico.
+
+**`DELETE /workspaces/{workspaceId}/groups/{groupId}`** exclui um grupo vazio e responde `204`.
+Grupo com integrantes retorna `409`; os vínculos precisam ser removidos antes. O backend ainda não
+implementa concessões de acesso de conteúdo a grupos nem compartilhamento/herança de pastas (#132),
+portanto esta rota não documenta nem promete comportamento sobre concessões futuras.
+
+**`GET /workspaces/{workspaceId}/groups/{groupId}/members`** lista integrantes atuais com os campos
+`workspaceMemberId`, `userId`, `name` e `email`. `workspaceMemberId` identifica o vínculo atual ao
+workspace usado para adicionar/remover a pessoa; não é o ID do usuário. O grupo só referencia a
+membership atual, então uma readmissão posterior não recria automaticamente a associação.
+
+**`PUT /workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}`** adiciona o vínculo
+atual identificado pelo `workspaceMemberId` e responde `204`. A membership precisa pertencer ao
+workspace da rota; ID inexistente ou de outro workspace retorna `404`. Repetir a inclusão é
+idempotente e não gera outro evento de histórico.
+
+**`DELETE /workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}`** remove a
+associação e responde `204`. Repetir a remoção também responde `204` e não cria outro evento.
+
+Nas rotas de grupo, `401` indica ausência de autenticação, `403` indica falta de vínculo ou da
+permissão `group/manage`, e `404` indica workspace/grupo inexistente ou fora do workspace. Corpo
+inválido responde `400`; nome duplicado e tentativa de excluir grupo com integrantes respondem
+`409`.
+
+Criação, renomeação, exclusão e alterações reais de integrantes são registradas no histórico. Os
+eventos de administração de grupo são exclusivos do proprietário do workspace; usuários delegados
+com `group/manage` não veem esse histórico. As rotas de grupo ainda não emitem notificações de mudança
+de acesso; quando essa integração for feita, deve chamar `NotificationService.accessChanged(Collection<UUID>)`
+na transação relevante. A migration V19 de grupos sucede a V18 de notificações.
+
 ## Histórico de atividades
 
 **`GET /workspaces/{workspaceId}/activity`** — autenticado pelo cookie `accessToken`; exige
@@ -436,9 +502,10 @@ para a mais antiga, com ID como desempate. O total e as páginas contam apenas e
 usuário. `action` aceita `folder_created`, `folder_renamed`, `folder_deleted`, `item_created`,
 `item_updated`, `item_archived`, `item_restored`, `item_deleted`, `member_invited`, `member_joined`,
 `member_role_changed`, `member_removed`, `member_invite_revoked`, `member_invite_declined`,
-`workspace_renamed`, `role_created`, `role_deleted` ou `role_permissions_changed`; `resourceType`
-aceita `folder`, `item`, `member`, `workspace` ou `role`. Os valores são sensíveis a maiúsculas e
-minúsculas. Valor desconhecido, intervalo invertido ou paginação inválida responde `400`.
+`workspace_renamed`, `role_created`, `role_deleted`, `role_permissions_changed`, `group_created`,
+`group_renamed`, `group_deleted`, `group_member_added` ou `group_member_removed`; `resourceType`
+aceita `folder`, `item`, `member`, `workspace`, `role` ou `group`. Os valores são sensíveis a
+maiúsculas e minúsculas. Valor desconhecido, intervalo invertido ou paginação inválida responde `400`.
 
 O proprietário vê todo o histórico do workspace. Para os demais usuários, são retornados somente
 eventos de itens e pastas ainda existentes no mesmo workspace, respeitando `item/read` ou
@@ -474,6 +541,76 @@ Sucesso (`200`):
 | `403` | sem `activity/read` |
 | `404` | workspace não encontrado ou sem vínculo |
 
+## Notificações
+
+As notificações são avisos fixos de conta e acesso. A migration `V18` cria a tabela `notification`,
+com chave estrangeira para o destinatário (`ON DELETE CASCADE`) e índice por destinatário e data.
+`V19` está reservada para outra issue. O campo `metadata` contém o identificador do evento, por
+exemplo `{ "event": "PROFILE_UPDATED" }`; os títulos e textos são fixos e não incluem referências,
+títulos de recursos, links nem segredos. Notificações não concedem nem verificam acesso a recursos.
+
+**`GET /notifications?page=0&size=20`** — autenticado (cookie `accessToken`).
+
+Lista somente as notificações do usuário autenticado, da mais recente para a mais antiga (ID como
+desempate). `page` começa em `0` (padrão `0`) e `size` tem padrão `20`. A requisição responde `400`
+se `page` for negativo, se `size` estiver fora do intervalo `1`–`100`, ou se `page × size` exceder
+`2147483647`, limite do deslocamento da paginação JPA.
+
+Sucesso (`200`):
+```json
+{
+  "notifications": [{
+    "id": "uuid",
+    "title": "Dados da conta atualizados",
+    "content": "Os dados da sua conta foram atualizados.",
+    "metadata": { "event": "PROFILE_UPDATED" },
+    "readAt": null,
+    "createdAt": "2026-10-26T12:00:00Z"
+  }],
+  "page": 0,
+  "size": 20,
+  "totalItems": 1,
+  "totalPages": 1
+}
+```
+
+**`PATCH /notifications/{notificationId}/read`** — autenticado (cookie `accessToken`).
+
+Marca como lida uma notificação pertencente ao usuário autenticado. Repetir a chamada é seguro e
+preserva o `readAt` original. ID inexistente ou pertencente a outro usuário responde `404`.
+
+| | |
+|---|---|
+| Sucesso | `204`, corpo vazio |
+| `401` | não autenticado |
+| `404` | notificação inexistente ou não pertencente ao usuário |
+
+**`GET /notifications/stream`** — autenticado (cookie `accessToken`), `text/event-stream`.
+
+Abre um stream SSE por usuário. São permitidas até cinco conexões simultâneas por usuário; uma
+conexão adicional responde `429`. Cada stream expira após 30 minutos e deve ser reaberto pelo
+cliente. Ao receber uma notificação, o stream envia o evento `notification`, com o ID da
+notificação como `id` SSE e como dado JSON (string UUID), por exemplo:
+
+```text
+event:notification
+id:8e8a9d8f-3c94-4d22-a290-598566ea5b16
+data:"8e8a9d8f-3c94-4d22-a290-598566ea5b16"
+```
+
+A notificação é persistida antes da emissão, que ocorre somente após o commit da transação. A
+entrega em tempo real é best effort: o cliente deve chamar `GET /notifications` ao conectar e ao
+reconectar para recuperar avisos persistidos. Falha ou desconexão do stream não desfaz a operação
+que originou o aviso.
+
+Trocas de perfil (`PATCH /me`) e senha (`PATCH /me/password`) geram os eventos fixos
+`PROFILE_UPDATED` e `PASSWORD_CHANGED`. Produtores futuros de mudanças de acesso podem chamar
+`NotificationService.accessChanged(Collection<UUID> affectedRecipients)`, que deduplica os IDs e
+emite o aviso fixo `ACCESS_CHANGED`. Os CRUDs de papéis, grupos, compartilhamentos e herança de
+permissões ainda não existem; a integração futura está prevista na issue #130 e no trabalho de
+gestão de papéis. Portanto, esta issue não completa o fan-out efetivo dessas alterações nem os
+eventos role-permission end-to-end (CA01).
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
@@ -496,6 +633,17 @@ Sucesso (`200`):
 | RF30 | POST | `/workspaces/{workspaceId}/items/attachments` | Cookie `accessToken` |
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
+| RF29 | PUT | `/workspaces/{workspaceId}/items/{itemId}` | Cookie `accessToken` |
 | RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
 | RF31 | POST | `/workspaces/{workspaceId}/items/{itemId}/archive` | Cookie `accessToken` |
 | RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
+| RF— | GET | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |
+| RF— | POST | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |
+| RF— | PUT | `/workspaces/{workspaceId}/groups/{groupId}` | Cookie `accessToken` + `group/manage` |
+| RF— | DELETE | `/workspaces/{workspaceId}/groups/{groupId}` | Cookie `accessToken` + `group/manage` |
+| RF— | GET | `/workspaces/{workspaceId}/groups/{groupId}/members` | Cookie `accessToken` + `group/manage` |
+| RF— | PUT | `/workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}` | Cookie `accessToken` + `group/manage` |
+| RF— | DELETE | `/workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}` | Cookie `accessToken` + `group/manage` |
+| — | GET | `/notifications` | Cookie `accessToken` |
+| — | PATCH | `/notifications/{notificationId}/read` | Cookie `accessToken` |
+| — | GET | `/notifications/stream` | Cookie `accessToken` |

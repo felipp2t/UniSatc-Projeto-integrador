@@ -7,6 +7,7 @@ import com.vaulty.api.dto.item.ItemPageResponse;
 import com.vaulty.api.dto.item.ItemResponse;
 import com.vaulty.api.dto.item.SecretValueResponse;
 import com.vaulty.api.dto.item.UpdateItemMetadataRequest;
+import com.vaulty.api.dto.item.UpdateItemRequest;
 import com.vaulty.api.service.AttachmentDownload;
 import com.vaulty.api.service.WorkspaceItemAttachmentService;
 import com.vaulty.api.service.WorkspaceItemService;
@@ -72,6 +73,14 @@ public class WorkspaceItemController implements WorkspaceItemControllerDocs {
                                         @PathVariable UUID itemId) {
         itemService.archive(userId, workspaceId, itemId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{itemId}")
+    public ResponseEntity<ItemResponse> update(@AuthenticationPrincipal UUID userId,
+                                               @PathVariable UUID workspaceId,
+                                               @PathVariable UUID itemId,
+                                               @Valid @RequestBody UpdateItemRequest request) {
+        return ResponseEntity.ok(itemService.update(userId, workspaceId, itemId, request));
     }
 
     @GetMapping("/{itemId}/attachment")
