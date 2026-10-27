@@ -40,7 +40,9 @@ export function PendingInvitesSection() {
       <ErrorState
         error={invites.error}
         message='Não foi possível carregar os convites pendentes.'
-        onRetry={invites.refetch}
+        onRetry={async () => {
+          await invites.refetch()
+        }}
       />
     )
   }
