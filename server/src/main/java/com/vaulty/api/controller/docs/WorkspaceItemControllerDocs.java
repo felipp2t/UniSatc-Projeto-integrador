@@ -6,6 +6,7 @@ import com.vaulty.api.dto.item.ItemPageResponse;
 import com.vaulty.api.dto.item.ItemResponse;
 import com.vaulty.api.dto.item.SecretValueResponse;
 import com.vaulty.api.dto.item.UpdateItemMetadataRequest;
+import com.vaulty.api.dto.item.UpdateItemRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,13 +33,25 @@ public interface WorkspaceItemControllerDocs {
     ResponseEntity<AttachmentResponse> replaceAttachment(@Parameter(hidden = true) UUID userId,
                                                          UUID workspaceId, UUID itemId, MultipartFile file);
 
-    @Operation(summary = "Atualiza o título, a descrição e a pasta de um item com anexo")
+    @Operation(summary = "Atualiza o título e a descrição de um item com anexo")
     @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "400"),
         @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
         @ApiResponse(responseCode = "409")})
     ResponseEntity<Void> updateAttachmentMetadata(@Parameter(hidden = true) UUID userId,
                                                   UUID workspaceId, UUID itemId,
                                                   UpdateItemMetadataRequest request);
+
+    @Operation(summary = "Arquiva um item")
+    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404"), @ApiResponse(responseCode = "409")})
+    ResponseEntity<Void> archive(@Parameter(hidden = true) UUID userId, UUID workspaceId, UUID itemId);
+
+    @Operation(summary = "Atualiza título e conteúdo de um item de texto, link ou segredo")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
+        @ApiResponse(responseCode = "409")})
+    ResponseEntity<ItemResponse> update(@Parameter(hidden = true) UUID userId,
+                                        UUID workspaceId, UUID itemId, UpdateItemRequest request);
 
     @Operation(summary = "Baixa ou visualiza um anexo autorizado")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
