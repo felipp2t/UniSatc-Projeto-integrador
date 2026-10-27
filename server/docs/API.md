@@ -3,7 +3,7 @@
 Referência detalhada de cada endpoint implementado no backend Java. Para instruções de setup e
 bootstrap do banco, veja [`../README.md`](../README.md).
 
-Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados; decisões novas de grupos, compartilhamento, remoção e readmissão ainda exigem conferência de implementação e não são presumidas como concluídas.
+Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados; grupos, concessões e herança de permissões não existem nesta branch e pertencem às issues #132/#133.
 
 Convenções gerais:
 - Todas as respostas de erro seguem o mesmo formato JSON (`GlobalExceptionHandler`):
@@ -28,14 +28,20 @@ Convenções gerais:
 - Não existe cadastro público: uma conta só nasce quando o dono do workspace envia um convite
   (RF10) e o convidado conclui o cadastro com o token recebido por e-mail (RF01/RF11), entrando no
   workspace único da empresa com o papel `Member` (acesso inicial, sem RBAC granular ainda).
-- **Início do RNF04** (autorização por permissão no próprio token): o `accessToken` carrega uma
-  claim `role` com o nome do papel do usuário no workspace (`Owner` ou `Member`, por enquanto —
-  ainda não existem papéis customizados nem permissões granulares por recurso/ação). A claim é
-  calculada a cada emissão/renovação de token (login, registro, refresh), nunca lida do banco a
-  cada requisição. `JwtAuthenticationFilter` expõe isso como uma `GrantedAuthority` do Spring
-  Security, pronta para checagens futuras (`hasAuthority(...)`) quando RBAC granular existir.
-  Identidade e papel são extraídos de uma única validação do JWT. Tokens antigos sem `role`
-  continuam autenticados, mas não recebem authorities.
+- Cada sessão está vinculada a um `workspace_member.id`: o JWT de acesso contém `membershipId` e
+  o refresh token persistido referencia o mesmo vínculo. Em cada requisição autenticada,
+  `JwtAuthenticationFilter` confirma no banco que o vínculo ainda existe para o usuário do JWT e
+  usa o papel atual do vínculo como authority. O access token legado sem `membershipId` não
+  autentica e recebe `401`; o papel do banco é atualizado efetivamente por requisição, sem esperar
+  o limite de validade de até 15 minutos do JWT.
+- Excluir um vínculo invalida imediatamente os access tokens associados e a FK com `ON DELETE
+  CASCADE` remove seus refresh tokens. Uma readmissão cria outro vínculo e não recupera a sessão
+  anterior. A migration V20 associa refresh tokens existentes ao vínculo atual do usuário e
+  descarta os que não têm vínculo. Portanto, um refresh migrado ainda válido de um membro atual
+  pode emitir novo par de tokens; login sem vínculo não emite sessão.
+- Isso documenta somente o comportamento implementado nesta branch. Grupos, concessões, herança e
+  validação granular completa de conteúdo não existem aqui e pertencem às issues #132/#133; não se
+  afirma atendimento integral ao RNF04.
 
 ---
 
@@ -164,8 +170,11 @@ O que a função faz:
 2. Busca esse token na tabela `refresh_token` (`401` se não existir).
 3. Confere se ele expirou (`401` se sim, sem tentar apagar dentro da transação que será revertida).
 4. Se estiver válido, deleta o token encontrado (uso único — todo refresh invalida o anterior).
-5. Emite um novo access token + um novo refresh token (rotação), devolvidos como cookies. Tokens
-   expirados são removidos pela manutenção agendada.
+5. Confirma que o vínculo de workspace associado ao refresh token ainda existe para o usuário.
+   Se existir, emite um novo access token com `membershipId` e um novo refresh token ligado ao
+   vínculo atual (rotação), devolvidos como cookies. Isso também permite migrar um refresh token
+   pré-V20 que a migration associou ao vínculo atual. Vínculo removido ou inexistente resulta em
+   `401`; tokens expirados são removidos pela manutenção agendada.
 
 | | |
 |---|---|
