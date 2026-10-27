@@ -3,7 +3,7 @@
 Referência detalhada de cada endpoint implementado no backend Java. Para instruções de setup e
 bootstrap do banco, veja [`../README.md`](../README.md).
 
-Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados; grupos, concessões e herança de permissões não existem nesta branch e pertencem às issues #132/#133.
+Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados. A gestão de grupos de acesso está disponível e cada sessão é vinculada ao vínculo atual do membro no workspace; tokens antigos não são reativados por readmissão. Compartilhamento/herança de pastas com grupos (#132/#133) e rotas de remoção de usuários continuam fora deste contrato.
 
 Convenções gerais:
 - Todas as respostas de erro seguem o mesmo formato JSON (`GlobalExceptionHandler`):
@@ -419,6 +419,54 @@ atividades sem incluir bytes nem chave do storage.
 Se `app.storage.s3.bucket` não estiver configurado, a aplicação inicia sem storage e as rotas de
 upload, substituição e download retornam `503 Service Unavailable`.
 
+## Gestão de grupos de acesso
+
+Todas as rotas abaixo exigem autenticação pelo cookie `accessToken`, vínculo atual ao workspace e
+a permissão global `group/manage`. Essa permissão administra grupos e integrantes; ela não concede
+leitura nem acesso a conteúdo. A permissão pode ser atribuída pelo modelo `role_permission`, mas a
+API de administração de papéis ainda não está disponível.
+
+**`GET /workspaces/{workspaceId}/groups`** lista os grupos do workspace, ordenados por nome e ID.
+Responde `200` com uma lista de `{ "id": "uuid", "name": "Equipe" }`, inclusive quando vazia.
+
+**`POST /workspaces/{workspaceId}/groups`** cria um grupo e responde `201` com `{ "id": "uuid",
+"name": "Equipe" }`. O corpo é `{ "name": string }`: o nome é obrigatório, tem de 1 a 50
+caracteres e espaços nas pontas são removidos. Nomes que conflitam após normalização de caixa,
+acentos e espaços retornam `409` dentro do mesmo workspace.
+
+**`PUT /workspaces/{workspaceId}/groups/{groupId}`** renomeia o grupo usando o mesmo corpo e as
+mesmas regras de validação. Responde `200` com o grupo atualizado; conflito de nome retorna `409`.
+Renomear não altera seus integrantes. Enviar o nome atual não cria evento de histórico.
+
+**`DELETE /workspaces/{workspaceId}/groups/{groupId}`** exclui um grupo vazio e responde `204`.
+Grupo com integrantes retorna `409`; os vínculos precisam ser removidos antes. O backend ainda não
+implementa concessões de acesso de conteúdo a grupos nem compartilhamento/herança de pastas (#132),
+portanto esta rota não documenta nem promete comportamento sobre concessões futuras.
+
+**`GET /workspaces/{workspaceId}/groups/{groupId}/members`** lista integrantes atuais com os campos
+`workspaceMemberId`, `userId`, `name` e `email`. `workspaceMemberId` identifica o vínculo atual ao
+workspace usado para adicionar/remover a pessoa; não é o ID do usuário. O grupo só referencia a
+membership atual, então uma readmissão posterior não recria automaticamente a associação.
+
+**`PUT /workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}`** adiciona o vínculo
+atual identificado pelo `workspaceMemberId` e responde `204`. A membership precisa pertencer ao
+workspace da rota; ID inexistente ou de outro workspace retorna `404`. Repetir a inclusão é
+idempotente e não gera outro evento de histórico.
+
+**`DELETE /workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}`** remove a
+associação e responde `204`. Repetir a remoção também responde `204` e não cria outro evento.
+
+Nas rotas de grupo, `401` indica ausência de autenticação, `403` indica falta de vínculo ou da
+permissão `group/manage`, e `404` indica workspace/grupo inexistente ou fora do workspace. Corpo
+inválido responde `400`; nome duplicado e tentativa de excluir grupo com integrantes respondem
+`409`.
+
+Criação, renomeação, exclusão e alterações reais de integrantes são registradas no histórico. Os
+eventos de administração de grupo são exclusivos do proprietário do workspace; usuários delegados
+com `group/manage` não veem esse histórico. As rotas de grupo ainda não emitem notificações de mudança
+de acesso; quando essa integração for feita, deve chamar `NotificationService.accessChanged(Collection<UUID>)`
+na transação relevante. A migration V19 de grupos sucede a V18 de notificações.
+
 ## Histórico de atividades
 
 **`GET /workspaces/{workspaceId}/activity`** — autenticado pelo cookie `accessToken`; exige
@@ -430,9 +478,10 @@ para a mais antiga, com ID como desempate. O total e as páginas contam apenas e
 usuário. `action` aceita `folder_created`, `folder_renamed`, `folder_deleted`, `item_created`,
 `item_updated`, `item_archived`, `item_restored`, `item_deleted`, `member_invited`, `member_joined`,
 `member_role_changed`, `member_removed`, `member_invite_revoked`, `member_invite_declined`,
-`workspace_renamed`, `role_created`, `role_deleted` ou `role_permissions_changed`; `resourceType`
-aceita `folder`, `item`, `member`, `workspace` ou `role`. Os valores são sensíveis a maiúsculas e
-minúsculas. Valor desconhecido, intervalo invertido ou paginação inválida responde `400`.
+`workspace_renamed`, `role_created`, `role_deleted`, `role_permissions_changed`, `group_created`,
+`group_renamed`, `group_deleted`, `group_member_added` ou `group_member_removed`; `resourceType`
+aceita `folder`, `item`, `member`, `workspace`, `role` ou `group`. Os valores são sensíveis a
+maiúsculas e minúsculas. Valor desconhecido, intervalo invertido ou paginação inválida responde `400`.
 
 O proprietário vê todo o histórico do workspace. Para os demais usuários, são retornados somente
 eventos de itens e pastas ainda existentes no mesmo workspace, respeitando `item/read` ou
@@ -468,6 +517,76 @@ Sucesso (`200`):
 | `403` | sem `activity/read` |
 | `404` | workspace não encontrado ou sem vínculo |
 
+## Notificações
+
+As notificações são avisos fixos de conta e acesso. A migration `V18` cria a tabela `notification`,
+com chave estrangeira para o destinatário (`ON DELETE CASCADE`) e índice por destinatário e data.
+`V19` está reservada para outra issue. O campo `metadata` contém o identificador do evento, por
+exemplo `{ "event": "PROFILE_UPDATED" }`; os títulos e textos são fixos e não incluem referências,
+títulos de recursos, links nem segredos. Notificações não concedem nem verificam acesso a recursos.
+
+**`GET /notifications?page=0&size=20`** — autenticado (cookie `accessToken`).
+
+Lista somente as notificações do usuário autenticado, da mais recente para a mais antiga (ID como
+desempate). `page` começa em `0` (padrão `0`) e `size` tem padrão `20`. A requisição responde `400`
+se `page` for negativo, se `size` estiver fora do intervalo `1`–`100`, ou se `page × size` exceder
+`2147483647`, limite do deslocamento da paginação JPA.
+
+Sucesso (`200`):
+```json
+{
+  "notifications": [{
+    "id": "uuid",
+    "title": "Dados da conta atualizados",
+    "content": "Os dados da sua conta foram atualizados.",
+    "metadata": { "event": "PROFILE_UPDATED" },
+    "readAt": null,
+    "createdAt": "2026-10-26T12:00:00Z"
+  }],
+  "page": 0,
+  "size": 20,
+  "totalItems": 1,
+  "totalPages": 1
+}
+```
+
+**`PATCH /notifications/{notificationId}/read`** — autenticado (cookie `accessToken`).
+
+Marca como lida uma notificação pertencente ao usuário autenticado. Repetir a chamada é seguro e
+preserva o `readAt` original. ID inexistente ou pertencente a outro usuário responde `404`.
+
+| | |
+|---|---|
+| Sucesso | `204`, corpo vazio |
+| `401` | não autenticado |
+| `404` | notificação inexistente ou não pertencente ao usuário |
+
+**`GET /notifications/stream`** — autenticado (cookie `accessToken`), `text/event-stream`.
+
+Abre um stream SSE por usuário. São permitidas até cinco conexões simultâneas por usuário; uma
+conexão adicional responde `429`. Cada stream expira após 30 minutos e deve ser reaberto pelo
+cliente. Ao receber uma notificação, o stream envia o evento `notification`, com o ID da
+notificação como `id` SSE e como dado JSON (string UUID), por exemplo:
+
+```text
+event:notification
+id:8e8a9d8f-3c94-4d22-a290-598566ea5b16
+data:"8e8a9d8f-3c94-4d22-a290-598566ea5b16"
+```
+
+A notificação é persistida antes da emissão, que ocorre somente após o commit da transação. A
+entrega em tempo real é best effort: o cliente deve chamar `GET /notifications` ao conectar e ao
+reconectar para recuperar avisos persistidos. Falha ou desconexão do stream não desfaz a operação
+que originou o aviso.
+
+Trocas de perfil (`PATCH /me`) e senha (`PATCH /me/password`) geram os eventos fixos
+`PROFILE_UPDATED` e `PASSWORD_CHANGED`. Produtores futuros de mudanças de acesso podem chamar
+`NotificationService.accessChanged(Collection<UUID> affectedRecipients)`, que deduplica os IDs e
+emite o aviso fixo `ACCESS_CHANGED`. Os CRUDs de papéis, grupos, compartilhamentos e herança de
+permissões ainda não existem; a integração futura está prevista na issue #130 e no trabalho de
+gestão de papéis. Portanto, esta issue não completa o fan-out efetivo dessas alterações nem os
+eventos role-permission end-to-end (CA01).
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
@@ -492,3 +611,13 @@ Sucesso (`200`):
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
 | RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
 | RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
+| RF— | GET | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |
+| RF— | POST | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |
+| RF— | PUT | `/workspaces/{workspaceId}/groups/{groupId}` | Cookie `accessToken` + `group/manage` |
+| RF— | DELETE | `/workspaces/{workspaceId}/groups/{groupId}` | Cookie `accessToken` + `group/manage` |
+| RF— | GET | `/workspaces/{workspaceId}/groups/{groupId}/members` | Cookie `accessToken` + `group/manage` |
+| RF— | PUT | `/workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}` | Cookie `accessToken` + `group/manage` |
+| RF— | DELETE | `/workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}` | Cookie `accessToken` + `group/manage` |
+| — | GET | `/notifications` | Cookie `accessToken` |
+| — | PATCH | `/notifications/{notificationId}/read` | Cookie `accessToken` |
+| — | GET | `/notifications/stream` | Cookie `accessToken` |
