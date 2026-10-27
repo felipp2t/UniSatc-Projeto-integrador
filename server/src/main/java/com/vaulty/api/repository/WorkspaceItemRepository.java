@@ -39,7 +39,6 @@ public interface WorkspaceItemRepository extends JpaRepository<WorkspaceItem, UU
             """)
     Optional<WorkspaceItem> findIncludingArchived(@Param("itemId") UUID itemId,
                                                   @Param("workspaceId") UUID workspaceId);
-
     @Lock(LockModeType.PESSIMISTIC_READ)
     @Query("""
             select item from WorkspaceItem item

@@ -139,6 +139,26 @@ public class WorkspaceItemService {
     }
 
     @Transactional
+    public void restore(UUID userId, UUID workspaceId, UUID itemId) {
+        Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
+        authorization.require(userId, workspace, "item", "update");
+        var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        if ("secret".equals(item.getType())) {
+            if (!authorization.allows(userId, workspace, "secret", "read")) {
+                throw new ResourceNotFoundException("Item indisponível");
+            }
+            authorization.require(userId, workspace, "secret", "update");
+        }
+        if (item.getArchivedAt() == null) {
+            throw new ConflictException("Item não está arquivado");
+        }
+        item.setArchivedAt(null);
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_RESTORED,
+                ActivityResourceType.ITEM, itemId, Map.of("type", item.getType(), "title", item.getTitle()));
+    }
+
+    @Transactional
     public void archive(UUID userId, UUID workspaceId, UUID itemId) {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "update");
