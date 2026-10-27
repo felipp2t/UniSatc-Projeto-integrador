@@ -19,16 +19,18 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     private final CredentialService credentialService;
+    private final NotificationService notificationService;
 
     public UserService(
             UserRepository userRepository,
 
             PasswordEncoder passwordEncoder,
-
-            CredentialService credentialService) {
+            CredentialService credentialService,
+            NotificationService notificationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.credentialService = credentialService;
+        this.notificationService = notificationService;
     }
 
     public User getMe(UUID userId) {
@@ -41,6 +43,7 @@ public class UserService {
         User user = getMe(userId);
         user.setName(request.name());
         userRepository.save(user);
+        notificationService.profileUpdated(userId);
     }
 
     @Transactional
