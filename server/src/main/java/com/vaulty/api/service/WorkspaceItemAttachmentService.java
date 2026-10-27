@@ -158,12 +158,8 @@ public class WorkspaceItemAttachmentService {
         var file = fileRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Anexo não encontrado"));
         var before = itemSnapshot(item, file);
-        var collection = request.collectionId() == null ? null
-                : collectionRepository.findByIdAndWorkspaceId(request.collectionId(), workspaceId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
         item.setTitle(request.title().trim());
         item.setDescription(description);
-        item.setCollection(collection);
         try {
             itemRepository.saveAndFlush(item);
             activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_UPDATED,
@@ -186,6 +182,10 @@ public class WorkspaceItemAttachmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Anexo não encontrado"));
         return new AttachmentDownload(requireStorage().get(file.getStorageKey()), file.getOriginalName(), file.getMimeType(),
                 "application/pdf".equals(file.getMimeType()) || file.getMimeType().startsWith("image/"));
+    }
+
+    public void deleteObjectAfterCommit(UUID itemId) {
+        fileRepository.findById(itemId).ifPresent(file -> deleteOldAfterCommit(file.getStorageKey()));
     }
 
     private WorkspaceItem attachmentItemForRead(UUID workspaceId, UUID itemId) {

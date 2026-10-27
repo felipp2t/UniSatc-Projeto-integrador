@@ -1,5 +1,7 @@
 package com.vaulty.api.config;
 
+import com.vaulty.api.entity.WorkspaceMember;
+import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -9,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -21,9 +24,18 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final WorkspaceMemberRepository workspaceMemberRepository;
 
+    @Autowired
+    public JwtAuthenticationFilter(JwtService jwtService, WorkspaceMemberRepository workspaceMemberRepository) {
+        this.jwtService = jwtService;
+        this.workspaceMemberRepository = workspaceMemberRepository;
+    }
+
+    // Permite construir o filtro em chamadas legadas; sem repositório, nenhum token autentica.
     public JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService;
+        this.workspaceMemberRepository = null;
     }
 
     @Override
@@ -36,7 +48,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         extractAccessTokenCookie(request)
                 .flatMap(jwtService::validateAccessToken)
-                .ifPresent(this::authenticate);
+                .ifPresent(claims -> {
+                    if (workspaceMemberRepository != null) {
+                        workspaceMemberRepository.findByIdAndUserId(claims.membershipId(), claims.userId())
+                                .ifPresent(member -> authenticate(claims, member));
+                    }
+                });
 
         filterChain.doFilter(request, response);
     }
@@ -52,10 +69,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .findFirst();
     }
 
-    private void authenticate(JwtService.AccessTokenClaims claims) {
-        List<GrantedAuthority> authorities = claims.role() == null
-                ? List.of()
-                : List.of(new SimpleGrantedAuthority(claims.role()));
+    private void authenticate(JwtService.AccessTokenClaims claims, WorkspaceMember member) {
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(member.getRole().getName()));
         var authentication = new UsernamePasswordAuthenticationToken(claims.userId(), null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
