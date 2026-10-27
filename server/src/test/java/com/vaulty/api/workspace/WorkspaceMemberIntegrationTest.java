@@ -4,14 +4,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.RolePermission;
 import com.vaulty.api.entity.WorkspaceRole;
+import jakarta.persistence.EntityManager;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.junit.jupiter.api.Test;
 
 class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
+
+    @Autowired private EntityManager entityManager;
+    @Autowired private ObjectMapper objectMapper;
 
     @Test
     void ownerGetsEveryActionForEveryResource() throws Exception {
@@ -109,6 +118,67 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(get("/workspaces/{workspaceId}/members", workspace.id()).cookie(authCookie(member)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void nonOwnerSeesMemberNamesAndRolesButNoEmailIncludingTheirOwn() throws Exception {
+        User owner = createUser("Proprietário");
+        User member = createUser("Membro");
+        WorkspaceResponse workspace = configureWorkspace(owner);
+        addMember(member, workspace.id());
+
+        String response = mockMvc.perform(get("/workspaces/{workspaceId}/members", workspace.id())
+                        .cookie(authCookie(member)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Map<String, Object>> members = objectMapper.readValue(response, new TypeReference<>() {});
+
+        assertThat(members).hasSize(2).allSatisfy(memberJson -> {
+            assertThat(memberJson).containsKeys("userId", "name", "roleName").doesNotContainKey("email");
+        });
+        assertThat(members).anySatisfy(memberJson -> assertThat(memberJson)
+                .containsEntry("userId", owner.getId().toString())
+                .containsEntry("name", "Proprietário")
+                .containsEntry("roleName", "Owner"));
+        assertThat(members).anySatisfy(memberJson -> assertThat(memberJson)
+                .containsEntry("userId", member.getId().toString())
+                .containsEntry("name", "Membro")
+                .containsEntry("roleName", "Member"));
+    }
+
+    @Test
+    void memberEmailVisibilityFollowsCurrentDatabaseOwnerInsteadOfJwtRoleClaim() throws Exception {
+        User formerOwner = createUser("Proprietário anterior");
+        User currentOwner = createUser("Novo proprietário");
+        WorkspaceResponse workspaceResponse = configureWorkspace(formerOwner);
+        addMember(currentOwner, workspaceResponse.id());
+        var formerOwnerCookie = authCookie(formerOwner);
+
+        var workspace = workspaceRepository.findById(workspaceResponse.id()).orElseThrow();
+        workspace.setOwner(currentOwner);
+        workspaceRepository.saveAndFlush(workspace);
+        entityManager.clear();
+
+        String formerOwnerResponse = mockMvc.perform(get("/workspaces/{workspaceId}/members", workspaceResponse.id())
+                        .cookie(formerOwnerCookie))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Map<String, Object>> formerOwnerMembers = objectMapper.readValue(
+                formerOwnerResponse, new TypeReference<>() {});
+        assertThat(formerOwnerMembers).hasSize(2).allSatisfy(memberJson ->
+                assertThat(memberJson).doesNotContainKey("email"));
+
+        String currentOwnerResponse = mockMvc.perform(get("/workspaces/{workspaceId}/members", workspaceResponse.id())
+                        .cookie(authCookie(currentOwner)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Map<String, Object>> currentOwnerMembers = objectMapper.readValue(
+                currentOwnerResponse, new TypeReference<>() {});
+        assertThat(currentOwnerMembers).hasSize(2).allSatisfy(memberJson ->
+                assertThat(memberJson).containsKey("email"));
+        assertThat(currentOwnerMembers).anySatisfy(memberJson -> assertThat(memberJson)
+                .containsEntry("userId", currentOwner.getId().toString())
+                .containsEntry("email", currentOwner.getEmail()));
     }
 
     @Test

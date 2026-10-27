@@ -107,10 +107,10 @@ public class AuthService {
     @Transactional
     public TokenPair login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new InvalidCredentialsException("Credenciais inválidas"));
+                .orElseThrow(() -> new InvalidCredentialsException("E-mail ou senha inválidos"));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new InvalidCredentialsException("Credenciais inválidas");
+            throw new InvalidCredentialsException("E-mail ou senha inválidos");
         }
 
         return issueTokenPair(user.getId());
