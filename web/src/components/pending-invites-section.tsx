@@ -14,6 +14,9 @@ export function PendingInvitesSection() {
     queryFn: async () => (await inviteApi.list()).data,
     queryKey: ['invites'],
   })
+  const handleRetry = useCallback(async () => {
+    await invites.refetch()
+  }, [invites.refetch])
   const revokeInvite = useMutation({
     mutationFn: inviteApi.revoke,
     onError: () => appToast.error('Não foi possível revogar o convite.'),
@@ -40,9 +43,7 @@ export function PendingInvitesSection() {
       <ErrorState
         error={invites.error}
         message='Não foi possível carregar os convites pendentes.'
-        onRetry={async () => {
-          await invites.refetch()
-        }}
+        onRetry={handleRetry}
       />
     )
   }
