@@ -459,6 +459,76 @@ Sucesso (`200`):
 | `403` | sem `activity/read` |
 | `404` | workspace não encontrado ou sem vínculo |
 
+## Notificações
+
+As notificações são avisos fixos de conta e acesso. A migration `V18` cria a tabela `notification`,
+com chave estrangeira para o destinatário (`ON DELETE CASCADE`) e índice por destinatário e data.
+`V19` está reservada para outra issue. O campo `metadata` contém o identificador do evento, por
+exemplo `{ "event": "PROFILE_UPDATED" }`; os títulos e textos são fixos e não incluem referências,
+títulos de recursos, links nem segredos. Notificações não concedem nem verificam acesso a recursos.
+
+**`GET /notifications?page=0&size=20`** — autenticado (cookie `accessToken`).
+
+Lista somente as notificações do usuário autenticado, da mais recente para a mais antiga (ID como
+desempate). `page` começa em `0` (padrão `0`) e `size` tem padrão `20`. A requisição responde `400`
+se `page` for negativo, se `size` estiver fora do intervalo `1`–`100`, ou se `page × size` exceder
+`2147483647`, limite do deslocamento da paginação JPA.
+
+Sucesso (`200`):
+```json
+{
+  "notifications": [{
+    "id": "uuid",
+    "title": "Dados da conta atualizados",
+    "content": "Os dados da sua conta foram atualizados.",
+    "metadata": { "event": "PROFILE_UPDATED" },
+    "readAt": null,
+    "createdAt": "2026-10-26T12:00:00Z"
+  }],
+  "page": 0,
+  "size": 20,
+  "totalItems": 1,
+  "totalPages": 1
+}
+```
+
+**`PATCH /notifications/{notificationId}/read`** — autenticado (cookie `accessToken`).
+
+Marca como lida uma notificação pertencente ao usuário autenticado. Repetir a chamada é seguro e
+preserva o `readAt` original. ID inexistente ou pertencente a outro usuário responde `404`.
+
+| | |
+|---|---|
+| Sucesso | `204`, corpo vazio |
+| `401` | não autenticado |
+| `404` | notificação inexistente ou não pertencente ao usuário |
+
+**`GET /notifications/stream`** — autenticado (cookie `accessToken`), `text/event-stream`.
+
+Abre um stream SSE por usuário. São permitidas até cinco conexões simultâneas por usuário; uma
+conexão adicional responde `429`. Cada stream expira após 30 minutos e deve ser reaberto pelo
+cliente. Ao receber uma notificação, o stream envia o evento `notification`, com o ID da
+notificação como `id` SSE e como dado JSON (string UUID), por exemplo:
+
+```text
+event:notification
+id:8e8a9d8f-3c94-4d22-a290-598566ea5b16
+data:"8e8a9d8f-3c94-4d22-a290-598566ea5b16"
+```
+
+A notificação é persistida antes da emissão, que ocorre somente após o commit da transação. A
+entrega em tempo real é best effort: o cliente deve chamar `GET /notifications` ao conectar e ao
+reconectar para recuperar avisos persistidos. Falha ou desconexão do stream não desfaz a operação
+que originou o aviso.
+
+Trocas de perfil (`PATCH /me`) e senha (`PATCH /me/password`) geram os eventos fixos
+`PROFILE_UPDATED` e `PASSWORD_CHANGED`. Produtores futuros de mudanças de acesso podem chamar
+`NotificationService.accessChanged(Collection<UUID> affectedRecipients)`, que deduplica os IDs e
+emite o aviso fixo `ACCESS_CHANGED`. Os CRUDs de papéis, grupos, compartilhamentos e herança de
+permissões ainda não existem; a integração futura está prevista na issue #130 e no trabalho de
+gestão de papéis. Portanto, esta issue não completa o fan-out efetivo dessas alterações nem os
+eventos role-permission end-to-end (CA01).
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
@@ -483,3 +553,6 @@ Sucesso (`200`):
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
 | RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
 | RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
+| — | GET | `/notifications` | Cookie `accessToken` |
+| — | PATCH | `/notifications/{notificationId}/read` | Cookie `accessToken` |
+| — | GET | `/notifications/stream` | Cookie `accessToken` |
