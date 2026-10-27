@@ -184,6 +184,10 @@ public class WorkspaceItemAttachmentService {
                 "application/pdf".equals(file.getMimeType()) || file.getMimeType().startsWith("image/"));
     }
 
+    public void deleteObjectAfterCommit(UUID itemId) {
+        fileRepository.findById(itemId).ifPresent(file -> deleteOldAfterCommit(file.getStorageKey()));
+    }
+
     private WorkspaceItem attachmentItemForRead(UUID workspaceId, UUID itemId) {
         return itemRepository.findForRead(itemId, workspaceId)
                 .filter(item -> "file".equals(item.getType()) || "image".equals(item.getType()))

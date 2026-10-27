@@ -45,6 +45,7 @@ public class WorkspaceItemService {
     private final WorkspaceContentAuthorization authorization;
     private final SecretCipher secretCipher;
     private final ActivityLogService activityLogService;
+    private final WorkspaceItemAttachmentService attachmentService;
 
     @Transactional
     public ItemResponse create(UUID userId, UUID workspaceId, CreateItemRequest request) {
@@ -136,6 +137,33 @@ public class WorkspaceItemService {
         var secret = secretRepository.findById(item.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
         return new SecretValueResponse(secretCipher.decrypt(secret.getValue()));
+    }
+
+    @Transactional
+    public void delete(UUID userId, UUID workspaceId, UUID itemId, boolean confirm) {
+        Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
+        authorization.require(userId, workspace, "item", "delete");
+        if (!confirm) {
+            throw new ValidationException("Confirmação explícita obrigatória para excluir o item");
+        }
+        var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        if ("secret".equals(item.getType())) {
+            if (!authorization.allows(userId, workspace, "secret", "read")) {
+                throw new ResourceNotFoundException("Item indisponível");
+            }
+            authorization.require(userId, workspace, "secret", "delete");
+        }
+        if (item.getArchivedAt() == null) {
+            throw new ConflictException("Somente itens arquivados podem ser excluídos definitivamente");
+        }
+        if ("file".equals(item.getType()) || "image".equals(item.getType())) {
+            attachmentService.deleteObjectAfterCommit(itemId);
+        }
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_DELETED,
+                ActivityResourceType.ITEM, itemId, Map.of("type", item.getType(), "title", item.getTitle()));
+        itemRepository.delete(item);
+        itemRepository.flush();
     }
 
     @Transactional

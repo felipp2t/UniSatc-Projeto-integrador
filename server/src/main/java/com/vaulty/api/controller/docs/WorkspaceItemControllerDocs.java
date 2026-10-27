@@ -95,4 +95,16 @@ public interface WorkspaceItemControllerDocs {
         @ApiResponse(responseCode = "404")})
     ResponseEntity<SecretValueResponse> reveal(@Parameter(hidden = true) UUID userId,
                                                UUID workspaceId, UUID itemId);
+
+    @Operation(summary = "Exclui definitivamente um item arquivado",
+            description = "Exige confirmação explícita com confirm=true. Para segredos, exige também secret:read e secret:delete.")
+    @ApiResponses({@ApiResponse(responseCode = "204", description = "Item excluído"),
+        @ApiResponse(responseCode = "400", description = "Confirmação ausente ou inválida"),
+        @ApiResponse(responseCode = "403", description = "Permissão insuficiente"),
+        @ApiResponse(responseCode = "404", description = "Item indisponível"),
+        @ApiResponse(responseCode = "409", description = "Item não está arquivado")})
+    ResponseEntity<Void> delete(@Parameter(hidden = true) UUID userId,
+                                UUID workspaceId, UUID itemId,
+                                @Parameter(description = "Confirma a exclusão definitiva", example = "true")
+                                boolean confirm);
 }

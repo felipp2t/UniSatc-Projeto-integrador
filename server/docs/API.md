@@ -428,6 +428,27 @@ atividades sem incluir bytes nem chave do storage.
 Se `app.storage.s3.bucket` não estiver configurado, a aplicação inicia sem storage e as rotas de
 upload, substituição e download retornam `503 Service Unavailable`.
 
+## Exclusão definitiva de itens arquivados (issue #38)
+
+**`DELETE /workspaces/{workspaceId}/items/{itemId}?confirm=true`** — autenticado; exige vínculo
+ao workspace e a permissão `item:delete`.
+
+`confirm` é opcional e tem padrão `false`; sem `confirm=true`, a operação responde `400` e não
+exclui o item. Apenas itens previamente arquivados podem ser excluídos definitivamente; um item
+ativo responde `409`. Item inexistente ou pertencente a outro workspace responde `404`.
+
+Para excluir um item do tipo `secret`, o usuário também precisa de `secret:read` e `secret:delete`.
+Sem `secret:read`, o segredo é tratado como indisponível e responde `404`; sem `secret:delete`,
+responde `403`. O vínculo e as permissões são avaliados pela autorização existente do workspace.
+
+Sucesso retorna `204` sem corpo. A exclusão no banco remove em cascata os dados associados,
+incluindo segredo, arquivo e mídia, e libera o título para reutilização. O histórico registra
+`item_deleted` (`resourceType: item`) com um snapshot de `type` e `title`.
+
+Para itens `file` e `image`, a resposta `204` confirma a exclusão no banco; a remoção do objeto no
+storage é tentada em `afterCommit`. Falhas são registradas em log, não desfazem a exclusão
+confirmada e não têm retentativa durável.
+
 ## RF31 — Arquivar item
 
 **`POST /workspaces/{workspaceId}/items/{itemId}/archive`** — autenticado; exige `item/update`.
@@ -648,6 +669,7 @@ eventos role-permission end-to-end (CA01).
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
 | RF29 | PUT | `/workspaces/{workspaceId}/items/{itemId}` | Cookie `accessToken` |
 | RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
+| #38 | DELETE | `/workspaces/{workspaceId}/items/{itemId}?confirm=true` | Cookie `accessToken` |
 | RF31 | POST | `/workspaces/{workspaceId}/items/{itemId}/archive` | Cookie `accessToken` |
 | RF32 | POST | `/workspaces/{workspaceId}/items/{itemId}/restore` | Cookie `accessToken` |
 | RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
