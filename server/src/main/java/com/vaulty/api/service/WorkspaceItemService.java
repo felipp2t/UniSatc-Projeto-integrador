@@ -19,6 +19,7 @@ import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.repository.WorkspaceItemSecretRepository;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -116,7 +117,7 @@ public class WorkspaceItemService {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
-        var item = itemRepository.findByIdAndWorkspaceIdAndArchivedAtIsNull(itemId, workspaceId)
+        var item = itemRepository.findIncludingArchived(itemId, workspaceId)
                 .filter(found -> includeSecrets || !"secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
         return toResponse(item, true);
@@ -127,12 +128,32 @@ public class WorkspaceItemService {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         authorization.require(userId, workspace, "secret", "read");
-        var item = itemRepository.findByIdAndWorkspaceIdAndArchivedAtIsNull(itemId, workspaceId)
+        var item = itemRepository.findIncludingArchived(itemId, workspaceId)
                 .filter(found -> "secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
         var secret = secretRepository.findById(item.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
         return new SecretValueResponse(secretCipher.decrypt(secret.getValue()));
+    }
+
+    @Transactional
+    public void archive(UUID userId, UUID workspaceId, UUID itemId) {
+        Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
+        authorization.require(userId, workspace, "item", "update");
+        var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        if ("secret".equals(item.getType())) {
+            if (!authorization.allows(userId, workspace, "secret", "read")) {
+                throw new ResourceNotFoundException("Item indisponível");
+            }
+            authorization.require(userId, workspace, "secret", "update");
+        }
+        if (item.getArchivedAt() != null) {
+            throw new ConflictException("Item já arquivado");
+        }
+        item.setArchivedAt(OffsetDateTime.now());
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_ARCHIVED,
+                ActivityResourceType.ITEM, itemId, Map.of("type", item.getType(), "title", item.getTitle()));
     }
 
     private void validateContent(CreateItemRequest request) {
