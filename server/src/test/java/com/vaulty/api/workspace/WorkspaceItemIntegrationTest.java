@@ -406,7 +406,7 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(status().isForbidden());
         mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
                         .cookie(authCookie(outsider)).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
