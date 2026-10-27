@@ -526,6 +526,7 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
 
     private Cookie authCookie(User user) {
         String role = workspaceService.getRoleName(user.getId());
-        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), role));
+        var membershipId = workspaceMemberRepository.findByUserId(user.getId()).orElseThrow().getId();
+        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), membershipId, role));
     }
 }
