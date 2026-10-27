@@ -19,6 +19,7 @@ import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.repository.WorkspaceItemSecretRepository;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -133,6 +134,26 @@ public class WorkspaceItemService {
         var secret = secretRepository.findById(item.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
         return new SecretValueResponse(secretCipher.decrypt(secret.getValue()));
+    }
+
+    @Transactional
+    public void restore(UUID userId, UUID workspaceId, UUID itemId) {
+        Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
+        authorization.require(userId, workspace, "item", "update");
+        var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        if ("secret".equals(item.getType())) {
+            if (!authorization.allows(userId, workspace, "secret", "read")) {
+                throw new ResourceNotFoundException("Item indisponível");
+            }
+            authorization.require(userId, workspace, "secret", "update");
+        }
+        if (item.getArchivedAt() == null) {
+            throw new ConflictException("Item não está arquivado");
+        }
+        item.setArchivedAt(null);
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_RESTORED,
+                ActivityResourceType.ITEM, itemId, Map.of("type", item.getType(), "title", item.getTitle()));
     }
 
     private void validateContent(CreateItemRequest request) {

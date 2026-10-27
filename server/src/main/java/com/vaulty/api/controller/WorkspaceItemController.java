@@ -119,6 +119,14 @@ public class WorkspaceItemController implements WorkspaceItemControllerDocs {
         return ResponseEntity.ok(item);
     }
 
+    @PostMapping("/{itemId}/restore")
+    public ResponseEntity<Void> restore(@AuthenticationPrincipal UUID userId,
+                                        @PathVariable UUID workspaceId,
+                                        @PathVariable UUID itemId) {
+        itemService.restore(userId, workspaceId, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{itemId}/secret")
     public ResponseEntity<SecretValueResponse> reveal(@AuthenticationPrincipal UUID userId,
                                                       @PathVariable UUID workspaceId,

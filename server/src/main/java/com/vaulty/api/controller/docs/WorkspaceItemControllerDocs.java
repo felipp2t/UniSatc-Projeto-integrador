@@ -71,6 +71,12 @@ public interface WorkspaceItemControllerDocs {
     ResponseEntity<ItemResponse> get(@Parameter(hidden = true) UUID userId,
                                      UUID workspaceId, UUID itemId);
 
+    @Operation(summary = "Restaura um item arquivado")
+    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404"), @ApiResponse(responseCode = "409")})
+    ResponseEntity<Void> restore(@Parameter(hidden = true) UUID userId,
+                                 UUID workspaceId, UUID itemId);
+
     @Operation(summary = "Revela o valor de um segredo autorizado")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
         @ApiResponse(responseCode = "404")})

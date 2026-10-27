@@ -410,6 +410,19 @@ atividades sem incluir bytes nem chave do storage.
 Se `app.storage.s3.bucket` não estiver configurado, a aplicação inicia sem storage e as rotas de
 upload, substituição e download retornam `503 Service Unavailable`.
 
+## RF32 — Restaurar item arquivado
+
+**`POST /workspaces/{workspaceId}/items/{itemId}/restore`** — autenticado; exige `item/update`.
+Para itens do tipo `secret`, também exige `secret/update` e o usuário precisa ter `secret/read`;
+sem `secret/read`, o item retorna `404` para manter sua existência oculta. A restauração remove
+somente a marca de arquivamento, preservando o conteúdo e o anexo. Ela não recria acessos que
+tenham sido removidos.
+
+Sucesso retorna `204`. Item ativo retorna `409`. Item ausente, fora do workspace ou oculto por falta
+de `secret/read` retorna `404`; ausência de permissão retorna `403`. A restauração é registrada no
+histórico como `item_restored`, com tipo e título, sem incluir conteúdo de texto, URL, valor do
+segredo nem dados do anexo.
+
 ## Histórico de atividades
 
 **`GET /workspaces/{workspaceId}/activity`** — autenticado pelo cookie `accessToken`; exige
@@ -482,4 +495,5 @@ Sucesso (`200`):
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
 | RF30 | PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | Cookie `accessToken` |
 | RF30 | GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | Cookie `accessToken` |
+| RF32 | POST | `/workspaces/{workspaceId}/items/{itemId}/restore` | Cookie `accessToken` |
 | RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
