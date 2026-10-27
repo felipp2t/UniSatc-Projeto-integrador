@@ -5,5 +5,6 @@ public enum ActivityResourceType {
     ITEM,
     MEMBER,
     WORKSPACE,
-    ROLE
+    ROLE,
+    GROUP
 }

@@ -4,6 +4,7 @@ import com.vaulty.api.dto.item.CreateItemRequest;
 import com.vaulty.api.dto.item.ItemPageResponse;
 import com.vaulty.api.dto.item.ItemResponse;
 import com.vaulty.api.dto.item.SecretValueResponse;
+import com.vaulty.api.dto.item.UpdateItemRequest;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceItem;
 import com.vaulty.api.entity.WorkspaceItemSecret;
@@ -19,6 +20,8 @@ import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.repository.WorkspaceItemSecretRepository;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -117,7 +120,7 @@ public class WorkspaceItemService {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
-        var item = itemRepository.findByIdAndWorkspaceIdAndArchivedAtIsNull(itemId, workspaceId)
+        var item = itemRepository.findIncludingArchived(itemId, workspaceId)
                 .filter(found -> includeSecrets || !"secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
         return toResponse(item, true);
@@ -128,7 +131,7 @@ public class WorkspaceItemService {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         authorization.require(userId, workspace, "secret", "read");
-        var item = itemRepository.findByIdAndWorkspaceIdAndArchivedAtIsNull(itemId, workspaceId)
+        var item = itemRepository.findIncludingArchived(itemId, workspaceId)
                 .filter(found -> "secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
         var secret = secretRepository.findById(item.getId())
@@ -163,22 +166,113 @@ public class WorkspaceItemService {
         itemRepository.flush();
     }
 
-    private void validateContent(CreateItemRequest request) {
-        if (request.type() == null) {
-            throw new ValidationException("Tipo de item inválido para esta entrega");
+    @Transactional
+    public void restore(UUID userId, UUID workspaceId, UUID itemId) {
+        Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
+        authorization.require(userId, workspace, "item", "update");
+        var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        if ("secret".equals(item.getType())) {
+            if (!authorization.allows(userId, workspace, "secret", "read")) {
+                throw new ResourceNotFoundException("Item indisponível");
+            }
+            authorization.require(userId, workspace, "secret", "update");
         }
-        boolean valid = switch (request.type()) {
-            case "text" -> request.textContent() != null && !request.textContent().isBlank()
-                    && request.linkUrl() == null && request.value() == null;
-            case "link" -> request.textContent() == null && request.value() == null
-                    && request.linkUrl() != null && isHttpUrl(request.linkUrl());
-            case "secret" -> request.textContent() == null && request.linkUrl() == null
-                    && request.value() != null && !request.value().isBlank();
+        if (item.getArchivedAt() == null) {
+            throw new ConflictException("Item não está arquivado");
+        }
+        item.setArchivedAt(null);
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_RESTORED,
+                ActivityResourceType.ITEM, itemId, Map.of("type", item.getType(), "title", item.getTitle()));
+    }
+
+    @Transactional
+    public void archive(UUID userId, UUID workspaceId, UUID itemId) {
+        Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
+        authorization.require(userId, workspace, "item", "update");
+        var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        if ("secret".equals(item.getType())) {
+            if (!authorization.allows(userId, workspace, "secret", "read")) {
+                throw new ResourceNotFoundException("Item indisponível");
+            }
+            authorization.require(userId, workspace, "secret", "update");
+        }
+        if (item.getArchivedAt() != null) {
+            throw new ConflictException("Item já arquivado");
+        }
+        item.setArchivedAt(OffsetDateTime.now());
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_ARCHIVED,
+                ActivityResourceType.ITEM, itemId, Map.of("type", item.getType(), "title", item.getTitle()));
+    }
+
+    @Transactional
+    public ItemResponse update(UUID userId, UUID workspaceId, UUID itemId, UpdateItemRequest request) {
+        Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
+        authorization.require(userId, workspace, "item", "update");
+        var item = itemRepository.findActiveForUpdate(itemId, workspaceId)
+                .filter(found -> "text".equals(found.getType()) || "link".equals(found.getType())
+                        || "secret".equals(found.getType()))
+                .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        if ("secret".equals(item.getType())) {
+            authorization.require(userId, workspace, "secret", "update");
+        }
+        validateContent(item.getType(), request.textContent(), request.linkUrl(), request.value());
+
+        var before = itemSnapshot(item, false);
+        try {
+            item.setTitle(request.title());
+            switch (item.getType()) {
+                case "text" -> item.setTextContent(request.textContent());
+                case "link" -> item.setLinkUrl(request.linkUrl());
+                case "secret" -> {
+                    var secret = secretRepository.findById(itemId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
+                    secret.setValue(secretCipher.encrypt(request.value()));
+                    secretRepository.saveAndFlush(secret);
+                }
+                default -> throw new IllegalStateException("Tipo de item inválido para edição");
+            }
+            itemRepository.saveAndFlush(item);
+            activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_UPDATED,
+                    ActivityResourceType.ITEM, itemId,
+                    Map.of("before", before, "after", itemSnapshot(item, true)));
+            return toResponse(item, true);
+        } catch (DataIntegrityViolationException exception) {
+            if (PersistenceConstraints.causedBy(exception, DUPLICATE_TITLE_CONSTRAINT)) {
+                throw new ConflictException("Título indisponível nesta localização");
+            }
+            throw exception;
+        }
+    }
+
+    private void validateContent(String type, String textContent, String linkUrl, String value) {
+        boolean valid = switch (type) {
+            case "text" -> textContent != null && !textContent.isBlank() && linkUrl == null && value == null;
+            case "link" -> textContent == null && value == null && linkUrl != null && isHttpUrl(linkUrl);
+            case "secret" -> textContent == null && linkUrl == null && value != null && !value.isBlank();
             default -> throw new ValidationException("Tipo de item inválido para esta entrega");
         };
         if (!valid) {
             throw new ValidationException("Conteúdo inválido para o tipo de item");
         }
+    }
+
+    private Map<String, Object> itemSnapshot(WorkspaceItem item, boolean after) {
+        var snapshot = new LinkedHashMap<String, Object>();
+        snapshot.put("type", item.getType());
+        snapshot.put("title", item.getTitle());
+        if ("text".equals(item.getType()) || "link".equals(item.getType()) || "secret".equals(item.getType())) {
+            snapshot.put("contentChanged", after);
+        }
+        return snapshot;
+    }
+
+    private void validateContent(CreateItemRequest request) {
+        if (request.type() == null) {
+            throw new ValidationException("Tipo de item inválido para esta entrega");
+        }
+        validateContent(request.type(), request.textContent(), request.linkUrl(), request.value());
     }
 
     private boolean isHttpUrl(String value) {
