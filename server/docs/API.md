@@ -169,7 +169,7 @@ O que a função faz:
 |---|---|
 | Request body | `{ "email": string, "password": string }` |
 | Sucesso | `200`, corpo vazio, seta `accessToken` + `refreshToken` |
-| `401` | e-mail não encontrado ou senha incorreta |
+| `401` | e-mail não encontrado ou senha incorreta; ambas as falhas retornam `E-mail ou senha inválidos` |
 | `429` | mais de 5 tentativas por IP em 1 minuto (rate limit) |
 
 ---
@@ -330,6 +330,26 @@ O que a função faz:
 | Auth | Cookie `accessToken` |
 | Sucesso | `200`, `{ "id": string, "name": string, "email": string }` |
 | `401` | não autenticado |
+
+---
+
+## RF15 — Listagem de membros
+
+**`GET /workspaces/{workspaceId}/members`** — autenticado (cookie `accessToken`), com vínculo ao workspace.
+
+Retorna `id`, `userId`, `name`, `roleId` e `roleName` dos membros do workspace. O campo `email`
+é incluído apenas quando o solicitante é o dono atual do workspace, conforme o estado persistido
+no banco. Para os demais membros, a propriedade `email` é omitida da resposta, inclusive para o
+próprio solicitante; a visibilidade não é decidida pela claim `role` do JWT.
+
+| | |
+|---|---|
+| Sucesso | `200`, lista de membros |
+| `401` | não autenticado |
+| `404` | workspace inexistente ou solicitante sem vínculo |
+
+O refinamento de permissões para conteúdo, grupos e herança de pastas é tratado nas dependências
+#130 e #132; esta rota descreve apenas a listagem e a visibilidade dos dados de membro.
 
 ---
 

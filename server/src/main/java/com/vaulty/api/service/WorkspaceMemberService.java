@@ -19,15 +19,16 @@ public class WorkspaceMemberService {
 
     @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> list(UUID userId, UUID workspaceId) {
-        List<WorkspaceMemberResponse> members = workspaceMemberRepository
-                .findAllVisibleToMember(workspaceId, userId).stream()
-                .map(workspaceMapper::toResponse)
-                .toList();
+        var workspaceMembers = workspaceMemberRepository.findAllVisibleToMember(workspaceId, userId);
 
-        if (members.isEmpty()) {
+        if (workspaceMembers.isEmpty()) {
             throw new ResourceNotFoundException("Workspace não encontrado");
         }
 
-        return members;
+        boolean includeEmail = workspaceMembers.get(0).getWorkspace().getOwner().getId().equals(userId);
+
+        return workspaceMembers.stream()
+                .map(member -> workspaceMapper.toResponse(member, includeEmail))
+                .toList();
     }
 }
