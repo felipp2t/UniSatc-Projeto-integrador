@@ -90,25 +90,32 @@ export function InviteMemberDialog() {
   return (
     <Dialog onOpenChange={handleOpenChange} open={open}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className='cursor-pointer rounded-none' size='sm'>
           <PlusIcon aria-hidden='true' size={14} />
           Convidar membro
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className='rounded-none p-7 shadow-none sm:max-w-[30rem]'>
         <DialogHeader>
-          <DialogTitle>Convidar membro</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className='text-[13px] tracking-[0.05em]'>
+            Convidar membro
+          </DialogTitle>
+          <DialogDescription className='font-medium text-[10px]'>
             O reenvio invalida o link anterior e reinicia a validade de 7 dias.
           </DialogDescription>
         </DialogHeader>
-        <form className='space-y-4' noValidate onSubmit={handleSubmit}>
+        <form
+          className='flex flex-col gap-4 pt-2'
+          noValidate
+          onSubmit={handleSubmit}
+        >
           <Field invalid={Boolean(emailError)}>
             <FieldLabel htmlFor={emailId}>E-mail</FieldLabel>
             <Input
               aria-describedby={emailError ? `${emailId}-error` : undefined}
               aria-invalid={Boolean(emailError)}
               autoComplete='email'
+              className='rounded-none border-border bg-card shadow-none focus-visible:ring-0'
               disabled={submitting}
               id={emailId}
               onValueChange={handleEmailChange}
@@ -123,15 +130,21 @@ export function InviteMemberDialog() {
               {requestError}
             </p>
           ) : null}
-          <DialogFooter>
+          <DialogFooter className='gap-2.5'>
             <Button
+              className='cursor-pointer rounded-none'
               disabled={submitting}
               onClick={handleCancel}
               variant='outline'
             >
               Cancelar
             </Button>
-            <Button disabled={submitting} loading={submitting} type='submit'>
+            <Button
+              className='cursor-pointer rounded-none'
+              disabled={submitting}
+              loading={submitting}
+              type='submit'
+            >
               Criar convite
             </Button>
           </DialogFooter>
