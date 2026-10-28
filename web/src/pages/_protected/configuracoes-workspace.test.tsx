@@ -144,6 +144,32 @@ describe('workspace members settings', () => {
     expect(
       screen.getByRole('button', { name: 'Remover Bia Member' })
     ).toBeDisabled()
+    expect(
+      screen.getByRole('combobox', { name: 'Cargo de Bia Member' })
+    ).toBeDisabled()
+    expect(screen.queryByRole('tab', { name: 'Convites' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Convidar' })).toBeNull()
+  })
+
+  it('shows member count, invites and invite action to the owner', async () => {
+    await renderWorkspaceSettings(ownerId)
+
+    expect(
+      await screen.findByRole('tab', { name: 'Membros (2)' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Convites' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Convidar' })).toBeInTheDocument()
+  })
+
+  it('locks the role select only for the signed-in member', async () => {
+    await renderWorkspaceSettings(ownerId)
+
+    expect(
+      await screen.findByRole('combobox', { name: 'Cargo de Ana Owner' })
+    ).toBeDisabled()
+    expect(
+      screen.getByRole('combobox', { name: 'Cargo de Bia Member' })
+    ).toBeEnabled()
   })
 
   it('protects the last owner and never simulates a removal the API cannot perform', async () => {

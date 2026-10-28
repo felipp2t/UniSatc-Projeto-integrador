@@ -1,17 +1,18 @@
 import {
   GearIcon,
   MagnifyingGlassIcon,
-  ShieldIcon,
   TrashIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
+import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import type { WorkspaceMemberResponse } from '@/api/types'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { InviteMemberDialog } from '@/components/invite-member-dialog'
+import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { appToast } from '@/components/ui/toast'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
   component: WorkspaceSettingsPage,
@@ -79,6 +81,9 @@ function WorkspaceSettingsPage() {
     },
     [clearSelectedMember]
   )
+  const handleRoleChange = useCallback(() => {
+    appToast.info('A alteração de cargo ainda não está disponível na API.')
+  }, [])
   const isOwner = Boolean(
     session.user?.id && workspace?.ownerId === session.user.id
   )
@@ -171,125 +176,79 @@ function WorkspaceSettingsPage() {
         </nav>
         <Separator className='hidden h-auto sm:block' orientation='vertical' />
         <Separator className='sm:hidden' />
-        <section
-          aria-labelledby='members-title'
-          className='min-w-0 flex-1 space-y-4'
-        >
-          <div>
-            <h2
-              className='font-bold font-mono text-sm uppercase tracking-wide'
-              id='members-title'
-            >
-              Membros do workspace
-            </h2>
-            <p className='mt-1 text-muted-foreground text-xs'>
-              Consulte quem tem acesso ao workspace e seu papel.
-            </p>
-          </div>
-          <div className='flex flex-col gap-2 sm:flex-row'>
-            <div className='relative flex-1'>
-              <label className='sr-only' htmlFor='member-search'>
-                Buscar membro por nome
-              </label>
-              <MagnifyingGlassIcon
-                aria-hidden='true'
-                className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground'
-              />
-              <Input
-                className='pl-9'
-                id='member-search'
-                onValueChange={setSearch}
-                placeholder='Buscar por nome'
-                value={search}
-              />
-            </div>
-            <Select onValueChange={setRoleFilter} value={roleFilter}>
-              <SelectTrigger aria-label='Filtrar por cargo' className='w-40'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>Todos os cargos</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role} value={role}>
-                    {role}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <section aria-label='Membros e convites' className='min-w-0 flex-1'>
           <Tabs defaultValue='members'>
-            <TabsList>
-              <TabsTrigger value='members'>
-                Membros ({members.isError ? 0 : (members.data?.length ?? 0)})
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value='members'>
-              {members.isPending ? (
-                <LoadingState label='Carregando membros…' />
-              ) : null}
-              {members.isError ? (
-                <ErrorState
-                  error={members.error}
-                  message={
-                    memberAccessDenied
-                      ? 'Acesso ao workspace negado. Se você perdeu o vínculo, procure um dono.'
-                      : 'Não foi possível carregar os membros.'
-                  }
-                  onRetry={retryMembers}
-                />
-              ) : null}
-              {!members.isError && members.data?.length === 0 ? (
-                <EmptyState
-                  description='Este workspace ainda não tem membros.'
-                  title='Nenhum membro encontrado'
-                />
-              ) : null}
-              {!members.isError &&
-              members.data &&
-              members.data.length > 0 &&
-              filteredMembers.length === 0 ? (
-                <EmptyState
-                  description='Ajuste a busca ou o filtro de cargo.'
-                  title='Nenhum resultado'
-                  variant='compact'
-                />
-              ) : null}
-              {!members.isError && filteredMembers.length > 0 ? (
-                <div className='max-h-120 overflow-auto border border-border'>
-                  <table
-                    aria-label='Membros, cargo, estado e data de entrada'
-                    className='w-full border-collapse text-left'
-                  >
-                    <tbody className='divide-y divide-border'>
-                      {filteredMembers.map((member, index) => (
-                        <MemberRow
-                          index={index}
-                          isLastOwner={isLastWorkspaceOwner(
-                            member.userId,
-                            workspace.ownerId,
-                            ownerCount
-                          )}
-                          isOwner={isOwner}
-                          key={member.id}
-                          member={member}
-                          onSelect={setSelectedMember}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
+            <div className='flex flex-wrap items-center justify-between gap-3'>
+              <TabsList>
+                <TabsTrigger value='members'>
+                  Membros ({members.isError ? 0 : (members.data?.length ?? 0)})
+                </TabsTrigger>
+                {isOwner ? (
+                  <TabsTrigger value='invites'>Convites</TabsTrigger>
+                ) : null}
+              </TabsList>
+              {isOwner ? <InviteMemberDialog /> : null}
+            </div>
+            <TabsContent className='mt-4 space-y-4' value='members'>
+              <div className='flex flex-col gap-2 sm:flex-row'>
+                <div className='relative flex-1'>
+                  <label className='sr-only' htmlFor='member-search'>
+                    Buscar membro por nome
+                  </label>
+                  <MagnifyingGlassIcon
+                    aria-hidden='true'
+                    className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground'
+                  />
+                  <Input
+                    className='pl-9'
+                    id='member-search'
+                    onValueChange={setSearch}
+                    placeholder='Buscar por nome'
+                    value={search}
+                  />
                 </div>
-              ) : null}
+                <Select onValueChange={setRoleFilter} value={roleFilter}>
+                  <SelectTrigger
+                    aria-label='Filtrar por cargo'
+                    className='w-40'
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>Todos os cargos</SelectItem>
+                    {roles.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <MembersList
+                currentUserId={session.user?.id}
+                filteredMembers={filteredMembers}
+                isOwner={isOwner}
+                memberAccessDenied={memberAccessDenied}
+                members={members}
+                onRetry={retryMembers}
+                onRoleChange={handleRoleChange}
+                onSelect={setSelectedMember}
+                ownerCount={ownerCount}
+                roles={roles}
+                workspaceOwnerId={workspace.ownerId}
+              />
+              <p className='text-muted-foreground text-xs'>
+                A API ainda não oferece a remoção de membros nem a alteração de
+                cargo; essas ações ficarão disponíveis quando o servidor
+                implementar as regras de acesso e proteção do último dono.
+              </p>
             </TabsContent>
+            {isOwner ? (
+              <TabsContent className='mt-4' value='invites'>
+                <PendingInvitesSection />
+              </TabsContent>
+            ) : null}
           </Tabs>
-          <p className='text-muted-foreground text-xs'>
-            Estado de acesso e data de entrada ainda não são fornecidos pela
-            API.
-          </p>
-          <p className='text-muted-foreground text-xs'>
-            A API ainda não oferece a remoção de membros; essa ação ficará
-            disponível quando o servidor implementar as regras de acesso e
-            proteção do último dono.
-          </p>
         </section>
       </div>
       <Dialog onOpenChange={handleDialogChange} open={Boolean(selectedMember)}>
@@ -319,18 +278,111 @@ function WorkspaceSettingsPage() {
   )
 }
 
+function MembersList({
+  currentUserId,
+  filteredMembers,
+  isOwner,
+  memberAccessDenied,
+  members,
+  onRetry,
+  onRoleChange,
+  onSelect,
+  ownerCount,
+  roles,
+  workspaceOwnerId,
+}: {
+  currentUserId: string | undefined
+  filteredMembers: WorkspaceMemberResponse[]
+  isOwner: boolean
+  memberAccessDenied: boolean
+  members: UseQueryResult<WorkspaceMemberResponse[]>
+  onRetry: () => Promise<void>
+  onRoleChange: (role: string) => void
+  onSelect: (member: { id: string; name: string }) => void
+  ownerCount: number
+  roles: string[]
+  workspaceOwnerId: string | undefined
+}) {
+  if (members.isPending) return <LoadingState label='Carregando membros…' />
+  if (members.isError) {
+    return (
+      <ErrorState
+        error={members.error}
+        message={
+          memberAccessDenied
+            ? 'Acesso ao workspace negado. Se você perdeu o vínculo, procure um dono.'
+            : 'Não foi possível carregar os membros.'
+        }
+        onRetry={onRetry}
+      />
+    )
+  }
+  if (members.data.length === 0) {
+    return (
+      <EmptyState
+        description='Este workspace ainda não tem membros.'
+        title='Nenhum membro encontrado'
+      />
+    )
+  }
+  if (filteredMembers.length === 0) {
+    return (
+      <EmptyState
+        description='Ajuste a busca ou o filtro de cargo.'
+        title='Nenhum resultado'
+        variant='compact'
+      />
+    )
+  }
+
+  return (
+    <div className='max-h-120 overflow-auto border border-border'>
+      <table
+        aria-label='Membros e cargos'
+        className='w-full border-collapse text-left'
+      >
+        <tbody className='divide-y divide-border'>
+          {filteredMembers.map((member, index) => (
+            <MemberRow
+              index={index}
+              isLastOwner={isLastWorkspaceOwner(
+                member.userId,
+                workspaceOwnerId,
+                ownerCount
+              )}
+              isOwner={isOwner}
+              isSelf={member.userId === currentUserId}
+              key={member.id}
+              member={member}
+              onRoleChange={onRoleChange}
+              onSelect={onSelect}
+              roles={roles}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function MemberRow({
   index,
   isLastOwner,
   isOwner,
+  isSelf,
   member,
+  onRoleChange,
   onSelect,
+  roles,
 }: {
   index: number
   isLastOwner: boolean
   isOwner: boolean
+  isSelf: boolean
   member: WorkspaceMemberResponse
+  onRoleChange: (role: string) => void
   onSelect: (member: { id: string; name: string }) => void
+  roles: string[]
 }) {
   const name = member.name || 'Usuário sem nome'
   const selectMember = useCallback(
@@ -360,36 +412,52 @@ function MemberRow({
           </div>
         </div>
       </td>
-      <td className='px-2 py-3'>
-        <span className='flex w-fit shrink-0 items-center gap-1.5 border border-primary/50 bg-primary/5 px-2 py-1 font-mono text-primary text-xs uppercase'>
-          <ShieldIcon aria-hidden='true' className='size-3' />
-          {member.roleName ?? '—'}
-        </span>
-      </td>
-      <td className='hidden px-2 py-3 font-mono text-muted-foreground text-xs md:table-cell'>
-        Estado: —
-      </td>
-      <td className='hidden px-2 py-3 font-mono text-muted-foreground text-xs lg:table-cell'>
-        Entrada: —
-      </td>
-      <td className='px-3 py-3 text-right'>
-        <Button
-          aria-label={`Remover ${name}`}
-          className='size-7 shrink-0 border border-destructive/40 text-destructive hover:bg-destructive/10'
-          disabled={!isOwner || isLastOwner}
-          onClick={selectMember}
-          size='icon'
-          title={
-            isOwner
-              ? isLastOwner
-                ? 'O último dono não pode ser removido.'
-                : 'Remoção indisponível até a API oferecer essa operação.'
-              : 'Somente um dono pode remover membros.'
-          }
-          variant='ghost'
-        >
-          <TrashIcon aria-hidden='true' className='size-3.5' />
-        </Button>
+      <td className='px-3 py-3'>
+        <div className='flex items-center justify-end gap-2'>
+          <Select
+            disabled={!isOwner || isSelf}
+            onValueChange={onRoleChange}
+            value={member.roleName ?? ''}
+          >
+            <SelectTrigger
+              aria-label={`Cargo de ${name}`}
+              className='h-7 w-32 border-primary/50 bg-primary/5 text-primary uppercase disabled:cursor-not-allowed disabled:opacity-60'
+              title={
+                isSelf
+                  ? 'Você não pode alterar o próprio cargo.'
+                  : isOwner
+                    ? undefined
+                    : 'Somente um dono pode alterar cargos.'
+              }
+            >
+              <SelectValue placeholder='—' />
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map((role) => (
+                <SelectItem className='uppercase' key={role} value={role}>
+                  {role}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            aria-label={`Remover ${name}`}
+            className='size-7 shrink-0 border border-destructive/40 text-destructive hover:bg-destructive/10'
+            disabled={!isOwner || isLastOwner}
+            onClick={selectMember}
+            size='icon'
+            title={
+              isOwner
+                ? isLastOwner
+                  ? 'O último dono não pode ser removido.'
+                  : 'Remoção indisponível até a API oferecer essa operação.'
+                : 'Somente um dono pode remover membros.'
+            }
+            variant='ghost'
+          >
+            <TrashIcon aria-hidden='true' className='size-3.5' />
+          </Button>
+        </div>
       </td>
     </tr>
   )

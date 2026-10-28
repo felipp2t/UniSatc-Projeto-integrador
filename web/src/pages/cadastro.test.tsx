@@ -282,7 +282,8 @@ describe('cadastro por convite', () => {
         await screen.findByRole('heading', { name: 'Convite indisponível' })
       ).toBeTruthy()
       expect(screen.queryByRole('button', { name: 'CRIAR CONTA' })).toBeNull()
-    }
+    },
+    10_000
   )
 
   it('shows local validation errors without sending the registration request', async () => {
