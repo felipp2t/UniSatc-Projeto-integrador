@@ -9,6 +9,7 @@ import {
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/api/errors'
 import type { SessionService } from '@/auth/session'
 import type { RouterContext } from '@/router-context'
 import { routerDefaults } from '@/router-defaults'
@@ -17,6 +18,8 @@ import { renderWithProviders } from '@/test/render'
 const workspaceApiMocks = vi.hoisted(() => ({
   list: vi.fn(),
   listMembers: vi.fn(),
+  removeMember: vi.fn(),
+  updateMemberRole: vi.fn(),
 }))
 const inviteApiMocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -36,6 +39,8 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       ...actual.workspaceApi,
       list: workspaceApiMocks.list,
       listMembers: workspaceApiMocks.listMembers,
+      removeMember: workspaceApiMocks.removeMember,
+      updateMemberRole: workspaceApiMocks.updateMemberRole,
     },
   }
 })
@@ -111,6 +116,12 @@ beforeEach(() => {
     data: [{ id: workspaceId, name: 'Workspace', ownerId }],
   })
   workspaceApiMocks.listMembers.mockResolvedValue({ data: members })
+  workspaceApiMocks.removeMember.mockRejectedValue(
+    new Error('A remoção de membros ainda não está disponível.')
+  )
+  workspaceApiMocks.updateMemberRole.mockRejectedValue(
+    new Error('A alteração de cargo ainda não está disponível.')
+  )
   inviteApiMocks.create.mockResolvedValue(undefined)
   inviteApiMocks.list.mockResolvedValue({ data: [] })
 })
@@ -144,7 +155,7 @@ describe('workspace members settings', () => {
     expect(screen.queryByText('Bia Member')).not.toBeInTheDocument()
   }, 10_000)
 
-  it('hides emails from non-owners and disables member removal', async () => {
+  it('hides emails and invite actions from non-owners', async () => {
     await renderWorkspaceSettings('member-2')
 
     expect(await screen.findByText('Ana Owner')).toBeInTheDocument()
@@ -152,9 +163,10 @@ describe('workspace members settings', () => {
     expect(
       screen.queryByRole('columnheader', { name: 'E-mail' })
     ).not.toBeInTheDocument()
+    expect(screen.getByText('member')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: 'Remover Bia Member' })
-    ).toBeDisabled()
+      screen.queryByRole('button', { name: 'Remover Bia Member' })
+    ).not.toBeInTheDocument()
     expect(
       screen.getByRole('combobox', { name: 'Cargo de Bia Member' })
     ).toBeDisabled()
@@ -206,36 +218,125 @@ describe('workspace members settings', () => {
     )
 
     await waitFor(() => expect(inviteApiMocks.create).toHaveBeenCalledOnce())
-    expect(inviteApiMocks.create).toHaveBeenCalledWith({
+    expect(inviteApiMocks.create.mock.calls[0]?.[0]).toEqual({
       email: 'new@example.com',
     })
     expect(await screen.findByText('new@example.com')).toBeInTheDocument()
     expect(inviteApiMocks.list).toHaveBeenCalledTimes(2)
   })
 
-  it('locks the role select only for the signed-in member', async () => {
+  it('shows disabled role and removal controls with the unavailable reason', async () => {
     await renderWorkspaceSettings(ownerId)
 
-    expect(
-      await screen.findByRole('combobox', { name: 'Cargo de Ana Owner' })
-    ).toBeDisabled()
-    expect(
-      screen.getByRole('combobox', { name: 'Cargo de Bia Member' })
-    ).toBeEnabled()
+    const ownerRole = await screen.findByRole('combobox', {
+      name: 'Cargo de Bia Member',
+    })
+    expect(ownerRole).toHaveTextContent('member')
+    expect(ownerRole).toBeDisabled()
+    expect(ownerRole).toHaveAttribute(
+      'title',
+      'A alteração de cargo ainda não está disponível na API.'
+    )
+    const removeButton = await screen.findByRole('button', {
+      name: 'Remover Bia Member',
+    })
+    expect(removeButton).toBeEnabled()
+    expect(removeButton).toHaveAttribute(
+      'title',
+      'A remoção ainda não está disponível na API do servidor.'
+    )
+    expect(workspaceApiMocks.removeMember).not.toHaveBeenCalled()
+    expect(workspaceApiMocks.updateMemberRole).not.toHaveBeenCalled()
   })
 
-  it('protects the last owner and never simulates a removal the API cannot perform', async () => {
-    const user = userEvent.setup()
+  it('protects the workspace owner by owner ID, independent of displayed roles', async () => {
+    workspaceApiMocks.listMembers.mockResolvedValue({
+      data: [
+        { ...members[0], roleName: 'member' },
+        { ...members[1], roleName: 'owner' },
+      ],
+    })
     await renderWorkspaceSettings(ownerId)
 
     expect(
       await screen.findByRole('button', { name: 'Remover Ana Owner' })
     ).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Remover Bia Member' }))
-    expect(await screen.findByRole('dialog')).toHaveTextContent('Bia Member')
     expect(
-      screen.getByRole('button', { name: 'Remoção indisponível' })
+      screen.getByRole('button', { name: 'Remover Ana Owner' })
+    ).toHaveAttribute(
+      'title',
+      'O último dono do workspace não pode ser removido.'
+    )
+    expect(
+      screen.getByRole('button', { name: 'Remover Bia Member' })
+    ).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Remover Bia Member' })
+    ).toHaveAttribute(
+      'title',
+      'A remoção ainda não está disponível na API do servidor.'
+    )
+  })
+
+  it('opens an informative dialog but blocks confirmation without API support', async () => {
+    const user = userEvent.setup()
+    await renderWorkspaceSettings(ownerId)
+
+    const removeButton = await screen.findByRole('button', {
+      name: 'Remover Bia Member',
+    })
+    await user.click(removeButton)
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveTextContent('Bia Member')
+    expect(dialog).toHaveTextContent('bia@example.com')
+    expect(dialog).toHaveTextContent('cargo member')
+    expect(dialog).toHaveTextContent(
+      'A remoção ainda não está disponível na API do servidor.'
+    )
+    expect(
+      within(dialog).getByRole('button', { name: 'Remover membro' })
     ).toBeDisabled()
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Remover membro' })
+    )
+    expect(workspaceApiMocks.removeMember).not.toHaveBeenCalled()
+  })
+
+  it('guides a removed member to contact a workspace owner on access denial', async () => {
+    workspaceApiMocks.listMembers.mockRejectedValueOnce(
+      new ApiError('Acesso negado', 403)
+    )
+    await renderWorkspaceSettings(ownerId)
+
+    expect(
+      await screen.findByText(
+        'Acesso ao workspace negado. Se você perdeu o vínculo, procure um dono.'
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('shows a safe network message instead of raw member API details', async () => {
+    workspaceApiMocks.listMembers.mockRejectedValueOnce(
+      new ApiError(
+        'Sensitive transport detail',
+        undefined,
+        undefined,
+        undefined,
+        {
+          networkError: true,
+        }
+      )
+    )
+    await renderWorkspaceSettings(ownerId)
+
+    expect(
+      await screen.findByText('Não foi possível carregar os membros.')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Sensitive transport detail')).toBeNull()
+    expect(
+      screen.getByRole('button', { name: retryButtonName })
+    ).toBeInTheDocument()
   })
 
   it('shows an empty result when no members match the search', async () => {

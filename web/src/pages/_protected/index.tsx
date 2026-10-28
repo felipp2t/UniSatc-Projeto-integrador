@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { isUnavailableCollectionError } from '@/api/collection-errors'
-import { itemsApi, workspaceApi } from '@/api/endpoints'
+import { itemsApi } from '@/api/endpoints'
 import type {
   CollectionPathEntry,
   ItemPageResponse,
@@ -45,6 +45,7 @@ import {
   WorkspaceCollections,
 } from '@/components/workspace-collections'
 import { useCollectionPath } from '@/hooks/use-collection-path'
+import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 const searchSchema = z.object({
   collectionId: z.guid().optional().catch(undefined),
@@ -61,11 +62,8 @@ export const Route = createFileRoute('/_protected/')({
 
 function HomePage() {
   const { collectionId } = Route.useSearch()
-  const workspaces = useQuery({
-    queryFn: async () => (await workspaceApi.list()).data,
-    queryKey: ['workspaces'],
-  })
-  const workspace = workspaces.data?.[0]
+  const workspaces = useCurrentWorkspace()
+  const workspace = workspaces.data
   const retryWorkspaces = useCallback(async () => {
     await workspaces.refetch()
   }, [workspaces.refetch])

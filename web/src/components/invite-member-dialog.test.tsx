@@ -72,7 +72,7 @@ describe('InviteMemberDialog', () => {
     )
 
     await waitFor(() => expect(create).toHaveBeenCalledOnce())
-    expect(create).toHaveBeenCalledWith({ email: 'member@example.com' })
+    expect(create.mock.calls[0]?.[0]).toEqual({ email: 'member@example.com' })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['invites'] })
     expect(success).toHaveBeenCalledWith(
       'Convite criado; e-mail encaminhado para envio'
@@ -130,7 +130,7 @@ describe('InviteMemberDialog', () => {
     const dialog = screen.getByRole('dialog')
     expect(
       within(dialog).getByText(
-        'O reenvio invalida o link anterior e reinicia a validade de 7 dias.'
+        'O convite não define o papel. Se já houver um convite pendente para este e-mail, ele será substituído, o link anterior será invalidado e o prazo de sete dias começará novamente.'
       )
     ).toBeTruthy()
     await user.type(

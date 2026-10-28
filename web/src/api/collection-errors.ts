@@ -1,4 +1,5 @@
 import { toApiError } from './errors'
+import { isForbiddenOrNotFoundStatus } from './http-status'
 
 type CollectionQuerySource = 'list' | 'path'
 
@@ -9,6 +10,6 @@ export function isUnavailableCollectionError(
 ) {
   const { status } = toApiError(error)
 
-  if (status === 403 || status === 404) return true
+  if (isForbiddenOrNotFoundStatus(status)) return true
   return status === 400 && (source === 'path' || page === 0)
 }

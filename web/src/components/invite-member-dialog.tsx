@@ -1,9 +1,10 @@
 import { UserPlusIcon } from '@phosphor-icons/react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { inviteApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
+import { inviteQueryKey } from '@/api/invite-helpers'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -27,13 +28,33 @@ export function InviteMemberDialog() {
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState<string>()
   const [requestError, setRequestError] = useState<string>()
-  const [submitting, setSubmitting] = useState(false)
-
   const reset = useCallback(() => {
     setEmail('')
     setEmailError(undefined)
     setRequestError(undefined)
   }, [])
+  const createInvite = useMutation({
+    mutationFn: inviteApi.create,
+    onError: (error) => {
+      const apiError = toApiError(error)
+      setRequestError(
+        apiError.status === 409
+          ? 'Este e-mail já possui uma conta.'
+          : apiError.status === 403
+            ? 'Apenas o dono do workspace pode executar esta ação.'
+            : apiError.isNetworkError
+              ? 'Erro de conexão. Verifique sua internet e tente novamente.'
+              : 'Não foi possível criar o convite. Tente novamente.'
+      )
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: inviteQueryKey })
+      appToast.success('Convite criado; e-mail encaminhado para envio')
+      setOpen(false)
+      reset()
+    },
+  })
+  const submitting = createInvite.isPending
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (submitting) return
@@ -43,7 +64,7 @@ export function InviteMemberDialog() {
     [reset, submitting]
   )
   const handleSubmit = useCallback(
-    async (event: React.SubmitEvent<HTMLFormElement>) => {
+    (event: React.SubmitEvent<HTMLFormElement>) => {
       event.preventDefault()
       const result = emailSchema.safeParse(email)
       if (!result.success) {
@@ -53,29 +74,9 @@ export function InviteMemberDialog() {
 
       setEmailError(undefined)
       setRequestError(undefined)
-      setSubmitting(true)
-      try {
-        await inviteApi.create({ email: result.data })
-        await queryClient.invalidateQueries({ queryKey: ['invites'] })
-        appToast.success('Convite criado; e-mail encaminhado para envio')
-        setOpen(false)
-        reset()
-      } catch (error) {
-        const apiError = toApiError(error)
-        setRequestError(
-          apiError.status === 409
-            ? 'Este e-mail já possui uma conta.'
-            : apiError.status === 403
-              ? 'Apenas o dono do workspace pode executar esta ação.'
-              : apiError.isNetworkError
-                ? 'Erro de conexão. Verifique sua internet e tente novamente.'
-                : 'Não foi possível criar o convite. Tente novamente.'
-        )
-      } finally {
-        setSubmitting(false)
-      }
+      createInvite.mutate({ email: result.data })
     },
-    [email, queryClient, reset]
+    [createInvite.mutate, email]
   )
   const handleEmailChange = useCallback((value: string) => {
     setEmail(value)
@@ -101,7 +102,9 @@ export function InviteMemberDialog() {
             Convidar membro
           </DialogTitle>
           <DialogDescription className='font-medium text-[10px]'>
-            O reenvio invalida o link anterior e reinicia a validade de 7 dias.
+            O convite não define o papel. Se já houver um convite pendente para
+            este e-mail, ele será substituído, o link anterior será invalidado e
+            o prazo de sete dias começará novamente.
           </DialogDescription>
         </DialogHeader>
         <form
