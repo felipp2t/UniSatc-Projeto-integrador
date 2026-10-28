@@ -4,7 +4,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { userApi } from '@/api/endpoints'
-import { toApiError } from '@/api/errors'
+import { getApiErrorMessage } from '@/api/get-api-error-message'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { ChangePasswordForm } from '@/components/change-password-form'
 import { Button } from '@/components/ui/button'
@@ -66,11 +66,10 @@ function AccountSettingsPage() {
         setName(undefined)
         appToast.success('Nome atualizado com sucesso.')
       } catch (error) {
-        const apiError = toApiError(error)
         setNameError(
-          apiError.isNetworkError
-            ? 'Erro de conexão. Verifique sua internet e tente novamente.'
-            : 'Não foi possível salvar o nome. Tente novamente.'
+          getApiErrorMessage(error, {
+            fallback: 'Não foi possível salvar o nome. Tente novamente.',
+          })
         )
       }
     },

@@ -283,6 +283,7 @@ describe('cadastro por convite', () => {
       ).toBeTruthy()
       expect(screen.queryByRole('button', { name: 'CRIAR CONTA' })).toBeNull()
     },
+    // Route integration runs have exceeded Vitest's default timeout under full-suite worker contention.
     10_000
   )
 

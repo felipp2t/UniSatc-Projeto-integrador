@@ -5,10 +5,10 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { inviteApi } from '@/api/endpoints'
-import { toApiError } from '@/api/errors'
-import { inviteQueryKey, isInviteExpired } from '@/api/invite-helpers'
+import { getApiErrorMessage } from '@/api/get-api-error-message'
+import { inviteQueryKey, isInviteExpired } from '@/api/invites'
 import type { InviteResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,28 +23,23 @@ import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { appToast } from '@/components/ui/toast'
+import { useExpiryTick } from '@/hooks/use-expiry-tick'
 
 export function PendingInvitesSection() {
   const queryClient = useQueryClient()
   const [selectedInvite, setSelectedInvite] = useState<InviteResponse>()
-  const [now, setNow] = useState(Date.now)
   const invites = useQuery({
     queryFn: async () => (await inviteApi.list()).data,
     queryKey: inviteQueryKey,
   })
-  const nextExpiration = invites.data
-    ?.filter((invite) => !isInviteExpired(invite.expiresAt, now))
-    .map((invite) => Date.parse(invite.expiresAt))
-    .sort((left, right) => left - right)[0]
-
-  useEffect(() => {
-    if (nextExpiration === undefined) return
-    const timeoutId = window.setTimeout(
-      () => setNow(Date.now()),
-      Math.max(0, nextExpiration - Date.now())
-    )
-    return () => window.clearTimeout(timeoutId)
-  }, [nextExpiration])
+  const expirations = useMemo(
+    () => [
+      ...(invites.data?.map((invite) => invite.expiresAt) ?? []),
+      ...(selectedInvite ? [selectedInvite.expiresAt] : []),
+    ],
+    [invites.data, selectedInvite]
+  )
+  const now = useExpiryTick(expirations)
 
   const retryLoad = useCallback(async () => {
     await invites.refetch()
@@ -89,23 +84,11 @@ export function PendingInvitesSection() {
   )
   const selectInvite = useCallback(
     (invite: InviteResponse) => {
+      if (isInviteExpired(invite.expiresAt, now)) return
       revokeInvite.reset()
       setSelectedInvite(invite)
     },
-    [revokeInvite.reset]
-  )
-  const handleSelectInvite = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      const {
-        currentTarget: {
-          dataset: { inviteId },
-        },
-      } = event
-      const invite = invites.data?.find((item) => item.id === inviteId)
-      if (invite && !isInviteExpired(invite.expiresAt, now))
-        selectInvite(invite)
-    },
-    [invites.data, now, selectInvite]
+    [now, revokeInvite.reset]
   )
   const confirmRevoke = useCallback(() => {
     if (
@@ -118,9 +101,6 @@ export function PendingInvitesSection() {
     revokeInvite.mutate(selectedInvite.id)
   }, [now, revokeInvite.isPending, revokeInvite.mutate, selectedInvite])
 
-  const selectedInviteExpired = Boolean(
-    selectedInvite && isInviteExpired(selectedInvite.expiresAt, now)
-  )
   const mutationError = revokeInvite.error
     ? getRevokeError(revokeInvite.error)
     : undefined
@@ -132,7 +112,7 @@ export function PendingInvitesSection() {
         isRevoking={revokeInvite.isPending}
         now={now}
         onRetry={retryLoad}
-        onSelectInvite={handleSelectInvite}
+        onSelectInvite={selectInvite}
       />
       <RevokeInviteDialog
         closeDialog={closeDialog}
@@ -140,8 +120,8 @@ export function PendingInvitesSection() {
         handleConfirmRevoke={confirmRevoke}
         handleOpenChange={handleOpenChange}
         isPending={revokeInvite.isPending}
+        now={now}
         selectedInvite={selectedInvite}
-        selectedInviteExpired={Boolean(selectedInviteExpired)}
       />
     </>
   )
@@ -158,7 +138,7 @@ function PendingInvitesList({
   isRevoking: boolean
   now: number
   onRetry: () => Promise<void>
-  onSelectInvite: (event: React.MouseEvent<HTMLButtonElement>) => void
+  onSelectInvite: (invite: InviteResponse) => void
 }) {
   if (invites.isPending) return <LoadingState label='Carregando convites…' />
   if (invites.isError) {
@@ -183,54 +163,70 @@ function PendingInvitesList({
   return (
     <ScrollArea className='max-h-120'>
       <ul className='m-0 list-none divide-y divide-border border border-border p-0'>
-        {invites.data.map((invite) => {
-          const expired = isInviteExpired(invite.expiresAt, now)
-
-          return (
-            <li
-              className='flex items-center gap-3 bg-card px-4 py-3'
-              key={invite.id}
-            >
-              <div className='flex min-w-0 flex-1 flex-col gap-1'>
-                <span className='truncate font-mono font-semibold text-xs tracking-wide'>
-                  {invite.email}
-                </span>
-                <div className='flex flex-wrap gap-x-3 gap-y-1 font-mono text-muted-foreground text-xs'>
-                  <span className='min-w-0 max-w-full break-words'>
-                    Convidado por{' '}
-                    {invite.invitedByName || 'Pessoa desconhecida'}
-                  </span>
-                  <span>
-                    Criado em{' '}
-                    {new Intl.DateTimeFormat('pt-BR', {
-                      dateStyle: 'medium',
-                    }).format(new Date(invite.createdAt))}
-                  </span>
-                  <span>
-                    {expired
-                      ? 'Convite expirado'
-                      : `Expira em ${new Intl.DateTimeFormat('pt-BR', {
-                          dateStyle: 'medium',
-                        }).format(new Date(invite.expiresAt))}`}
-                  </span>
-                </div>
-              </div>
-              <Button
-                aria-label={`Revogar convite para ${invite.email}`}
-                className='size-7 rounded-none border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'
-                data-invite-id={invite.id}
-                disabled={expired || isRevoking}
-                onClick={onSelectInvite}
-                size='icon'
-                variant='outline'
-              >
-                <TrashIcon aria-hidden='true' className='size-3.5' />
-              </Button>
-            </li>
-          )
-        })}
+        {invites.data.map((invite) => (
+          <PendingInviteRow
+            invite={invite}
+            isRevoking={isRevoking}
+            key={invite.id}
+            now={now}
+            onSelect={onSelectInvite}
+          />
+        ))}
       </ul>
     </ScrollArea>
+  )
+}
+
+function PendingInviteRow({
+  invite,
+  isRevoking,
+  now,
+  onSelect,
+}: {
+  invite: InviteResponse
+  isRevoking: boolean
+  now: number
+  onSelect: (invite: InviteResponse) => void
+}) {
+  const expired = isInviteExpired(invite.expiresAt, now)
+  const selectInvite = useCallback(() => onSelect(invite), [invite, onSelect])
+
+  return (
+    <li className='flex items-center gap-3 bg-card px-4 py-3'>
+      <div className='flex min-w-0 flex-1 flex-col gap-1'>
+        <span className='truncate font-mono font-semibold text-xs tracking-wide'>
+          {invite.email}
+        </span>
+        <div className='flex flex-wrap gap-x-3 gap-y-1 font-mono text-muted-foreground text-xs'>
+          <span className='min-w-0 max-w-full break-words'>
+            Convidado por {invite.invitedByName || 'Pessoa desconhecida'}
+          </span>
+          <span>
+            Criado em{' '}
+            {new Intl.DateTimeFormat('pt-BR', {
+              dateStyle: 'medium',
+            }).format(new Date(invite.createdAt))}
+          </span>
+          <span>
+            {expired
+              ? 'Convite expirado'
+              : `Expira em ${new Intl.DateTimeFormat('pt-BR', {
+                  dateStyle: 'medium',
+                }).format(new Date(invite.expiresAt))}`}
+          </span>
+        </div>
+      </div>
+      <Button
+        aria-label={`Revogar convite para ${invite.email}`}
+        className='size-7 rounded-none border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive'
+        disabled={expired || isRevoking}
+        onClick={selectInvite}
+        size='icon'
+        variant='outline'
+      >
+        <TrashIcon aria-hidden='true' className='size-3.5' />
+      </Button>
+    </li>
   )
 }
 
@@ -240,18 +236,19 @@ function RevokeInviteDialog({
   handleConfirmRevoke,
   handleOpenChange,
   isPending,
+  now,
   selectedInvite,
-  selectedInviteExpired,
 }: {
   closeDialog: () => void
   error: string | undefined
   handleConfirmRevoke: () => void
   handleOpenChange: (open: boolean) => void
   isPending: boolean
+  now: number
   selectedInvite: InviteResponse | undefined
-  selectedInviteExpired: boolean
 }) {
   if (!selectedInvite) return null
+  const expired = isInviteExpired(selectedInvite.expiresAt, now)
   return (
     <Dialog onOpenChange={handleOpenChange} open>
       <DialogContent
@@ -264,7 +261,7 @@ function RevokeInviteDialog({
               Revogar convite
             </DialogTitle>
             <DialogDescription className='font-medium text-[10px]'>
-              {selectedInviteExpired
+              {expired
                 ? `O convite para ${selectedInvite.email} expirou e não pode mais ser revogado.`
                 : `Tem certeza de que deseja revogar o convite enviado para ${selectedInvite.email}?`}
             </DialogDescription>
@@ -285,7 +282,7 @@ function RevokeInviteDialog({
             </Button>
             <Button
               className='rounded-none'
-              disabled={selectedInviteExpired || isPending}
+              disabled={expired || isPending}
               loading={isPending}
               onClick={handleConfirmRevoke}
               variant='destructive'
@@ -300,14 +297,13 @@ function RevokeInviteDialog({
 }
 
 function getRevokeError(cause: unknown) {
-  const error = toApiError(cause)
-  if (error.status === 403)
-    return 'Você não tem permissão para revogar este convite.'
-  if (error.status === 404 || error.status === 409) {
-    return 'Este convite não está mais disponível. Atualize a lista e tente novamente.'
-  }
-  if (error.isNetworkError) {
-    return 'Erro de conexão. Verifique sua internet e tente novamente.'
-  }
-  return error.message || 'Não foi possível revogar o convite. Tente novamente.'
+  return getApiErrorMessage(cause, {
+    fallback: 'Não foi possível revogar o convite. Tente novamente.',
+    statusMessages: {
+      403: 'Você não tem permissão para revogar este convite.',
+      404: 'Este convite não está mais disponível. Atualize a lista e tente novamente.',
+      409: 'Este convite não está mais disponível. Atualize a lista e tente novamente.',
+    },
+    useServerMessage: true,
+  })
 }

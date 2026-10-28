@@ -14,6 +14,7 @@ import type { PropsWithChildren } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { inviteApi } from '@/api/endpoints'
 import { ApiError } from '@/api/errors'
+import { inviteQueryKey } from '@/api/invites'
 import type { InviteResponse } from '@/api/types'
 import '../test/dom-setup'
 import { PendingInvitesSection } from './pending-invites-section'
@@ -51,7 +52,7 @@ function setup(initialInvites?: InviteResponse[]) {
       queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
     },
   })
-  if (initialInvites) queryClient.setQueryData(['invites'], initialInvites)
+  if (initialInvites) queryClient.setQueryData(inviteQueryKey, initialInvites)
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
@@ -200,6 +201,44 @@ describe('PendingInvitesSection', () => {
     ).toBeInTheDocument()
   })
 
+  it.each([
+    [
+      new ApiError('forbidden', 403),
+      'Você não tem permissão para revogar este convite.',
+    ],
+    [
+      new ApiError('not found', 404),
+      'Este convite não está mais disponível. Atualize a lista e tente novamente.',
+    ],
+    [
+      new ApiError('offline', undefined, undefined, undefined, {
+        networkError: true,
+      }),
+      'Erro de conexão. Verifique sua internet e tente novamente.',
+    ],
+  ])(
+    'maps revoke failures to a user-facing message',
+    async (error, message) => {
+      vi.mocked(inviteApi.list).mockResolvedValue({ data: [invite] } as never)
+      vi.mocked(inviteApi.revoke).mockRejectedValueOnce(error)
+      const { user } = setup()
+      await screen.findByText('colaborador@example.com')
+      await user.click(
+        screen.getByRole('button', {
+          name: 'Revogar convite para colaborador@example.com',
+        })
+      )
+      const dialog = await screen.findByRole('dialog')
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Revogar convite' })
+      )
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        message
+      )
+    }
+  )
+
   it('marks an expired invite and prevents opening a revoke dialog', async () => {
     const expired = {
       ...invite,
@@ -242,5 +281,48 @@ describe('PendingInvitesSection', () => {
       within(dialog).getByRole('button', { name: 'Revogar convite' })
     ).toBeDisabled()
     expect(inviteApi.revoke).not.toHaveBeenCalled()
+  })
+
+  it('keeps the selected invite expiry active after optimistic removal from the list', async () => {
+    vi.useFakeTimers()
+    const expiring = {
+      ...invite,
+      expiresAt: new Date(Date.now() + 1500).toISOString(),
+    }
+    let finishRevoke: () => void = () => undefined
+    vi.mocked(inviteApi.list).mockResolvedValue({ data: [expiring] } as never)
+    vi.mocked(inviteApi.revoke).mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishRevoke = resolve
+      }) as never
+    )
+    const { queryClient } = setup([expiring])
+    expect(screen.getByText('colaborador@example.com')).toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Revogar convite para colaborador@example.com',
+      })
+    )
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Revogar convite' })
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(queryClient.getQueryData(inviteQueryKey)).toEqual([])
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1600)
+    })
+
+    expect(
+      within(dialog).getByText(expiredDescriptionPattern)
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByRole('button', { name: 'Revogando…' })
+    ).toBeDisabled()
+    await act(async () => finishRevoke())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

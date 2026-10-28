@@ -7,7 +7,9 @@ import {
   RouterProvider,
 } from '@tanstack/react-router'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/api/errors'
 import type { SessionService } from '@/auth/session'
 import type { RouterContext } from '@/router-context'
 import { routerDefaults } from '@/router-defaults'
@@ -106,5 +108,53 @@ describe('account settings', () => {
     expect(screen.getByLabelText('Senha atual')).toBeInTheDocument()
     expect(apiMocks.getMe).toHaveBeenCalledOnce()
     expect(apiMocks.inviteList).not.toHaveBeenCalled()
+  })
+
+  it('shows the shared network message, keeps the edited name, and allows retry', async () => {
+    const user = userEvent.setup()
+    apiMocks.updateProfile
+      .mockRejectedValueOnce(
+        new ApiError('network failure', undefined, undefined, undefined, {
+          networkError: true,
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+    await renderAccountSettings()
+
+    const nameInput = await screen.findByRole('textbox', { name: 'Nome' })
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Nome atualizado')
+    await user.click(screen.getByRole('button', { name: 'Salvar nome' }))
+
+    expect(
+      await screen.findByText(
+        'Erro de conexão. Verifique sua internet e tente novamente.'
+      )
+    ).toBeInTheDocument()
+    expect(nameInput).toHaveValue('Nome atualizado')
+
+    await user.click(screen.getByRole('button', { name: 'Salvar nome' }))
+    expect(apiMocks.updateProfile).toHaveBeenNthCalledWith(2, {
+      name: 'Nome atualizado',
+    })
+  })
+
+  it('uses the account fallback without exposing an unclassified error', async () => {
+    apiMocks.updateProfile.mockRejectedValueOnce(new Error('Internal detail'))
+    const user = userEvent.setup()
+    await renderAccountSettings()
+
+    const nameInput = await screen.findByRole('textbox', { name: 'Nome' })
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Nome atualizado')
+    await user.click(screen.getByRole('button', { name: 'Salvar nome' }))
+
+    expect(
+      await screen.findByText(
+        'Não foi possível salvar o nome. Tente novamente.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Internal detail')).not.toBeInTheDocument()
+    expect(nameInput).toHaveValue('Nome atualizado')
   })
 })

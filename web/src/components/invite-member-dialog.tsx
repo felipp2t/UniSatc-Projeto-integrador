@@ -3,8 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { inviteApi } from '@/api/endpoints'
-import { toApiError } from '@/api/errors'
-import { inviteQueryKey } from '@/api/invite-helpers'
+import { getApiErrorMessage } from '@/api/get-api-error-message'
+import { inviteQueryKey } from '@/api/invites'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,7 +19,7 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { appToast } from '@/components/ui/toast'
 
-const emailSchema = z.string().trim().email('Informe um e-mail válido.')
+const emailSchema = z.string().trim().pipe(z.email('Informe um e-mail válido.'))
 
 export function InviteMemberDialog() {
   const queryClient = useQueryClient()
@@ -36,22 +36,21 @@ export function InviteMemberDialog() {
   const createInvite = useMutation({
     mutationFn: inviteApi.create,
     onError: (error) => {
-      const apiError = toApiError(error)
       setRequestError(
-        apiError.status === 409
-          ? 'Este e-mail já possui uma conta.'
-          : apiError.status === 403
-            ? 'Apenas o dono do workspace pode executar esta ação.'
-            : apiError.isNetworkError
-              ? 'Erro de conexão. Verifique sua internet e tente novamente.'
-              : 'Não foi possível criar o convite. Tente novamente.'
+        getApiErrorMessage(error, {
+          fallback: 'Não foi possível criar o convite. Tente novamente.',
+          statusMessages: {
+            403: 'Apenas o dono do workspace pode executar esta ação.',
+            409: 'Este e-mail já possui uma conta.',
+          },
+        })
       )
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: inviteQueryKey })
       appToast.success('Convite criado; e-mail encaminhado para envio')
       setOpen(false)
       reset()
+      await queryClient.invalidateQueries({ queryKey: inviteQueryKey })
     },
   })
   const submitting = createInvite.isPending

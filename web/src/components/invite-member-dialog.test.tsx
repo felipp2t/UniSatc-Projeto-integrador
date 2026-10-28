@@ -60,7 +60,14 @@ describe('InviteMemberDialog', () => {
   it('sends only the trimmed email, invalidates invite queries, announces success and resets', async () => {
     const { queryClient, user } = setup()
     create.mockResolvedValue(undefined)
-    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    let finishInvalidation: () => void = () => undefined
+    const invalidate = vi
+      .spyOn(queryClient, 'invalidateQueries')
+      .mockReturnValue(
+        new Promise<void>((resolve) => {
+          finishInvalidation = resolve
+        }) as never
+      )
     await user.click(screen.getByRole('button', { name: 'Convidar' }))
     const dialog = screen.getByRole('dialog')
     await user.type(
@@ -71,13 +78,15 @@ describe('InviteMemberDialog', () => {
       within(dialog).getByRole('button', { name: 'Criar convite' })
     )
 
-    await waitFor(() => expect(create).toHaveBeenCalledOnce())
+    await waitFor(() => expect(invalidate).toHaveBeenCalledOnce())
     expect(create.mock.calls[0]?.[0]).toEqual({ email: 'member@example.com' })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['invites'] })
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(success).toHaveBeenCalledWith(
       'Convite criado; e-mail encaminhado para envio'
     )
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    await act(async () => finishInvalidation())
     await user.click(screen.getByRole('button', { name: 'Convidar' }))
     expect(
       within(screen.getByRole('dialog')).getByLabelText('E-mail')
