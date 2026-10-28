@@ -70,7 +70,7 @@ export function Header({
 
   return (
     <header className={cnHeader(className)} {...props}>
-      <div className='mx-auto flex min-h-14 max-w-7xl items-center gap-4 px-6'>
+      <div className='container mx-auto flex min-h-14 items-center gap-4 px-8'>
         <Link
           className='shrink-0 font-bold font-mono text-lg text-primary tracking-widest'
           to='/'

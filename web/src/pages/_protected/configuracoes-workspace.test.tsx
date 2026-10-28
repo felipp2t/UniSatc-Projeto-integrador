@@ -1,0 +1,228 @@
+// @vitest-environment happy-dom
+
+import { QueryClient } from '@tanstack/react-query'
+import {
+  createMemoryHistory,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router'
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SessionService } from '@/auth/session'
+import type { RouterContext } from '@/router-context'
+import { routerDefaults } from '@/router-defaults'
+import { renderWithProviders } from '@/test/render'
+
+const workspaceApiMocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  listMembers: vi.fn(),
+}))
+
+vi.mock('@/api/endpoints', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/endpoints')>()
+  return {
+    ...actual,
+    workspaceApi: {
+      ...actual.workspaceApi,
+      list: workspaceApiMocks.list,
+      listMembers: workspaceApiMocks.listMembers,
+    },
+  }
+})
+
+import { routeTree } from '@/route-tree.gen'
+
+const workspaceId = 'workspace-1'
+const ownerId = 'owner-1'
+const retryButtonName = /tentar novamente|recarregar/i
+const members = [
+  {
+    email: 'ana@example.com',
+    id: 'membership-1',
+    name: 'Ana Owner',
+    roleName: 'owner',
+    userId: ownerId,
+  },
+  {
+    email: 'bia@example.com',
+    id: 'membership-2',
+    name: 'Bia Member',
+    roleName: 'member',
+    userId: 'member-2',
+  },
+]
+
+function createSession(userId: string): SessionService {
+  return {
+    dispose: vi.fn(),
+    handleSessionExpired: vi.fn(),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    logout: vi.fn().mockResolvedValue(undefined),
+    setNavigateToLogin: vi.fn(),
+    status: 'authenticated',
+    updateUser: vi.fn(),
+    user: { email: 'user@example.com', id: userId, name: 'User' },
+  }
+}
+
+async function renderWorkspaceSettings(userId: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
+    },
+  })
+  const router = createRouter({
+    context: {
+      permissionChecker: { can: () => true },
+      queryClient,
+      session: createSession(userId),
+    } satisfies RouterContext,
+    history: createMemoryHistory({
+      initialEntries: ['/configuracoes-workspace'],
+    }),
+    isServer: false,
+    routeTree,
+    ...routerDefaults,
+  })
+  router.startTransition = (transition) => {
+    transition()
+    return Promise.resolve(true)
+  }
+  router.updateLatestLocation()
+  await router.load({ sync: true })
+  return renderWithProviders(<RouterProvider router={router} />, {
+    queryClient,
+  })
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  workspaceApiMocks.list.mockResolvedValue({
+    data: [{ id: workspaceId, name: 'Workspace', ownerId }],
+  })
+  workspaceApiMocks.listMembers.mockResolvedValue({ data: members })
+})
+
+afterEach(() => vi.restoreAllMocks())
+
+describe('workspace members settings', () => {
+  it('shows emails only to the workspace owner and filters by name and role', async () => {
+    const user = userEvent.setup()
+    await renderWorkspaceSettings(ownerId)
+
+    expect(await screen.findByText('ana@example.com')).toBeInTheDocument()
+    expect(screen.getByText('bia@example.com')).toBeInTheDocument()
+    expect(workspaceApiMocks.listMembers).toHaveBeenCalledWith(workspaceId)
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Buscar membro por nome' }),
+      'Bia'
+    )
+    expect(screen.getByText('Bia Member')).toBeInTheDocument()
+    expect(screen.queryByText('ana@example.com')).not.toBeInTheDocument()
+
+    await user.clear(
+      screen.getByRole('textbox', { name: 'Buscar membro por nome' })
+    )
+    await user.click(
+      screen.getByRole('combobox', { name: 'Filtrar por cargo' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'owner' }))
+    expect(screen.getByText('Ana Owner')).toBeInTheDocument()
+    expect(screen.queryByText('Bia Member')).not.toBeInTheDocument()
+  }, 10_000)
+
+  it('hides emails from non-owners and disables member removal', async () => {
+    await renderWorkspaceSettings('member-2')
+
+    expect(await screen.findByText('Ana Owner')).toBeInTheDocument()
+    expect(screen.queryByText('ana@example.com')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('columnheader', { name: 'E-mail' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Remover Bia Member' })
+    ).toBeDisabled()
+  })
+
+  it('protects the last owner and never simulates a removal the API cannot perform', async () => {
+    const user = userEvent.setup()
+    await renderWorkspaceSettings(ownerId)
+
+    expect(
+      await screen.findByRole('button', { name: 'Remover Ana Owner' })
+    ).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Remover Bia Member' }))
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Bia Member')
+    expect(
+      screen.getByRole('button', { name: 'Remoção indisponível' })
+    ).toBeDisabled()
+  })
+
+  it('shows an empty result when no members match the search', async () => {
+    const user = userEvent.setup()
+    await renderWorkspaceSettings(ownerId)
+
+    await screen.findByText('Ana Owner')
+    await user.type(
+      screen.getByRole('textbox', { name: 'Buscar membro por nome' }),
+      'Ninguém'
+    )
+
+    expect(await screen.findByText('Nenhum resultado')).toBeInTheDocument()
+  })
+
+  it('offers retry when the members request fails', async () => {
+    workspaceApiMocks.listMembers.mockRejectedValueOnce(
+      new Error('Request failed')
+    )
+    await renderWorkspaceSettings(ownerId)
+
+    expect(
+      await screen.findByText('Não foi possível carregar os membros.')
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: retryButtonName })
+    ).toBeInTheDocument()
+  })
+
+  it('does not request members with an empty workspace ID when workspace loading is retried', async () => {
+    const user = userEvent.setup()
+    workspaceApiMocks.list
+      .mockRejectedValueOnce(new Error('Request failed'))
+      .mockResolvedValueOnce({
+        data: [{ id: workspaceId, name: 'Workspace', ownerId }],
+      })
+    await renderWorkspaceSettings(ownerId)
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: retryButtonName,
+      })
+    )
+
+    await waitFor(() => {
+      expect(workspaceApiMocks.listMembers).toHaveBeenCalledWith(workspaceId)
+    })
+    expect(workspaceApiMocks.listMembers).not.toHaveBeenCalledWith('')
+  })
+
+  it('hides cached member rows after the members request fails', async () => {
+    workspaceApiMocks.listMembers.mockResolvedValueOnce({ data: members })
+    const { queryClient } = await renderWorkspaceSettings(ownerId)
+    expect(await screen.findByText('Ana Owner')).toBeInTheDocument()
+
+    workspaceApiMocks.listMembers.mockRejectedValueOnce(
+      new Error('Access denied')
+    )
+    await queryClient.invalidateQueries({
+      queryKey: ['workspace-members', workspaceId],
+    })
+    expect(
+      await screen.findByText('Não foi possível carregar os membros.')
+    ).toBeInTheDocument()
+
+    expect(screen.queryByText('Ana Owner')).not.toBeInTheDocument()
+  })
+})
