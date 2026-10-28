@@ -7,6 +7,7 @@ import { userApi, workspaceApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { ChangePasswordForm } from '@/components/change-password-form'
+import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/ui/error-state'
@@ -225,6 +226,7 @@ function AccountSettingsPage() {
                       Consulte e revogue os convites enviados ao workspace.
                     </p>
                   </div>
+                  <InviteMemberDialog />
                   <PendingInvitesSection />
                 </section>
               </>
