@@ -97,7 +97,9 @@ function WorkspaceSettingsPage() {
     const matchesName = (member.name ?? '')
       .toLocaleLowerCase()
       .includes(search.trim().toLocaleLowerCase())
-    return matchesName && (roleFilter === 'all' || member.roleName === roleFilter)
+    return (
+      matchesName && (roleFilter === 'all' || member.roleName === roleFilter)
+    )
   })
   const ownerCount = (members.data ?? []).filter(
     (member) => member.roleName?.toLocaleLowerCase() === 'owner'
@@ -137,10 +139,7 @@ function WorkspaceSettingsPage() {
     <main className='container mx-auto space-y-6 px-8 py-12'>
       <header className='flex flex-col gap-6'>
         <AppBreadcrumb
-          items={[
-            { label: 'Início', to: '/' },
-            { label: 'Configurações' },
-          ]}
+          items={[{ label: 'Início', to: '/' }, { label: 'Configurações' }]}
         />
         <div className='flex items-center gap-4'>
           <GearIcon
