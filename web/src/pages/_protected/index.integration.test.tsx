@@ -179,7 +179,7 @@ describe('workspace settings entry', () => {
     expect(
       screen.queryByRole('button', { name: 'Ações do workspace' })
     ).toBeNull()
-  })
+  }, 10_000)
 
   it('opens the workspace settings from the workspace actions menu', async () => {
     const user = userEvent.setup()

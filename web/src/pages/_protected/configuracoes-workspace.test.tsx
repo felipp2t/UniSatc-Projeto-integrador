@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionService } from '@/auth/session'
@@ -18,11 +18,20 @@ const workspaceApiMocks = vi.hoisted(() => ({
   list: vi.fn(),
   listMembers: vi.fn(),
 }))
+const inviteApiMocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  list: vi.fn(),
+}))
 
 vi.mock('@/api/endpoints', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/endpoints')>()
   return {
     ...actual,
+    inviteApi: {
+      ...actual.inviteApi,
+      create: inviteApiMocks.create,
+      list: inviteApiMocks.list,
+    },
     workspaceApi: {
       ...actual.workspaceApi,
       list: workspaceApiMocks.list,
@@ -102,6 +111,8 @@ beforeEach(() => {
     data: [{ id: workspaceId, name: 'Workspace', ownerId }],
   })
   workspaceApiMocks.listMembers.mockResolvedValue({ data: members })
+  inviteApiMocks.create.mockResolvedValue(undefined)
+  inviteApiMocks.list.mockResolvedValue({ data: [] })
 })
 
 afterEach(() => vi.restoreAllMocks())
@@ -144,6 +155,73 @@ describe('workspace members settings', () => {
     expect(
       screen.getByRole('button', { name: 'Remover Bia Member' })
     ).toBeDisabled()
+    expect(
+      screen.getByRole('combobox', { name: 'Cargo de Bia Member' })
+    ).toBeDisabled()
+    expect(screen.queryByRole('tab', { name: 'Convites' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Convidar' })).toBeNull()
+  })
+
+  it('shows member count, invites and invite action to the owner', async () => {
+    await renderWorkspaceSettings(ownerId)
+
+    expect(
+      await screen.findByRole('tab', { name: 'Membros (2)' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Convites' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Convidar' })).toBeInTheDocument()
+  })
+
+  it('loads invites only after opening the tab and refreshes after creating one', async () => {
+    const user = userEvent.setup()
+    const existingInvite = {
+      createdAt: '2026-10-20T12:00:00Z',
+      email: 'existing@example.com',
+      expiresAt: '2026-11-03T12:00:00Z',
+      id: 'invite-1',
+      invitedByName: 'Ana Owner',
+      invitedByUserId: ownerId,
+    }
+    const createdInvite = {
+      ...existingInvite,
+      email: 'new@example.com',
+      id: 'invite-2',
+    }
+    inviteApiMocks.list
+      .mockResolvedValueOnce({ data: [existingInvite] })
+      .mockResolvedValueOnce({ data: [existingInvite, createdInvite] })
+    await renderWorkspaceSettings(ownerId)
+
+    await screen.findByRole('tab', { name: 'Convites' })
+    expect(inviteApiMocks.list).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('tab', { name: 'Convites' }))
+    expect(await screen.findByText('existing@example.com')).toBeInTheDocument()
+    expect(inviteApiMocks.list).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'Convidar' }))
+    const dialog = screen.getByRole('dialog')
+    await user.type(within(dialog).getByLabelText('E-mail'), 'new@example.com')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Criar convite' })
+    )
+
+    await waitFor(() => expect(inviteApiMocks.create).toHaveBeenCalledOnce())
+    expect(inviteApiMocks.create).toHaveBeenCalledWith({
+      email: 'new@example.com',
+    })
+    expect(await screen.findByText('new@example.com')).toBeInTheDocument()
+    expect(inviteApiMocks.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('locks the role select only for the signed-in member', async () => {
+    await renderWorkspaceSettings(ownerId)
+
+    expect(
+      await screen.findByRole('combobox', { name: 'Cargo de Ana Owner' })
+    ).toBeDisabled()
+    expect(
+      screen.getByRole('combobox', { name: 'Cargo de Bia Member' })
+    ).toBeEnabled()
   })
 
   it('protects the last owner and never simulates a removal the API cannot perform', async () => {
