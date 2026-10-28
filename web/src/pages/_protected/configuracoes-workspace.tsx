@@ -25,6 +25,13 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import { LoadingState } from '@/components/ui/loading-state'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -36,7 +43,7 @@ export const Route = createFileRoute('/_protected/configuracoes-workspace')({
 function WorkspaceSettingsPage() {
   const { session } = Route.useRouteContext()
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
   const [selectedMember, setSelectedMember] = useState<{
     id: string
     name: string
@@ -62,12 +69,6 @@ function WorkspaceSettingsPage() {
     if (!workspaceId) return
     await members.refetch()
   }, [members.refetch, workspaceId])
-  const updateRoleFilter = useCallback(
-    (event: React.ChangeEvent<HTMLSelectElement>) => {
-      setRoleFilter(event.target.value)
-    },
-    []
-  )
   const clearSelectedMember = useCallback(
     () => setSelectedMember(undefined),
     []
@@ -96,7 +97,7 @@ function WorkspaceSettingsPage() {
     const matchesName = (member.name ?? '')
       .toLocaleLowerCase()
       .includes(search.trim().toLocaleLowerCase())
-    return matchesName && (!roleFilter || member.roleName === roleFilter)
+    return matchesName && (roleFilter === 'all' || member.roleName === roleFilter)
   })
   const ownerCount = (members.data ?? []).filter(
     (member) => member.roleName?.toLocaleLowerCase() === 'owner'
@@ -139,7 +140,6 @@ function WorkspaceSettingsPage() {
           items={[
             { label: 'Início', to: '/' },
             { label: 'Configurações' },
-            { label: 'Membros' },
           ]}
         />
         <div className='flex items-center gap-4'>
@@ -155,12 +155,6 @@ function WorkspaceSettingsPage() {
           aria-label='Configurações do workspace'
           className='flex w-full shrink-0 flex-col gap-1 sm:w-52'
         >
-          <Link
-            className='flex items-center gap-2.5 border-transparent border-l-2 px-3 py-2 font-mono font-semibold text-muted-foreground text-xs uppercase tracking-wide transition-colors hover:bg-muted/30 hover:text-foreground'
-            to='/configuracoes'
-          >
-            <GearIcon aria-hidden='true' className='size-3.5 shrink-0' /> Conta
-          </Link>
           <Link
             activeProps={{
               className: 'border-primary bg-primary/10 text-primary',
@@ -206,29 +200,23 @@ function WorkspaceSettingsPage() {
                 className='pl-9'
                 id='member-search'
                 onValueChange={setSearch}
-                placeholder='Buscar por nome…'
+                placeholder='Buscar por nome'
                 value={search}
               />
             </div>
-            <div className='flex items-center gap-2 font-mono text-xs'>
-              <label className='sr-only' htmlFor='member-role-filter'>
-                Filtrar por cargo
-              </label>
-              <select
-                aria-label='Filtrar por cargo'
-                className='h-9 min-w-40 border border-input bg-background px-3 font-mono text-xs uppercase'
-                id='member-role-filter'
-                onChange={updateRoleFilter}
-                value={roleFilter}
-              >
-                <option value=''>Todos os cargos</option>
+            <Select onValueChange={setRoleFilter} value={roleFilter}>
+              <SelectTrigger aria-label='Filtrar por cargo' className='w-40'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Todos os cargos</SelectItem>
                 {roles.map((role) => (
-                  <option key={role} value={role}>
+                  <SelectItem key={role} value={role}>
                     {role}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </div>
+              </SelectContent>
+            </Select>
           </div>
           <Tabs defaultValue='members'>
             <TabsList>

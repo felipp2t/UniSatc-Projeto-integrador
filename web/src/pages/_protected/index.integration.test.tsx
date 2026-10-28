@@ -171,6 +171,32 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks())
 
+describe('workspace settings entry', () => {
+  it('hides the workspace actions menu inside a collection', async () => {
+    await renderAt(`/?collectionId=${folderAId}`)
+
+    await screen.findByRole('heading', { name: 'Folder A' })
+    expect(
+      screen.queryByRole('button', { name: 'Ações do workspace' })
+    ).toBeNull()
+  })
+
+  it('opens the workspace settings from the workspace actions menu', async () => {
+    const user = userEvent.setup()
+    await renderAt('/')
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Ações do workspace' })
+    )
+
+    expect(
+      await screen.findByRole('menuitem', {
+        name: 'Configurações do workspace',
+      })
+    ).toHaveAttribute('href', '/configuracoes-workspace')
+  })
+})
+
 describe('workspace collection navigation', () => {
   it('creates a root folder from the header and trims the name', async () => {
     const user = userEvent.setup()

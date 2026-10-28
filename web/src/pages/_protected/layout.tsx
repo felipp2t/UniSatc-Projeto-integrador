@@ -54,7 +54,6 @@ function ProtectedLayout() {
           onLogout={handleLogout}
           userEmail={session.user?.email}
           userName={session.user?.name}
-          workspaceSettingsTo='/configuracoes-workspace'
         />
         <OfflineBanner />
         <div className='flex min-h-0 flex-1 overflow-hidden'>

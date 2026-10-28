@@ -125,10 +125,10 @@ describe('workspace members settings', () => {
     await user.clear(
       screen.getByRole('textbox', { name: 'Buscar membro por nome' })
     )
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Filtrar por cargo' }),
-      'owner'
+    await user.click(
+      screen.getByRole('combobox', { name: 'Filtrar por cargo' })
     )
+    await user.click(await screen.findByRole('option', { name: 'owner' }))
     expect(screen.getByText('Ana Owner')).toBeInTheDocument()
     expect(screen.queryByText('Bia Member')).not.toBeInTheDocument()
   }, 10_000)
