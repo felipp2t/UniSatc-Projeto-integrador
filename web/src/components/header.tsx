@@ -30,10 +30,12 @@ interface HeaderProps extends React.ComponentProps<'header'> {
   onOpenNotification?: (notification: NotificationData) => void
   userEmail?: string
   userName?: string
+  workspaceSettingsTo?: AppRoute
 }
 
 export function Header({
   accountTo,
+  workspaceSettingsTo,
   notifications,
   onAccountSettings,
   onLogout,
@@ -129,6 +131,17 @@ export function Header({
                       <GearIcon aria-hidden='true' size={14} />
                       Configurações da conta
                     </button>
+                  </DropdownMenuItem>
+                ) : null}
+                {workspaceSettingsTo ? (
+                  <DropdownMenuItem asChild>
+                    <Link
+                      className='flex w-full items-center gap-2'
+                      to={workspaceSettingsTo}
+                    >
+                      <GearIcon aria-hidden='true' size={14} />
+                      Configurações do workspace
+                    </Link>
                   </DropdownMenuItem>
                 ) : null}
                 {onLogout ? (
