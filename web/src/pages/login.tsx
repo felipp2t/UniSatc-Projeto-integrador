@@ -2,15 +2,24 @@ import { FolderIcon } from '@phosphor-icons/react'
 import { revalidateLogic, useForm, useSelector } from '@tanstack/react-form'
 import {
   createFileRoute,
+  Link,
   useNavigate,
   useRouteContext,
 } from '@tanstack/react-router'
-import { cn } from 'cn'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { authApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import { sanitizeInternalRedirect } from '@/auth/redirect'
+import {
+  authButtonClassName,
+  authErrorClassName,
+  authInputClassName,
+  authLabelClassName,
+  authLinkClassName,
+  authSecretContainerClassName,
+  authSecretInputClassName,
+} from '@/components/auth-form-styles'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -19,9 +28,7 @@ import {
   FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-
-const inputClassName =
-  'dark:border-input/40 focus-visible:outline-none focus-visible:border-input/40 focus-visible:ring-2 focus-visible:ring-input/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+import { SecretInput } from '@/components/ui/secret-input'
 
 export const Route = createFileRoute('/login')({
   component: LoginPage,
@@ -49,8 +56,8 @@ function LoginPage() {
         const apiError = toApiError(cause)
         setError(
           apiError.isRateLimited
-            ? 'Too many login attempts. Please wait a few minutes before trying again.'
-            : 'Invalid email or password.'
+            ? 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.'
+            : 'E-mail ou senha inválidos.'
         )
         return
       }
@@ -58,9 +65,7 @@ function LoginPage() {
       try {
         await session.initialize(true)
         if (session.status !== 'authenticated') {
-          setError(
-            'Unable to confirm your session. Please try logging in again.'
-          )
+          setError('Não foi possível confirmar sua sessão. Entre novamente.')
           return
         }
 
@@ -70,7 +75,7 @@ function LoginPage() {
         })
       } catch {
         setError(
-          'Login succeeded, but we could not continue. Please try again.'
+          'Login realizado, mas não foi possível continuar. Tente novamente.'
         )
       }
     },
@@ -80,10 +85,10 @@ function LoginPage() {
     }),
     validators: {
       onSubmit: z.object({
-        email: z.email('Please enter a valid email address.'),
+        email: z.email('Informe um e-mail válido.'),
         password: z
           .string()
-          .min(6, 'Password must be at least 6 characters long.'),
+          .min(6, 'A senha deve ter pelo menos 6 caracteres.'),
       }),
     },
   })
@@ -119,7 +124,7 @@ function LoginPage() {
                   <span className='sr-only'>Vaulty</span>
                 </a>
                 <h1 className='font-bold text-xl' id={`${formId}-title`}>
-                  Welcome to Vaulty
+                  Bem-vindo ao Vaulty
                 </h1>
               </div>
 
@@ -132,31 +137,25 @@ function LoginPage() {
                     return (
                       <Field data-invalid={invalid}>
                         <FieldLabel
-                          className='font-sans text-sm leading-none'
+                          className={authLabelClassName}
                           htmlFor={field.name}
                         >
-                          Email
+                          E-mail
                         </FieldLabel>
                         <Input
                           aria-describedby={invalid ? errorId : undefined}
                           aria-invalid={invalid}
                           autoComplete='off'
-                          className={cn(
-                            inputClassName,
-                            'rounded-md bg-background py-1 font-sans text-base md:text-sm'
-                          )}
+                          className={authInputClassName}
                           disabled={submitting}
                           id={field.name}
                           name={field.name}
                           onBlur={field.handleBlur}
                           onValueChange={field.handleChange}
-                          placeholder='your.email@example.com'
+                          placeholder='seu.email@exemplo.com'
                           value={field.state.value}
                         />
-                        <FieldError
-                          className='font-normal text-sm'
-                          id={errorId}
-                        >
+                        <FieldError className={authErrorClassName} id={errorId}>
                           {field.state.meta.errors[0]?.message}
                         </FieldError>
                       </Field>
@@ -170,33 +169,35 @@ function LoginPage() {
                       field.state.meta.isTouched && !field.state.meta.isValid
                     return (
                       <Field data-invalid={invalid}>
-                        <FieldLabel
-                          className='font-sans text-sm leading-none'
-                          htmlFor={field.name}
-                        >
-                          Password
-                        </FieldLabel>
-                        <Input
+                        <div className='flex items-center justify-between'>
+                          <FieldLabel
+                            className={authLabelClassName}
+                            htmlFor={field.name}
+                          >
+                            Senha
+                          </FieldLabel>
+                          <Link
+                            className={authLinkClassName}
+                            to='/esqueci-senha'
+                          >
+                            Esqueceu a senha?
+                          </Link>
+                        </div>
+                        <SecretInput
                           aria-describedby={invalid ? errorId : undefined}
                           aria-invalid={invalid}
                           autoComplete='off'
-                          className={cn(
-                            inputClassName,
-                            'rounded-md bg-background py-1 font-sans text-base md:text-sm'
-                          )}
+                          className={authSecretInputClassName}
+                          containerClassName={authSecretContainerClassName}
                           disabled={submitting}
                           id={field.name}
                           name={field.name}
                           onBlur={field.handleBlur}
                           onValueChange={field.handleChange}
                           placeholder='123456'
-                          type='password'
                           value={field.state.value}
                         />
-                        <FieldError
-                          className='font-normal text-sm'
-                          id={errorId}
-                        >
+                        <FieldError className={authErrorClassName} id={errorId}>
                           {field.state.meta.errors[0]?.message ? (
                             <p>{field.state.meta.errors[0].message}</p>
                           ) : null}
@@ -213,12 +214,12 @@ function LoginPage() {
               ) : null}
               <Field>
                 <Button
-                  className='cursor-pointer rounded-md font-bold tracking-[0.05em] hover:bg-primary hover:brightness-110'
+                  className={authButtonClassName}
                   disabled={!canSubmit || submitting}
                   loading={submitting}
                   type='submit'
                 >
-                  {submitting ? 'Logging in...' : 'Login'}
+                  {submitting ? 'Entrando...' : 'Entrar'}
                 </Button>
               </Field>
             </FieldGroup>
