@@ -55,7 +55,6 @@ export function PendingInvitesSection() {
       if (context?.previousInvites) {
         queryClient.setQueryData(inviteQueryKey, context.previousInvites)
       }
-      appToast.error('Não foi possível revogar o convite.')
     },
     onMutate: async (inviteId) => {
       await queryClient.cancelQueries({ queryKey: inviteQueryKey })
@@ -304,6 +303,5 @@ function getRevokeError(cause: unknown) {
       404: 'Este convite não está mais disponível. Atualize a lista e tente novamente.',
       409: 'Este convite não está mais disponível. Atualize a lista e tente novamente.',
     },
-    useServerMessage: true,
   })
 }

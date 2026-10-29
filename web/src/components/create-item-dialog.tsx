@@ -396,7 +396,6 @@ function getCreateError(error: unknown, type: CreateItemType) {
       type === 'secret'
         ? 'Não foi possível confirmar o cadastro do segredo. Confira se ele foi criado antes de tentar novamente.'
         : 'Não foi possível confirmar o cadastro. Confira se o item foi criado antes de tentar novamente.',
-    networkFirst: true,
     statusMessages: {
       409: 'Já existe um item com esse título nessa localização.',
     },

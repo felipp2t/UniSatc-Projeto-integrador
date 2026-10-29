@@ -44,6 +44,22 @@ const expiresAtPattern = /Expira em/
 const rolePattern = /cargo|role/i
 const confirmationPattern = /Tem certeza/
 const expiredDescriptionPattern = /expirou e não pode mais ser revogado/
+const { toastError, toastSuccess } = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}))
+
+vi.mock('@/components/ui/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/ui/toast')>()
+  return {
+    ...actual,
+    appToast: {
+      ...actual.appToast,
+      error: toastError,
+      success: toastSuccess,
+    },
+  }
+})
 
 function setup(initialInvites?: InviteResponse[]) {
   const queryClient = new QueryClient({
@@ -69,6 +85,8 @@ function setup(initialInvites?: InviteResponse[]) {
 beforeEach(() => {
   vi.mocked(inviteApi.list).mockReset()
   vi.mocked(inviteApi.revoke).mockReset()
+  toastError.mockReset()
+  toastSuccess.mockReset()
 })
 
 afterEach(() => {
@@ -190,6 +208,7 @@ describe('PendingInvitesSection', () => {
     expect(
       within(dialog).getByRole('button', { name: 'Revogar convite' })
     ).toBeEnabled()
+    expect(toastError).not.toHaveBeenCalled()
 
     await user.click(
       within(dialog).getByRole('button', { name: 'Revogar convite' })
@@ -238,6 +257,31 @@ describe('PendingInvitesSection', () => {
       )
     }
   )
+
+  it('keeps server details out of revoke errors and does not show an error toast', async () => {
+    vi.mocked(inviteApi.list).mockResolvedValue({ data: [invite] } as never)
+    vi.mocked(inviteApi.revoke).mockRejectedValueOnce(
+      new ApiError('Sensitive revoke detail', 500)
+    )
+    const { user } = setup()
+    await screen.findByText('colaborador@example.com')
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Revogar convite para colaborador@example.com',
+      })
+    )
+    const dialog = await screen.findByRole('dialog')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Revogar convite' })
+    )
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Não foi possível revogar o convite. Tente novamente.'
+    )
+    expect(within(dialog).queryByText('Sensitive revoke detail')).toBeNull()
+    expect(toastError).not.toHaveBeenCalled()
+    expect(toastSuccess).not.toHaveBeenCalled()
+  })
 
   it('marks an expired invite and prevents opening a revoke dialog', async () => {
     const expired = {

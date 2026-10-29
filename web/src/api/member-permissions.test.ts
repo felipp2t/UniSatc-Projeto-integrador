@@ -16,7 +16,6 @@ describe('workspace member permissions', () => {
     ).toMatchObject({
       canChangeRole: true,
       canRemove: true,
-      canRequestRemoval: true,
       changeRoleReason: undefined,
       isOwner: true,
       isSelf: false,
@@ -35,7 +34,6 @@ describe('workspace member permissions', () => {
     ).toMatchObject({
       canChangeRole: false,
       canRemove: false,
-      canRequestRemoval: false,
       isLastOwner: true,
       isSelf: true,
       removeReason: 'O último dono do workspace não pode ser removido.',
@@ -53,7 +51,6 @@ describe('workspace member permissions', () => {
     ).toMatchObject({
       canChangeRole: false,
       canRemove: false,
-      canRequestRemoval: true,
       changeRoleReason:
         'A alteração de cargo ainda não está disponível na API.',
       removeReason: 'A remoção ainda não está disponível na API do servidor.',
@@ -83,7 +80,6 @@ describe('workspace member permissions', () => {
     ).toMatchObject({
       canChangeRole: false,
       canRemove: false,
-      canRequestRemoval: false,
       changeRoleReason: 'Somente um dono pode alterar cargos.',
       removeReason: 'Somente um dono pode remover membros.',
     })

@@ -1,5 +1,14 @@
 export const MEMBER_MANAGEMENT_AVAILABLE: boolean = false
 
+export type MemberPermissions = ReturnType<typeof getMemberPermissions>
+
+export function isWorkspaceOwner(
+  currentUserId: string | undefined,
+  workspaceOwnerId: string | undefined
+) {
+  return Boolean(currentUserId && currentUserId === workspaceOwnerId)
+}
+
 export function getMemberPermissions({
   currentUserId,
   workspaceOwnerId,
@@ -11,17 +20,14 @@ export function getMemberPermissions({
   memberUserId: string
   managementAvailable?: boolean
 }) {
-  const isOwner = Boolean(currentUserId && currentUserId === workspaceOwnerId)
+  const isOwner = isWorkspaceOwner(currentUserId, workspaceOwnerId)
   const isSelf = currentUserId === memberUserId
   const isLastOwner = Boolean(
     workspaceOwnerId && memberUserId === workspaceOwnerId
   )
-  const canRequestRemoval = isOwner && !isLastOwner
-
   return {
     canChangeRole: managementAvailable && isOwner && !isSelf,
-    canRemove: managementAvailable && canRequestRemoval,
-    canRequestRemoval,
+    canRemove: managementAvailable && isOwner && !isLastOwner,
     changeRoleReason: isOwner
       ? isSelf
         ? 'Você não pode alterar o próprio cargo.'

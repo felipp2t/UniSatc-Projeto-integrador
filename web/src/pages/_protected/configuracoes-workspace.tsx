@@ -15,7 +15,11 @@ import { useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
 import { isForbiddenOrNotFound } from '@/api/http-status'
-import { getMemberPermissions } from '@/api/member-permissions'
+import {
+  getMemberPermissions,
+  isWorkspaceOwner,
+  type MemberPermissions,
+} from '@/api/member-permissions'
 import type { WorkspaceMemberResponse } from '@/api/types'
 import { workspaceMembersQueryKey } from '@/api/workspace-keys'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
@@ -76,20 +80,7 @@ function WorkspaceSettingsPage() {
   const retryMembers = useCallback(async () => {
     await members.refetch()
   }, [members.refetch])
-  const isOwner = Boolean(
-    session.user?.id && currentWorkspace?.ownerId === session.user.id
-  )
-  const selectedMemberPermissions = useMemo(
-    () =>
-      selectedMember
-        ? getMemberPermissions({
-            currentUserId: session.user?.id,
-            memberUserId: selectedMember.userId,
-            workspaceOwnerId: currentWorkspace?.ownerId,
-          })
-        : undefined,
-    [currentWorkspace?.ownerId, selectedMember, session.user?.id]
-  )
+  const isOwner = isWorkspaceOwner(session.user?.id, currentWorkspace?.ownerId)
   const removeMember = useMutation({
     mutationFn: (memberUserId: string) => {
       if (!workspaceId) throw new Error('Workspace indisponível.')
@@ -147,26 +138,19 @@ function WorkspaceSettingsPage() {
     [clearSelectedMember]
   )
   const requestRemoveMember = useCallback(
-    (member: WorkspaceMemberResponse) => {
-      if (
-        getMemberPermissions({
-          currentUserId: session.user?.id,
-          memberUserId: member.userId,
-          workspaceOwnerId: currentWorkspace?.ownerId,
-        }).canRequestRemoval
-      ) {
+    (member: WorkspaceMemberResponse, permissions: MemberPermissions) => {
+      if (permissions.canRemove) {
         setSelectedMember(member)
       }
     },
-    [currentWorkspace?.ownerId, session.user?.id]
+    []
   )
   const handleRoleChange = useCallback(
-    (member: WorkspaceMemberResponse, roleName: string) => {
-      const permissions = getMemberPermissions({
-        currentUserId: session.user?.id,
-        memberUserId: member.userId,
-        workspaceOwnerId: currentWorkspace?.ownerId,
-      })
+    (
+      member: WorkspaceMemberResponse,
+      permissions: MemberPermissions,
+      roleName: string
+    ) => {
       if (!permissions.canChangeRole) return
       const roleId = members.data?.find(
         (candidate) => candidate.roleName === roleName
@@ -174,26 +158,12 @@ function WorkspaceSettingsPage() {
       if (roleId)
         updateMemberRole.mutate({ memberUserId: member.userId, roleId })
     },
-    [
-      currentWorkspace?.ownerId,
-      members.data,
-      session.user?.id,
-      updateMemberRole.mutate,
-    ]
+    [members.data, updateMemberRole.mutate]
   )
   const confirmRemoveMember = useCallback(() => {
-    if (
-      !(selectedMember && workspaceId && selectedMemberPermissions?.canRemove)
-    ) {
-      return
-    }
+    if (!(selectedMember && workspaceId)) return
     removeMember.mutate(selectedMember.userId)
-  }, [
-    removeMember.mutate,
-    selectedMember,
-    selectedMemberPermissions,
-    workspaceId,
-  ])
+  }, [removeMember.mutate, selectedMember, workspaceId])
   const roles = useMemo(
     () =>
       [
@@ -224,7 +194,7 @@ function WorkspaceSettingsPage() {
     )
   if (!currentWorkspace?.id) {
     return (
-      <main className='container mx-auto px-8 py-12'>
+      <main className='container mx-auto px-4 py-8 md:px-8 md:py-12'>
         <EmptyState
           description='Você precisa estar vinculado a um workspace para consultar os membros. Peça a um dono para verificar seu acesso.'
           title='Nenhum workspace disponível'
@@ -234,7 +204,7 @@ function WorkspaceSettingsPage() {
   }
 
   return (
-    <main className='container mx-auto space-y-6 px-8 py-12'>
+    <main className='container mx-auto space-y-6 px-4 py-8 md:px-8 md:py-12'>
       <header className='flex flex-col gap-6'>
         <AppBreadcrumb
           items={[
@@ -242,18 +212,20 @@ function WorkspaceSettingsPage() {
             { label: 'Membros do workspace' },
           ]}
         />
-        <div className='flex items-center gap-4'>
+        <div className='flex min-w-0 items-center gap-4'>
           <GearIcon
             aria-hidden='true'
             className='size-6 shrink-0 text-primary'
           />
-          <h1 className='font-bold font-mono text-3xl'>MEMBROS DO WORKSPACE</h1>
+          <h1 className='truncate font-bold font-mono text-xl md:text-3xl'>
+            MEMBROS DO WORKSPACE
+          </h1>
         </div>
       </header>
-      <div className='flex min-w-0 flex-col gap-8 sm:flex-row'>
+      <div className='flex min-w-0 flex-col gap-8 md:flex-row'>
         <nav
           aria-label='Configurações do workspace'
-          className='flex w-full shrink-0 flex-col gap-1 sm:w-52'
+          className='hidden w-full shrink-0 flex-col gap-1 md:flex md:w-52'
         >
           <Link
             activeProps={{
@@ -270,8 +242,7 @@ function WorkspaceSettingsPage() {
             Membros
           </Link>
         </nav>
-        <Separator className='hidden h-auto sm:block' orientation='vertical' />
-        <Separator className='sm:hidden' />
+        <Separator className='hidden h-auto md:block' orientation='vertical' />
         <section aria-label='Membros e convites' className='min-w-0 flex-1'>
           <Tabs defaultValue='members'>
             <div className='flex flex-wrap items-center justify-between gap-3'>
@@ -286,7 +257,7 @@ function WorkspaceSettingsPage() {
               {isOwner ? <InviteMemberDialog /> : null}
             </div>
             <TabsContent className='mt-4 space-y-4' value='members'>
-              <div className='flex flex-col gap-2 sm:flex-row'>
+              <div className='flex flex-col gap-2 md:flex-row'>
                 <div className='relative flex-1'>
                   <label className='sr-only' htmlFor='member-search'>
                     Buscar membro por nome
@@ -306,7 +277,7 @@ function WorkspaceSettingsPage() {
                 <Select onValueChange={setRoleFilter} value={roleFilter}>
                   <SelectTrigger
                     aria-label='Filtrar por cargo'
-                    className='w-40'
+                    className='w-full md:w-40'
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -351,9 +322,6 @@ function WorkspaceSettingsPage() {
               {selectedMember?.roleName})?
             </DialogDescription>
           </DialogHeader>
-          <p className='text-muted-foreground text-sm' role='status'>
-            {selectedMemberPermissions?.removeReason}
-          </p>
           {removeError ? (
             <p className='text-destructive text-sm' role='alert'>
               {removeError}
@@ -368,9 +336,7 @@ function WorkspaceSettingsPage() {
               Cancelar
             </Button>
             <Button
-              disabled={
-                !selectedMemberPermissions?.canRemove || removeMember.isPending
-              }
+              disabled={removeMember.isPending}
               loading={removeMember.isPending}
               onClick={confirmRemoveMember}
               variant='destructive'
@@ -401,8 +367,15 @@ function MembersList({
   isOwner: boolean
   memberAccessDenied: boolean
   members: UseQueryResult<WorkspaceMemberResponse[]>
-  onRemoveRequest: (member: WorkspaceMemberResponse) => void
-  onRoleChange: (member: WorkspaceMemberResponse, roleName: string) => void
+  onRemoveRequest: (
+    member: WorkspaceMemberResponse,
+    permissions: MemberPermissions
+  ) => void
+  onRoleChange: (
+    member: WorkspaceMemberResponse,
+    permissions: MemberPermissions,
+    roleName: string
+  ) => void
   onRetry: () => Promise<void>
   roles: string[]
   workspaceOwnerId: string | undefined
@@ -439,14 +412,27 @@ function MembersList({
     )
   }
 
+  const membersWithPermissions = filteredMembers.map((member) => ({
+    member,
+    permissions: getMemberPermissions({
+      currentUserId,
+      memberUserId: member.userId,
+      workspaceOwnerId,
+    }),
+  }))
   return (
     <div className='max-h-120 overflow-auto border border-border'>
       <table
         aria-label='Membros e cargos'
-        className='w-full border-collapse text-left'
+        className='w-full table-fixed border-collapse text-left'
       >
+        <colgroup>
+          <col />
+          <col className='w-24 md:w-36' />
+          {isOwner ? <col className='w-11 md:w-15' /> : null}
+        </colgroup>
         <tbody className='divide-y divide-border'>
-          {filteredMembers.map((member, index) => (
+          {membersWithPermissions.map(({ member, permissions }, index) => (
             <MemberRow
               index={index}
               isOwner={isOwner}
@@ -454,11 +440,7 @@ function MembersList({
               member={member}
               onRemoveRequest={onRemoveRequest}
               onRoleChange={onRoleChange}
-              permissions={getMemberPermissions({
-                currentUserId,
-                memberUserId: member.userId,
-                workspaceOwnerId,
-              })}
+              permissions={permissions}
               roles={roles}
             />
           ))}
@@ -480,24 +462,31 @@ function MemberRow({
   index: number
   isOwner: boolean
   member: WorkspaceMemberResponse
-  onRemoveRequest: (member: WorkspaceMemberResponse) => void
-  onRoleChange: (member: WorkspaceMemberResponse, roleName: string) => void
-  permissions: ReturnType<typeof getMemberPermissions>
+  onRemoveRequest: (
+    member: WorkspaceMemberResponse,
+    permissions: MemberPermissions
+  ) => void
+  onRoleChange: (
+    member: WorkspaceMemberResponse,
+    permissions: MemberPermissions,
+    roleName: string
+  ) => void
+  permissions: MemberPermissions
   roles: string[]
 }) {
   const { name } = member
   const handleRemoveRequest = useCallback(
-    () => onRemoveRequest(member),
-    [member, onRemoveRequest]
+    () => onRemoveRequest(member, permissions),
+    [member, onRemoveRequest, permissions]
   )
   const handleRoleChange = useCallback(
-    (roleName: string) => onRoleChange(member, roleName),
-    [member, onRoleChange]
+    (roleName: string) => onRoleChange(member, permissions, roleName),
+    [member, onRoleChange, permissions]
   )
 
   return (
     <tr className={index % 2 === 0 ? 'bg-card' : 'bg-muted/10'}>
-      <td className='px-4 py-3'>
+      <td className='max-w-0 px-2 py-3 md:px-4'>
         <div className='flex items-center gap-3'>
           <span
             aria-hidden='true'
@@ -517,7 +506,7 @@ function MemberRow({
           </div>
         </div>
       </td>
-      <td className='px-2 py-3'>
+      <td className='px-1 py-3 md:px-2'>
         <Select
           disabled={!permissions.canChangeRole}
           onValueChange={handleRoleChange}
@@ -525,10 +514,10 @@ function MemberRow({
         >
           <SelectTrigger
             aria-label={`Cargo de ${name}`}
-            className='w-36 border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase'
+            className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
             title={permissions.changeRoleReason ?? 'Cargo disponível.'}
           >
-            <SelectValue />
+            <SelectValue className='truncate' />
           </SelectTrigger>
           <SelectContent>
             {roles.map((role) => (
@@ -540,11 +529,11 @@ function MemberRow({
         </Select>
       </td>
       {isOwner ? (
-        <td className='px-3 py-3 text-right'>
+        <td className='px-2 py-3 text-right md:px-4'>
           <Button
             aria-label={`Remover ${name}`}
             className='size-7 shrink-0 border border-destructive/40 text-destructive hover:bg-destructive/10'
-            disabled={!permissions.canRequestRemoval}
+            disabled={!permissions.canRemove}
             onClick={handleRemoveRequest}
             size='icon'
             title={permissions.removeReason ?? 'Remover membro.'}

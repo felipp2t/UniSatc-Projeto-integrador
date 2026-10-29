@@ -153,7 +153,7 @@ describe('workspace members settings', () => {
     await user.click(await screen.findByRole('option', { name: 'owner' }))
     expect(screen.getByText('Ana Owner')).toBeInTheDocument()
     expect(screen.queryByText('Bia Member')).not.toBeInTheDocument()
-  }, 10_000)
+  })
 
   it('hides emails and invite actions from non-owners', async () => {
     await renderWorkspaceSettings('member-2')
@@ -225,7 +225,7 @@ describe('workspace members settings', () => {
     expect(inviteApiMocks.list).toHaveBeenCalledTimes(2)
   })
 
-  it('shows disabled role and removal controls with the unavailable reason', async () => {
+  it('shows disabled role and removal controls with unavailable titles', async () => {
     await renderWorkspaceSettings(ownerId)
 
     const ownerRole = await screen.findByRole('combobox', {
@@ -240,7 +240,7 @@ describe('workspace members settings', () => {
     const removeButton = await screen.findByRole('button', {
       name: 'Remover Bia Member',
     })
-    expect(removeButton).toBeEnabled()
+    expect(removeButton).toBeDisabled()
     expect(removeButton).toHaveAttribute(
       'title',
       'A remoção ainda não está disponível na API do servidor.'
@@ -269,7 +269,7 @@ describe('workspace members settings', () => {
     )
     expect(
       screen.getByRole('button', { name: 'Remover Bia Member' })
-    ).toBeEnabled()
+    ).toBeDisabled()
     expect(
       screen.getByRole('button', { name: 'Remover Bia Member' })
     ).toHaveAttribute(
@@ -278,7 +278,7 @@ describe('workspace members settings', () => {
     )
   })
 
-  it('opens an informative dialog but blocks confirmation without API support', async () => {
+  it('does not open a removal dialog when the API does not support removal', async () => {
     const user = userEvent.setup()
     await renderWorkspaceSettings(ownerId)
 
@@ -287,19 +287,8 @@ describe('workspace members settings', () => {
     })
     await user.click(removeButton)
 
-    const dialog = screen.getByRole('dialog')
-    expect(dialog).toHaveTextContent('Bia Member')
-    expect(dialog).toHaveTextContent('bia@example.com')
-    expect(dialog).toHaveTextContent('cargo member')
-    expect(dialog).toHaveTextContent(
-      'A remoção ainda não está disponível na API do servidor.'
-    )
-    expect(
-      within(dialog).getByRole('button', { name: 'Remover membro' })
-    ).toBeDisabled()
-    await user.click(
-      within(dialog).getByRole('button', { name: 'Remover membro' })
-    )
+    expect(removeButton).toBeDisabled()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(workspaceApiMocks.removeMember).not.toHaveBeenCalled()
   })
 

@@ -282,9 +282,7 @@ describe('cadastro por convite', () => {
         await screen.findByRole('heading', { name: 'Convite indisponível' })
       ).toBeTruthy()
       expect(screen.queryByRole('button', { name: 'CRIAR CONTA' })).toBeNull()
-    },
-    // Route integration runs have exceeded Vitest's default timeout under full-suite worker contention.
-    10_000
+    }
   )
 
   it('shows local validation errors without sending the registration request', async () => {

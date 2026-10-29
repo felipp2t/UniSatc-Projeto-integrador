@@ -8,15 +8,11 @@ export function getApiErrorMessage(
   options: {
     fallback: string
     network?: string
-    networkFirst?: boolean
     statusMessages?: Record<number, string>
     useServerMessage?: boolean
   }
 ) {
   const error = toApiError(cause)
-  if (options.networkFirst && error.isNetworkError) {
-    return options.network ?? DEFAULT_NETWORK_MESSAGE
-  }
   const statusMessage =
     error.status === undefined
       ? undefined

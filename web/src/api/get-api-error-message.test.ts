@@ -46,19 +46,13 @@ describe('getApiErrorMessage', () => {
     ).toBe('Network message')
   })
 
-  it('can prioritize a network error over a mapped HTTP status', () => {
+  it('uses a mapped HTTP status message', () => {
     expect(
-      getApiErrorMessage(
-        new ApiError('Offline', 409, undefined, undefined, {
-          networkError: true,
-        }),
-        {
-          ...options,
-          networkFirst: true,
-          statusMessages: { 409: 'Conflict message' },
-        }
-      )
-    ).toBe('Network message')
+      getApiErrorMessage(new ApiError('Conflict', 409), {
+        ...options,
+        statusMessages: { 409: 'Conflict message' },
+      })
+    ).toBe('Conflict message')
   })
 
   it('uses the fallback when there is no status or network message', () => {
