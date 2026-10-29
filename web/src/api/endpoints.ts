@@ -60,20 +60,8 @@ export const workspaceApi = {
     }
     return { ...response, data: parsed.data }
   },
-  removeMember: (_workspaceId: string, _memberId: string): Promise<never> =>
-    Promise.reject(
-      new Error('A remoção de membros ainda não está disponível.')
-    ),
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
-  updateMemberRole: (
-    _workspaceId: string,
-    _memberId: string,
-    _roleId: string
-  ): Promise<never> =>
-    Promise.reject(
-      new Error('A alteração de cargo ainda não está disponível.')
-    ),
 }
 
 export const inviteApi = {

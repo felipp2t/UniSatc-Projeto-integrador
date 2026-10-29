@@ -4,16 +4,10 @@ import {
   TrashIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
-import {
-  type UseQueryResult,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
+import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
-import { getApiErrorMessage } from '@/api/get-api-error-message'
 import { isForbiddenOrNotFound } from '@/api/http-status'
 import {
   getMemberPermissions,
@@ -26,14 +20,6 @@ import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
@@ -47,7 +33,6 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { appToast } from '@/components/ui/toast'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
@@ -57,12 +42,8 @@ export const Route = createFileRoute('/_protected/configuracoes-workspace')({
 
 function WorkspaceSettingsPage() {
   const { session } = Route.useRouteContext()
-  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
-  const [selectedMember, setSelectedMember] =
-    useState<WorkspaceMemberResponse>()
-  const [removeError, setRemoveError] = useState<string>()
   const workspaces = useCurrentWorkspace()
   const currentWorkspace = workspaces.data
   const workspaceId = currentWorkspace?.id
@@ -81,89 +62,6 @@ function WorkspaceSettingsPage() {
     await members.refetch()
   }, [members.refetch])
   const isOwner = isWorkspaceOwner(session.user?.id, currentWorkspace?.ownerId)
-  const removeMember = useMutation({
-    mutationFn: (memberUserId: string) => {
-      if (!workspaceId) throw new Error('Workspace indisponível.')
-      return workspaceApi.removeMember(workspaceId, memberUserId)
-    },
-    onError: (error) => {
-      setRemoveError(
-        getApiErrorMessage(error, {
-          fallback: 'Não foi possível remover o membro.',
-        })
-      )
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: workspaceMembersQueryKey(workspaceId),
-      })
-      appToast.success('Membro removido com sucesso.')
-      setSelectedMember(undefined)
-    },
-  })
-  const updateMemberRole = useMutation({
-    mutationFn: ({
-      memberUserId,
-      roleId,
-    }: {
-      memberUserId: string
-      roleId: string
-    }) => {
-      if (!workspaceId) throw new Error('Workspace indisponível.')
-      return workspaceApi.updateMemberRole(workspaceId, memberUserId, roleId)
-    },
-    onError: (error) => {
-      appToast.error(
-        getApiErrorMessage(error, {
-          fallback: 'Não foi possível alterar o cargo.',
-        })
-      )
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: workspaceMembersQueryKey(workspaceId),
-      })
-    },
-  })
-  const clearSelectedMember = useCallback(() => {
-    if (removeMember.isPending) return
-    setSelectedMember(undefined)
-    setRemoveError(undefined)
-    removeMember.reset()
-  }, [removeMember.isPending, removeMember.reset])
-  const handleDialogChange = useCallback(
-    (open: boolean) => {
-      if (!open) clearSelectedMember()
-    },
-    [clearSelectedMember]
-  )
-  const requestRemoveMember = useCallback(
-    (member: WorkspaceMemberResponse, permissions: MemberPermissions) => {
-      if (permissions.canRemove) {
-        setSelectedMember(member)
-      }
-    },
-    []
-  )
-  const handleRoleChange = useCallback(
-    (
-      member: WorkspaceMemberResponse,
-      permissions: MemberPermissions,
-      roleName: string
-    ) => {
-      if (!permissions.canChangeRole) return
-      const roleId = members.data?.find(
-        (candidate) => candidate.roleName === roleName
-      )?.roleId
-      if (roleId)
-        updateMemberRole.mutate({ memberUserId: member.userId, roleId })
-    },
-    [members.data, updateMemberRole.mutate]
-  )
-  const confirmRemoveMember = useCallback(() => {
-    if (!(selectedMember && workspaceId)) return
-    removeMember.mutate(selectedMember.userId)
-  }, [removeMember.mutate, selectedMember, workspaceId])
   const roles = useMemo(
     () =>
       [
@@ -297,9 +195,7 @@ function WorkspaceSettingsPage() {
                 isOwner={isOwner}
                 memberAccessDenied={memberAccessDenied}
                 members={members}
-                onRemoveRequest={requestRemoveMember}
                 onRetry={retryMembers}
-                onRoleChange={handleRoleChange}
                 roles={roles}
                 workspaceOwnerId={currentWorkspace.ownerId}
               />
@@ -312,40 +208,6 @@ function WorkspaceSettingsPage() {
           </Tabs>
         </section>
       </div>
-      <Dialog onOpenChange={handleDialogChange} open={Boolean(selectedMember)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remover membro</DialogTitle>
-            <DialogDescription>
-              Confirmar remoção de {selectedMember?.name} (
-              {selectedMember?.email ?? 'e-mail não disponível'}, cargo{' '}
-              {selectedMember?.roleName})?
-            </DialogDescription>
-          </DialogHeader>
-          {removeError ? (
-            <p className='text-destructive text-sm' role='alert'>
-              {removeError}
-            </p>
-          ) : null}
-          <DialogFooter>
-            <Button
-              disabled={removeMember.isPending}
-              onClick={clearSelectedMember}
-              variant='outline'
-            >
-              Cancelar
-            </Button>
-            <Button
-              disabled={removeMember.isPending}
-              loading={removeMember.isPending}
-              onClick={confirmRemoveMember}
-              variant='destructive'
-            >
-              Remover membro
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </main>
   )
 }
@@ -356,8 +218,6 @@ function MembersList({
   memberAccessDenied,
   members,
   currentUserId,
-  onRemoveRequest,
-  onRoleChange,
   onRetry,
   roles,
   workspaceOwnerId,
@@ -367,15 +227,6 @@ function MembersList({
   isOwner: boolean
   memberAccessDenied: boolean
   members: UseQueryResult<WorkspaceMemberResponse[]>
-  onRemoveRequest: (
-    member: WorkspaceMemberResponse,
-    permissions: MemberPermissions
-  ) => void
-  onRoleChange: (
-    member: WorkspaceMemberResponse,
-    permissions: MemberPermissions,
-    roleName: string
-  ) => void
   onRetry: () => Promise<void>
   roles: string[]
   workspaceOwnerId: string | undefined
@@ -438,8 +289,6 @@ function MembersList({
               isOwner={isOwner}
               key={member.id}
               member={member}
-              onRemoveRequest={onRemoveRequest}
-              onRoleChange={onRoleChange}
               permissions={permissions}
               roles={roles}
             />
@@ -454,35 +303,16 @@ function MemberRow({
   index,
   isOwner,
   member,
-  onRemoveRequest,
-  onRoleChange,
   permissions,
   roles,
 }: {
   index: number
   isOwner: boolean
   member: WorkspaceMemberResponse
-  onRemoveRequest: (
-    member: WorkspaceMemberResponse,
-    permissions: MemberPermissions
-  ) => void
-  onRoleChange: (
-    member: WorkspaceMemberResponse,
-    permissions: MemberPermissions,
-    roleName: string
-  ) => void
   permissions: MemberPermissions
   roles: string[]
 }) {
   const { name } = member
-  const handleRemoveRequest = useCallback(
-    () => onRemoveRequest(member, permissions),
-    [member, onRemoveRequest, permissions]
-  )
-  const handleRoleChange = useCallback(
-    (roleName: string) => onRoleChange(member, permissions, roleName),
-    [member, onRoleChange, permissions]
-  )
 
   return (
     <tr className={index % 2 === 0 ? 'bg-card' : 'bg-muted/10'}>
@@ -507,11 +337,7 @@ function MemberRow({
         </div>
       </td>
       <td className='px-1 py-3 md:px-2'>
-        <Select
-          disabled={!permissions.canChangeRole}
-          onValueChange={handleRoleChange}
-          value={member.roleName}
-        >
+        <Select disabled value={member.roleName}>
           <SelectTrigger
             aria-label={`Cargo de ${name}`}
             className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
@@ -533,8 +359,7 @@ function MemberRow({
           <Button
             aria-label={`Remover ${name}`}
             className='size-7 shrink-0 border border-destructive/40 text-destructive hover:bg-destructive/10'
-            disabled={!permissions.canRemove}
-            onClick={handleRemoveRequest}
+            disabled
             size='icon'
             title={permissions.removeReason ?? 'Remover membro.'}
             variant='outline'

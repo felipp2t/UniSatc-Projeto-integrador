@@ -18,8 +18,6 @@ import { renderWithProviders } from '@/test/render'
 const workspaceApiMocks = vi.hoisted(() => ({
   list: vi.fn(),
   listMembers: vi.fn(),
-  removeMember: vi.fn(),
-  updateMemberRole: vi.fn(),
 }))
 const inviteApiMocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -39,8 +37,6 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       ...actual.workspaceApi,
       list: workspaceApiMocks.list,
       listMembers: workspaceApiMocks.listMembers,
-      removeMember: workspaceApiMocks.removeMember,
-      updateMemberRole: workspaceApiMocks.updateMemberRole,
     },
   }
 })
@@ -116,12 +112,6 @@ beforeEach(() => {
     data: [{ id: workspaceId, name: 'Workspace', ownerId }],
   })
   workspaceApiMocks.listMembers.mockResolvedValue({ data: members })
-  workspaceApiMocks.removeMember.mockRejectedValue(
-    new Error('A remoção de membros ainda não está disponível.')
-  )
-  workspaceApiMocks.updateMemberRole.mockRejectedValue(
-    new Error('A alteração de cargo ainda não está disponível.')
-  )
   inviteApiMocks.create.mockResolvedValue(undefined)
   inviteApiMocks.list.mockResolvedValue({ data: [] })
 })
@@ -245,8 +235,6 @@ describe('workspace members settings', () => {
       'title',
       'A remoção ainda não está disponível na API do servidor.'
     )
-    expect(workspaceApiMocks.removeMember).not.toHaveBeenCalled()
-    expect(workspaceApiMocks.updateMemberRole).not.toHaveBeenCalled()
   })
 
   it('protects the workspace owner by owner ID, independent of displayed roles', async () => {
@@ -289,7 +277,6 @@ describe('workspace members settings', () => {
 
     expect(removeButton).toBeDisabled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(workspaceApiMocks.removeMember).not.toHaveBeenCalled()
   })
 
   it('guides a removed member to contact a workspace owner on access denial', async () => {

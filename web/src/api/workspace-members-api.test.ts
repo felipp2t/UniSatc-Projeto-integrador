@@ -53,21 +53,4 @@ describe('workspaceApi member contracts', () => {
       )
     }
   )
-
-  it('keeps removal local and rejects without making an HTTP request', async () => {
-    await expect(
-      workspaceApi.removeMember('workspace-local', 'user-local-1')
-    ).rejects.toThrow('A remoção de membros ainda não está disponível.')
-    await expect(
-      workspaceApi.updateMemberRole(
-        'workspace-local',
-        'user-local-1',
-        'role-local-owner'
-      )
-    ).rejects.toThrow('A alteração de cargo ainda não está disponível.')
-    expect(apiMocks.delete).not.toHaveBeenCalled()
-    expect(apiMocks.get).not.toHaveBeenCalled()
-    expect(apiMocks.post).not.toHaveBeenCalled()
-    expect(apiMocks.put).not.toHaveBeenCalled()
-  })
 })
