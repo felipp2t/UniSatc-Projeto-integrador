@@ -122,6 +122,67 @@ describe('endpoint helpers', () => {
       })
     )
   })
+
+  it('normalizes workspace member DTOs with optional email at the API boundary', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      data: [
+        {
+          id: 'membership-1',
+          name: 'Ana Owner',
+          roleId: 'role-owner',
+          roleName: 'owner',
+          userId: 'user-1',
+        },
+        {
+          email: 'bia@example.com',
+          id: 'membership-2',
+          name: 'Bia Member',
+          roleId: 'role-member',
+          roleName: 'member',
+          userId: 'user-2',
+        },
+      ],
+    } as never)
+
+    const { data } = await workspaceApi.listMembers('workspace-1')
+
+    expect(data).toEqual([
+      {
+        email: undefined,
+        id: 'membership-1',
+        name: 'Ana Owner',
+        roleId: 'role-owner',
+        roleName: 'owner',
+        userId: 'user-1',
+      },
+      {
+        email: 'bia@example.com',
+        id: 'membership-2',
+        name: 'Bia Member',
+        roleId: 'role-member',
+        roleName: 'member',
+        userId: 'user-2',
+      },
+    ])
+  })
+
+  it.each(['missing', 'empty'])(
+    'rejects workspace member DTOs with a %s required user ID',
+    async (userIdState) => {
+      const member = {
+        id: 'membership-1',
+        name: 'Ana Owner',
+        roleId: 'role-owner',
+        roleName: 'owner',
+        ...(userIdState === 'empty' ? { userId: '' } : {}),
+      }
+      vi.spyOn(apiClient, 'get').mockResolvedValue({ data: [member] } as never)
+
+      await expect(workspaceApi.listMembers('workspace-1')).rejects.toThrow(
+        'A resposta da API contém membros inválidos.'
+      )
+    }
+  )
 })
 
 describe('auth interceptor contract', () => {

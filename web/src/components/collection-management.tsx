@@ -8,7 +8,7 @@ import {
 import { Link } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
-import { toApiError } from '@/api/errors'
+import { getApiErrorMessage } from '@/api/get-api-error-message'
 import type { CollectionResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import {
@@ -331,22 +331,26 @@ function getCollectionMutationError(
   cause: unknown,
   action: CollectionNameAction | CollectionDeleteAction
 ) {
-  const error = toApiError(cause)
-  if (error.status === 403) return 'Você não tem permissão para esta ação.'
-  if (error.status === 404 && action !== 'create') {
-    return 'Esta pasta não está mais disponível. A listagem foi atualizada.'
+  const statusMessages: Record<number, string> = {
+    403: 'Você não tem permissão para esta ação.',
+    409:
+      action === 'delete'
+        ? 'Esta pasta contém itens ou subpastas e não pode ser excluída.'
+        : 'Já existe uma pasta com esse nome nesta localização.',
   }
-  if (error.status === 409 && action === 'delete') {
-    return 'Esta pasta contém itens ou subpastas e não pode ser excluída.'
+  if (action !== 'create') {
+    statusMessages[404] =
+      'Esta pasta não está mais disponível. A listagem foi atualizada.'
   }
-  if (error.status === 409) {
-    return 'Já existe uma pasta com esse nome nesta localização.'
-  }
-  if (error.isNetworkError && action === 'create') {
-    return 'Não foi possível confirmar a criação. Confira a listagem antes de tentar novamente.'
-  }
-  if (error.isNetworkError) return 'Não foi possível concluir. Tente novamente.'
-  return error.message || 'Não foi possível concluir a operação.'
+  return getApiErrorMessage(cause, {
+    fallback: 'Não foi possível concluir a operação.',
+    network:
+      action === 'create'
+        ? 'Não foi possível confirmar a criação. Confira a listagem antes de tentar novamente.'
+        : 'Não foi possível concluir. Tente novamente.',
+    statusMessages,
+    useServerMessage: true,
+  })
 }
 
 export function CreateCollectionButton({ onClick }: { onClick: () => void }) {

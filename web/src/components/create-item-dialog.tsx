@@ -8,6 +8,7 @@ import {
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
+import { getApiErrorMessage } from '@/api/get-api-error-message'
 import type { CreateItemRequest, CreateItemType } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import {
@@ -386,19 +387,20 @@ function isHttpUrl(value: string) {
 }
 
 function getCreateError(error: unknown, type: CreateItemType) {
-  const apiError = toApiError(error)
-  if (apiError.isNetworkError) {
-    return type === 'secret'
-      ? 'Não foi possível confirmar o cadastro do segredo. Confira se ele foi criado antes de tentar novamente.'
-      : 'Não foi possível confirmar o cadastro. Confira se o item foi criado antes de tentar novamente.'
-  }
-  if (apiError.status === 409) {
-    return 'Já existe um item com esse título nessa localização.'
-  }
-  if (type === 'secret') {
-    return 'Não foi possível salvar o segredo. Verifique sua permissão e tente novamente.'
-  }
-  return apiError.message || 'Não foi possível criar o item.'
+  return getApiErrorMessage(error, {
+    fallback:
+      type === 'secret'
+        ? 'Não foi possível salvar o segredo. Verifique sua permissão e tente novamente.'
+        : 'Não foi possível criar o item.',
+    network:
+      type === 'secret'
+        ? 'Não foi possível confirmar o cadastro do segredo. Confira se ele foi criado antes de tentar novamente.'
+        : 'Não foi possível confirmar o cadastro. Confira se o item foi criado antes de tentar novamente.',
+    statusMessages: {
+      409: 'Já existe um item com esse título nessa localização.',
+    },
+    useServerMessage: type !== 'secret',
+  })
 }
 
 export function CreateItemDialog({

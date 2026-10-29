@@ -20,9 +20,10 @@ import type {
   UpdateProfileRequest,
   UpdateWorkspaceRequest,
   UserResponse,
-  WorkspaceMemberResponse,
+  WorkspaceMemberDto,
   WorkspaceResponse,
 } from './types'
+import { workspaceMembersSchema } from './workspace-members'
 
 export const authApi = {
   forgotPassword: (request: ForgotPasswordRequest) =>
@@ -49,10 +50,16 @@ export const workspaceApi = {
   get: (workspaceId: string) =>
     apiClient.get<WorkspaceResponse>(`/workspaces/${workspaceId}`),
   list: () => apiClient.get<WorkspaceResponse[]>('/workspaces'),
-  listMembers: (workspaceId: string) =>
-    apiClient.get<WorkspaceMemberResponse[]>(
+  listMembers: async (workspaceId: string) => {
+    const response = await apiClient.get<WorkspaceMemberDto[]>(
       `/workspaces/${workspaceId}/members`
-    ),
+    )
+    const parsed = workspaceMembersSchema.safeParse(response.data)
+    if (!parsed.success) {
+      throw new Error('A resposta da API contém membros inválidos.')
+    }
+    return { ...response, data: parsed.data }
+  },
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
 }

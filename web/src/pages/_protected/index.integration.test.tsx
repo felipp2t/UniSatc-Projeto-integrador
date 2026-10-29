@@ -171,6 +171,32 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks())
 
+describe('workspace settings entry', () => {
+  it('hides the workspace actions menu inside a collection', async () => {
+    await renderAt(`/?collectionId=${folderAId}`)
+
+    await screen.findByRole('heading', { name: 'Folder A' })
+    expect(
+      screen.queryByRole('button', { name: 'Ações do workspace' })
+    ).toBeNull()
+  })
+
+  it('opens the workspace settings from the workspace actions menu', async () => {
+    const user = userEvent.setup()
+    await renderAt('/')
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Ações do workspace' })
+    )
+
+    expect(
+      await screen.findByRole('menuitem', {
+        name: 'Configurações do workspace',
+      })
+    ).toHaveAttribute('href', '/configuracoes-workspace')
+  })
+})
+
 describe('workspace collection navigation', () => {
   it('creates a root folder from the header and trims the name', async () => {
     const user = userEvent.setup()
@@ -422,6 +448,46 @@ describe('workspace collection navigation', () => {
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(message)
   })
+
+  it.each([
+    [
+      'a network failure',
+      new ApiError('server detail', undefined, undefined, undefined, {
+        networkError: true,
+      }),
+      'Não foi possível confirmar a criação. Confira a listagem antes de tentar novamente.',
+    ],
+    [
+      'an unclassified error',
+      new ApiError(String(), 422),
+      'Não foi possível concluir a operação.',
+    ],
+    [
+      'an unmapped server status',
+      new ApiError('Detalhe enviado pelo servidor.', 422),
+      'Detalhe enviado pelo servidor.',
+    ],
+  ])(
+    'uses the correct message for %s during folder creation',
+    async (_label, error, message) => {
+      apiMocks.collectionsCreate.mockRejectedValue(error)
+      const user = userEvent.setup()
+      await renderAt('/')
+      await user.click(
+        await screen.findByRole('button', { name: 'Nova pasta' })
+      )
+      const dialog = await screen.findByRole('dialog')
+      await user.type(within(dialog).getByLabelText('Nome'), 'Folder')
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Criar pasta' })
+      )
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        message
+      )
+      expect(apiMocks.collectionsCreate).toHaveBeenCalledTimes(1)
+    }
+  )
 
   it.each([403, 404, 409])(
     'shows a clear rename error for HTTP %s',

@@ -3,6 +3,7 @@ import {
   DotsThreeVerticalIcon,
   FileIcon,
   FolderIcon,
+  GearIcon,
   KeyIcon,
   LinkIcon,
 } from '@phosphor-icons/react'
@@ -12,7 +13,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { isUnavailableCollectionError } from '@/api/collection-errors'
-import { itemsApi, workspaceApi } from '@/api/endpoints'
+import { itemsApi } from '@/api/endpoints'
 import type {
   CollectionPathEntry,
   ItemPageResponse,
@@ -44,6 +45,7 @@ import {
   WorkspaceCollections,
 } from '@/components/workspace-collections'
 import { useCollectionPath } from '@/hooks/use-collection-path'
+import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 const searchSchema = z.object({
   collectionId: z.guid().optional().catch(undefined),
@@ -60,11 +62,8 @@ export const Route = createFileRoute('/_protected/')({
 
 function HomePage() {
   const { collectionId } = Route.useSearch()
-  const workspaces = useQuery({
-    queryFn: async () => (await workspaceApi.list()).data,
-    queryKey: ['workspaces'],
-  })
-  const workspace = workspaces.data?.[0]
+  const workspaces = useCurrentWorkspace()
+  const workspace = workspaces.data
   const retryWorkspaces = useCallback(async () => {
     await workspaces.refetch()
   }, [workspaces.refetch])
@@ -76,7 +75,7 @@ function HomePage() {
   }
   if (!workspace?.id) {
     return (
-      <main className='mx-auto w-full max-w-7xl px-6 py-12'>
+      <main className='container mx-auto px-8 py-12'>
         <EmptyState
           description='Você precisa estar vinculado a um workspace para consultar os itens.'
           title='Nenhum workspace disponível'
@@ -144,7 +143,7 @@ function WorkspaceBrowser({
   }
 
   return (
-    <main className='mx-auto flex min-h-full w-full max-w-7xl flex-col gap-7 px-6 py-10 md:px-8 md:py-12'>
+    <main className='container mx-auto flex min-h-full flex-col gap-7 px-8 py-12'>
       <WorkspaceBreadcrumbs
         collectionId={collectionId}
         isLoading={path.isPending}
@@ -255,9 +254,39 @@ function WorkspaceHeading({
           {isLoading && collectionId ? (
             <Skeleton aria-label='Carregando pasta' className='h-8 w-48' />
           ) : (
-            <h1 className='truncate font-bold font-display text-3xl uppercase tracking-tight'>
-              {title}
-            </h1>
+            <div className='flex min-w-0 items-center gap-2'>
+              <h1 className='truncate font-bold font-display text-3xl uppercase tracking-tight'>
+                {title}
+              </h1>
+              {collectionId ? null : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      aria-label='Ações do workspace'
+                      className='flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-sm text-foreground/80 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent data-[state=open]:text-accent-foreground'
+                      type='button'
+                    >
+                      <DotsThreeVerticalIcon
+                        aria-hidden='true'
+                        className='size-6'
+                        weight='bold'
+                      />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align='start'>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        className='flex w-full items-center gap-2'
+                        to='/configuracoes-workspace'
+                      >
+                        <GearIcon aria-hidden='true' size={14} />
+                        Configurações do workspace
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           )}
         </div>
       </div>
