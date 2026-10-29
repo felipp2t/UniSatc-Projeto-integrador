@@ -78,9 +78,25 @@ Todos os cookies (`accessToken`, `refreshToken`) são `httpOnly` + `secure` + `s
 não são enviados pelo navegador em HTTP, os testes autenticados em `http://localhost` exigem HTTPS
 ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 
+Cada par de tokens é associado ao registro `workspace_member` do usuário. O JWT de acesso inclui
+o ID desse vínculo; a cada requisição autenticada, o servidor confirma que o vínculo ainda existe
+para o mesmo usuário e obtém dele o papel atual. Remover o membro invalida imediatamente o acesso
+por JWT e, pela FK `ON DELETE CASCADE`, remove também seus refresh tokens. Uma readmissão cria outro
+vínculo, sem revalidar sessões antigas. O access token legado sem `membershipId` recebe `401`;
+refresh tokens existentes são associados ao vínculo atual pela V20, e os sem vínculo são
+descartados. Login de usuário sem vínculo não emite sessão; um refresh migrado de membro atual pode
+rotacionar e emitir um novo par.
+
+A V20 mantém a política existente de workspace, membros e proprietário. O papel é consultado no
+banco por requisição, mas grupos, concessões e herança de permissões não existem nesta branch e
+seguem para as issues #132/#133. Isso não representa atendimento integral ao RNF04 nem validação
+completa de conteúdo granular.
+
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|
+| — | GET | `/invites` | Sim, só o dono | — | 200, lista `{ id, email, invitedByUserId, invitedByName, createdAt, expiresAt }` | 401 não autenticado, 403 não é o dono |
 | RF10 | POST | `/invites` | Sim, só o dono | `{ email }` | 201 | 400 e-mail inválido, 401 não autenticado, 403 não é o dono, 409 e-mail já cadastrado |
+| RF12 | POST | `/invites/decline` | Não | `{ email, token }` | 204 | 400 corpo inválido, 404 convite indisponível, 429 limite de tentativas |
 | RF01/RF11 | POST | `/auth/register` | Não | `{ email, token, name, password, confirmPassword }` | 200, seta cookies | 400 senhas não conferem, 404 convite não encontrado, 409 convite expirado ou e-mail já cadastrado |
 | RF02 | POST | `/auth/login` | Não | `{ email, password }` | 200, seta cookies | 401 credenciais inválidas |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` | — | 200, roda os cookies | 401 refresh token inválido/expirado |
@@ -94,6 +110,27 @@ ou o envio manual do cabeçalho `Cookie` pela ferramenta de testes.
 Trocar a senha (RF05) e redefini-la via e-mail (RF49) invalidam todos os refresh tokens e todos os
 tokens de redefinição pendentes do usuário, forçando novo login em outras sessões e impedindo o
 reuso de links antigos.
+
+`GET /invites` lista apenas convites ainda não expirados cujo e-mail não pertence a uma conta; a
+resposta inclui `id`, `email`, `invitedByUserId`, `invitedByName`, `createdAt` e `expiresAt`.
+
+## Notificações
+
+`GET /notifications` lista, com paginação, os avisos do usuário autenticado; `PATCH
+/notifications/{notificationId}/read` marca um aviso próprio como lido; e `GET
+/notifications/stream` fornece avisos em tempo real por SSE (até cinco conexões por usuário,
+30 minutos por conexão). O stream envia apenas o UUID da notificação como string JSON. Os avisos
+persistidos podem ser recuperados consultando a lista ao conectar e reconectar; a emissão SSE é
+best effort e acontece após o commit.
+
+Os eventos atuais cobrem atualização de perfil e troca de senha. Há um ponto de integração
+`accessChanged(Collection<UUID>)` para futuros produtores de mudanças de acesso, mas os CRUDs de
+papéis, grupos, compartilhamentos e herança ainda não estão implementados. A issue #42 não completa
+o fan-out de permissões nem eventos role-permission de ponta a ponta (CA01); a integração futura está
+prevista na issue #130 e no trabalho de gestão de papéis. Os avisos usam título e texto fixos, sem
+referências ou dados de recursos e sem segredos, e não verificam acesso. A migration `V18` cria a
+tabela e seu índice; `V19` está reservada para outra issue. Consulte [`docs/API.md`](docs/API.md)
+para formatos e respostas completos.
 
 ## Workspace (em andamento)
 
@@ -110,6 +147,7 @@ segunda linha impossível, inclusive sob concorrência.
 | GET | `/workspaces` | Sim | 200 com a lista (0 ou 1 item) | Retorna o workspace único, se o usuário for membro. |
 | GET | `/workspaces/{workspaceId}` | Sim | 200 com o workspace | Exige vínculo de membro; sem vínculo, retorna 404. |
 | GET | `/workspaces/{workspaceId}/members` | Sim | 200 com a lista de membros | Exige vínculo de membro; sem vínculo, retorna 404. |
+| GET | `/workspaces/{workspaceId}/activity` | Sim | 200 com página do histórico | Exige `activity/read`; a visibilidade do histórico respeita as permissões atuais do usuário. |
 | PUT | `/workspaces/{workspaceId}` | Sim | 200 com o workspace atualizado | Somente o proprietário pode substituir `name` e `description`; sem permissão, retorna 404. |
 | POST | `/workspaces/{workspaceId}/collections` | Sim | 201 com a pasta criada | Exige `collection/create`; pasta pai deve pertencer ao mesmo workspace. |
 | GET | `/workspaces/{workspaceId}/collections` | Sim | 200 com página de pastas do nível | Exige vínculo de membro; `parentId` omitido lista a raiz. `page` começa em 0 e `size` tem padrão 20 e máximo 100. |
@@ -126,8 +164,12 @@ Pastas são persistidas na tabela `collection`. A raiz é o workspace e não pos
 | POST | `/workspaces/{workspaceId}/items` | 201 | `item/create`; segredos exigem também `secret/create`. |
 | GET | `/workspaces/{workspaceId}/items` | 200 | Lista metadados paginados da raiz ou da pasta indicada por `collectionId`; segredos só aparecem para quem tem `secret/read`. |
 | GET | `/workspaces/{workspaceId}/items/search?q=...` | 200 | Busca paginada por todas as palavras do título, em qualquer ordem, ignorando caixa e acentos; aplica as mesmas permissões. |
-| GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Retorna texto ou link; segredos retornam apenas metadados com `secret/read` e ficam indisponíveis sem essa permissão. |
+| GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Retorna conteúdo/metadados do item autorizado; segredos ficam indisponíveis sem `secret/read`. |
 | GET | `/workspaces/{workspaceId}/items/{itemId}/secret` | 200 | Revela o valor somente com `item/read` e `secret/read`. |
+| POST | `/workspaces/{workspaceId}/items/attachments` | 201 | Cria item `file`/`image` com um anexo; exige `item/create`. |
+| PUT | `/workspaces/{workspaceId}/items/{itemId}/attachment` | 200 | Substitui o anexo com `item/update`; falha preserva o anterior. |
+| PUT | `/workspaces/{workspaceId}/items/{itemId}/metadata` | 204 | Atualiza título, descrição e pasta com `item/update`. |
+| GET | `/workspaces/{workspaceId}/items/{itemId}/attachment` | 200 | Baixa o arquivo autorizado; PDF/imagens podem ser exibidos inline. `download=true` força download. |
 
 Na criação, informe `type` (`text`, `link` ou `secret`), `title`, `collectionId` opcional e
 respectivamente `textContent` (até 100.000 caracteres e não apenas espaços), `linkUrl` HTTP(S)
@@ -136,6 +178,15 @@ Texto/Markdown e valor secreto são preservados exatamente, incluindo espaços s
 `page`, `size`, `totalItems` e `totalPages`; `page` começa em 0 e `size` vai de 1 a 100.
 O valor de um segredo é criptografado com AES-256-GCM antes da gravação e nunca aparece nas
 respostas de criação, listagem, busca ou consulta comum.
+
+Anexos aceitam PDF, TXT, MD, DOCX, XLSX, PPTX, PNG e JPEG (`.jpg`/`.jpeg`), até
+20.000.000 bytes por arquivo. Cada item `file`/`image` tem exatamente um anexo. A substituição usa
+um objeto novo e mantém o anterior disponível se a gravação não concluir; não há histórico de versões.
+O nome, MIME type e tamanho ficam no banco, mas o conteúdo fica no storage compatível com S3.
+O storage é opcional: sem `app.storage.s3.bucket`, a aplicação inicia normalmente e endpoints de
+anexo retornam `503 Service Unavailable`. Para habilitá-los, configure `app.storage.s3.bucket`,
+`app.storage.s3.region`, `app.storage.s3.access-key` e `app.storage.s3.secret-key`; `app.storage.s3.endpoint`
+é opcional para usar um endpoint compatível, e `app.storage.s3.path-style` aceita `true`/`false`.
 
 Títulos de itens e nomes de pastas são únicos por localização, ignorando caixa, acentos e
 espaços nas extremidades. Itens arquivados continuam reservando o título. A busca considera
@@ -155,5 +206,6 @@ Camadas técnicas em `src/main/java/com/vaulty/api`: `controller`, `service`, `r
 
 Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken`,
 `EmailOutbox`, `Workspace`, `WorkspaceRole`, `WorkspaceMember`, `WorkspaceCollection`,
-`WorkspaceItem`, `WorkspaceItemSecret` e `RolePermission`. Notificações, histórico de atividades,
-anexos, compartilhamento granular de conteúdo e gestão de papéis ainda não foram implementados.
+`WorkspaceItem`, `WorkspaceItemSecret`, `WorkspaceItemFile`, `WorkspaceItemMedia` e `RolePermission`.
+Anexos e histórico de atividades estão implementados. Compartilhamento granular de conteúdo e gestão
+de papéis ainda não foram implementados.

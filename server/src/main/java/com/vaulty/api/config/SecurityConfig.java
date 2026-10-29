@@ -34,7 +34,9 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .headers(headers -> headers.addHeaderWriter((request, response) -> {
-                    if ("POST".equals(request.getMethod()) && "/invites/validate".equals(request.getRequestURI())) {
+                    if ("POST".equals(request.getMethod())
+                            && ("/invites/validate".equals(request.getRequestURI())
+                                    || "/invites/decline".equals(request.getRequestURI()))) {
                         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
                     }
                 }))
@@ -50,6 +52,7 @@ public class SecurityConfig {
                                 "/auth/forgot-password",
                                 "/auth/reset-password",
                                 "/invites/validate",
+                                "/invites/decline",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html")

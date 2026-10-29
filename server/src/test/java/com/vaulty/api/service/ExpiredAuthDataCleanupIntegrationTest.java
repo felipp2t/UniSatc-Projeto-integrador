@@ -16,6 +16,9 @@ import com.vaulty.api.repository.PasswordResetTokenRepository;
 import com.vaulty.api.repository.RefreshTokenRepository;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
+import com.vaulty.api.repository.WorkspaceMemberRepository;
+import com.vaulty.api.repository.WorkspaceRepository;
+import com.vaulty.api.repository.WorkspaceRoleRepository;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -28,6 +31,9 @@ class ExpiredAuthDataCleanupIntegrationTest extends PostgresIntegrationTest {
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
     @Autowired private UserInviteRepository userInviteRepository;
+    @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
+    @Autowired private WorkspaceRepository workspaceRepository;
+    @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
     @Autowired private ExpiredAuthDataCleanupService cleanupService;
     @Autowired private AuthService authService;
     @Autowired private PasswordEncoder passwordEncoder;
@@ -84,6 +90,17 @@ class ExpiredAuthDataCleanupIntegrationTest extends PostgresIntegrationTest {
         RefreshToken value = new RefreshToken();
         value.setToken(token);
         value.setUser(user);
+        var membership = workspaceMemberRepository.findByUserId(user.getId()).orElseGet(() -> {
+            var workspace = workspaceRepository.findSingleton().orElseThrow();
+            var role = workspaceRoleRepository.findByWorkspaceIdAndName(
+                    workspace.getId(), com.vaulty.api.entity.WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
+            var created = new com.vaulty.api.entity.WorkspaceMember();
+            created.setUser(user);
+            created.setWorkspace(workspace);
+            created.setRole(role);
+            return workspaceMemberRepository.saveAndFlush(created);
+        });
+        value.setWorkspaceMember(membership);
         value.setExpiresAt(expiresAt);
         return refreshTokenRepository.save(value);
     }

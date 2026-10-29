@@ -41,6 +41,7 @@ function createSession(initialize: () => Promise<void>): SessionService {
     logout: vi.fn(),
     setNavigateToLogin: vi.fn(),
     status: 'authenticated',
+    updateUser: vi.fn(),
     user: { email: 'user@example.com', id: 'user-id', name: 'User' },
   }
 }

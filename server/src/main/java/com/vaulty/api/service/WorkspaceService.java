@@ -4,14 +4,20 @@ import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.Workspace;
+import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
@@ -26,22 +32,30 @@ public class WorkspaceService {
     private final WorkspaceRoleRepository workspaceRoleRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceMapper workspaceMapper;
+    private final ActivityLogService activityLogService;
 
     @Transactional
-    public void addAsMember(User user) {
+    public WorkspaceMember addAsMember(User user) {
         Workspace workspace = singleton();
         WorkspaceRole memberRole = workspaceRoleRepository
                 .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
 
-        workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
+        return workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
     }
 
     @Transactional(readOnly = true)
-    public void requireOwner(UUID userId) {
-        if (!singleton().getOwner().getId().equals(userId)) {
+    public Workspace requireOwner(UUID userId) {
+        Workspace workspace = singleton();
+        if (!workspace.getOwner().getId().equals(userId)) {
             throw new ForbiddenException("Apenas o dono do workspace pode executar esta ação");
         }
+        return workspace;
+    }
+
+    @Transactional(readOnly = true)
+    public UUID singletonId() {
+        return singleton().getId();
     }
 
     // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
@@ -72,8 +86,17 @@ public class WorkspaceService {
         Workspace workspace = workspaceRepository.findByIdAndOwnerId(workspaceId, ownerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
 
+        Map<String, Object> previous = new LinkedHashMap<>();
+        previous.put("name", workspace.getName());
+        previous.put("description", workspace.getDescription());
         workspaceMapper.update(request, workspace);
         workspaceRepository.saveAndFlush(workspace);
+        Map<String, Object> current = new LinkedHashMap<>();
+        current.put("name", workspace.getName());
+        current.put("description", workspace.getDescription());
+        activityLogService.record(workspaceId, ownerId, ActivityActorContext.USER,
+                ActivityAction.WORKSPACE_RENAMED, ActivityResourceType.WORKSPACE, workspaceId,
+                Map.of("previous", previous, "current", current));
 
         return workspaceMapper.toResponse(workspace);
     }

@@ -13,7 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-// Limita brute-force/spam nos fluxos públicos de conta e validação de convite (5 req/min por IP e caminho).
+// Limita brute-force/spam nos fluxos públicos de conta e convite (5 req/min por IP e caminho).
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
@@ -22,7 +22,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "/auth/register",
             "/auth/forgot-password",
             "/auth/reset-password",
-            "/invites/validate");
+            "/invites/validate",
+            "/invites/decline");
 
     private final ObjectMapper objectMapper;
     private final RateLimitRegistry registry;

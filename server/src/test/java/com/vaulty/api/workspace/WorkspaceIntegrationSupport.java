@@ -11,6 +11,7 @@ import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
+import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.service.JwtService;
 import jakarta.servlet.http.Cookie;
 import java.util.UUID;
@@ -29,6 +30,7 @@ abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
     @Autowired protected WorkspaceRepository workspaceRepository;
     @Autowired protected WorkspaceRoleRepository workspaceRoleRepository;
     @Autowired protected WorkspaceMemberRepository workspaceMemberRepository;
+    @Autowired protected RolePermissionRepository rolePermissionRepository;
     @Autowired protected WorkspaceMapper workspaceMapper;
     @Autowired protected JwtService jwtService;
     @Autowired protected PasswordEncoder passwordEncoder;
@@ -73,8 +75,12 @@ abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
     }
 
     protected Cookie authCookie(User user) {
-        String role = workspaceMemberRepository.findByUserId(user.getId())
-                .map(member -> member.getRole().getName()).orElse(null);
-        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), role));
+        WorkspaceMember membership = workspaceMemberRepository.findByUserId(user.getId()).orElseThrow();
+        return new Cookie("accessToken", jwtService.generateAccessToken(
+                user.getId(), membership.getId(), membership.getRole().getName()));
+    }
+
+    protected Cookie authCookieWithoutMembership(User user) {
+        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), null));
     }
 }

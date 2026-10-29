@@ -39,14 +39,15 @@ class NameValidationTest {
 
     @Test
     void appliesDatabaseLengthLimitsToBothInputs() {
-        String max = "a".repeat(255);
-        String tooLong = "a".repeat(256);
+        String max = "a".repeat(100);
+        String tooLong = "a".repeat(101);
 
         assertThat(validator.validate(new UpdateProfileRequest(max))).isEmpty();
         assertThat(validator.validate(new UpdateProfileRequest(tooLong))).isNotEmpty();
         assertThat(validator.validate(register("  Ana  "))).isEmpty();
         assertThat(register("  Ana  ").name()).isEqualTo("Ana");
-        assertThat(validator.validate(register(tooLong))).isNotEmpty();
+        assertThat(validator.validate(register("a".repeat(255)))).isEmpty();
+        assertThat(validator.validate(register("a".repeat(256)))).isNotEmpty();
     }
 
     private RegisterRequest register(String name) {

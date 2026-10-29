@@ -32,10 +32,10 @@ public interface WorkspaceMapper {
     @Mapping(target = "updatedAt", ignore = true)
     WorkspaceMember toMember(User user, Workspace workspace, WorkspaceRole role);
 
-    @Mapping(target = "userId", source = "user.id")
-    @Mapping(target = "name", source = "user.name")
-    @Mapping(target = "email", source = "user.email")
-    @Mapping(target = "roleId", source = "role.id")
-    @Mapping(target = "roleName", source = "role.name")
-    WorkspaceMemberResponse toResponse(WorkspaceMember member);
+    @Mapping(target = "userId", source = "member.user.id")
+    @Mapping(target = "name", source = "member.user.name")
+    @Mapping(target = "email", expression = "java(includeEmail ? member.getUser().getEmail() : null)")
+    @Mapping(target = "roleId", source = "member.role.id")
+    @Mapping(target = "roleName", source = "member.role.name")
+    WorkspaceMemberResponse toResponse(WorkspaceMember member, boolean includeEmail);
 }

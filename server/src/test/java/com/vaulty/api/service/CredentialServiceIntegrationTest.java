@@ -12,10 +12,14 @@ import com.vaulty.api.dto.user.ChangePasswordRequest;
 import com.vaulty.api.entity.PasswordResetToken;
 import com.vaulty.api.entity.RefreshToken;
 import com.vaulty.api.entity.User;
+import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.exception.InvalidCredentialsException;
 import com.vaulty.api.repository.PasswordResetTokenRepository;
 import com.vaulty.api.repository.RefreshTokenRepository;
 import com.vaulty.api.repository.UserRepository;
+import com.vaulty.api.repository.WorkspaceMemberRepository;
+import com.vaulty.api.repository.WorkspaceRepository;
+import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
 import jakarta.servlet.http.Cookie;
 import java.time.OffsetDateTime;
@@ -30,6 +34,9 @@ import org.springframework.test.web.servlet.MockMvc;
 class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired private UserRepository userRepository;
+    @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
+    @Autowired private WorkspaceRepository workspaceRepository;
+    @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
     @Autowired private UserService userService;
@@ -64,7 +71,8 @@ class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
         createRefreshToken(user, "active-refresh-token", OffsetDateTime.now().plusHours(1));
 
         mockMvc.perform(patch("/me/password")
-                        .cookie(new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), null)))
+                        .cookie(new Cookie("accessToken", jwtService.generateAccessToken(
+                                user.getId(), ensureMembership(user).getId(), null)))
                         .contentType("application/json")
                         .content("""
                                 {"currentPassword":"wrong-password","newPassword":"new-password","confirmPassword":"new-password"}
@@ -121,7 +129,21 @@ class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(token);
         refreshToken.setUser(user);
+        refreshToken.setWorkspaceMember(ensureMembership(user));
         refreshToken.setExpiresAt(expiresAt);
         refreshTokenRepository.save(refreshToken);
+    }
+
+    private WorkspaceMember ensureMembership(User user) {
+        return workspaceMemberRepository.findByUserId(user.getId()).orElseGet(() -> {
+            var workspace = workspaceRepository.findSingleton().orElseThrow();
+            var role = workspaceRoleRepository.findByWorkspaceIdAndName(
+                    workspace.getId(), com.vaulty.api.entity.WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
+            var membership = new WorkspaceMember();
+            membership.setUser(user);
+            membership.setWorkspace(workspace);
+            membership.setRole(role);
+            return workspaceMemberRepository.saveAndFlush(membership);
+        });
     }
 }

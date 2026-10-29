@@ -51,6 +51,7 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     @Test
     void doesNotOfferWorkspaceCreationThroughTheApi() throws Exception {
         User owner = createUser();
+        configureWorkspace(owner);
 
         mockMvc.perform(post("/workspaces")
                         .cookie(authCookie(owner))
@@ -85,13 +86,14 @@ class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void doesNotExposeWorkspaceToUsersWhoAreNotMembers() throws Exception {
+    void rejectsLegacyTokenFromUserWithoutWorkspaceMembership() throws Exception {
         User owner = createUser();
         User unrelatedUser = createUser();
         WorkspaceResponse createdWorkspace = configureWorkspace(owner, "Workspace privado");
 
-        mockMvc.perform(get("/workspaces/{workspaceId}", createdWorkspace.id()).cookie(authCookie(unrelatedUser)))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/workspaces/{workspaceId}", createdWorkspace.id())
+                        .cookie(authCookieWithoutMembership(unrelatedUser)))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

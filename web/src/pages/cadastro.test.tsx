@@ -50,6 +50,7 @@ function createSession() {
     get status() {
       return status
     },
+    updateUser: vi.fn(),
     get user() {
       return user
     },

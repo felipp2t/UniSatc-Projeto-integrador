@@ -501,6 +501,7 @@ export interface components {
             id?: string;
             name?: string;
             email?: string;
+            createdAt?: string;
         };
     };
     responses: never;

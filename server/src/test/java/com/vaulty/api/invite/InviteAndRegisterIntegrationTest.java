@@ -1,6 +1,7 @@
 package com.vaulty.api.invite;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.vaulty.api.PostgresIntegrationTest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.UserInviteRepository;
@@ -68,6 +70,88 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void ownerCanRevokeInviteAndItCannotBeValidatedOrRegistered() throws Exception {
+        UserInvite invite = createInvite("revogado@example.com");
+        User member = createMember();
+        var memberId = member.getId();
+        var memberCount = workspaceMemberRepository.count();
+
+        mockMvc.perform(post("/invites/{id}/revoke", invite.getId()).cookie(authCookie(admin())))
+                .andExpect(status().isNoContent());
+
+        assertThat(userInviteRepository.findById(invite.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserInviteStatus.REVOKED);
+        assertThat(jdbcTemplate.queryForList(
+                        "SELECT action, actor_id, actor_context, resource_id, snapshot::text AS snapshot FROM activity_log WHERE resource_id = ?",
+                        invite.getId()))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.get("action")).isEqualTo("member_invite_revoked");
+                    assertThat(event.get("actor_id")).isEqualTo(admin().getId());
+                    assertThat(event.get("actor_context")).isEqualTo("USER");
+                    assertThat(event.get("resource_id")).isEqualTo(invite.getId());
+                    assertThat(event.get("snapshot").toString()).contains("revogado@example.com");
+                });
+
+        String body = """
+                { "email": "%s", "token": "%s" }
+                """.formatted(invite.getEmail(), invite.getToken());
+        mockMvc.perform(post("/invites/validate").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/auth/register").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "token": "%s", "name": "Revogado",
+                                  "password": "password123", "confirmPassword": "password123" }
+                                """.formatted(invite.getEmail(), invite.getToken())))
+                .andExpect(status().isNotFound());
+
+        assertThat(userRepository.findByEmail(invite.getEmail())).isEmpty();
+        assertThat(workspaceMemberRepository.count()).isEqualTo(memberCount);
+        assertThat(workspaceMemberRepository.findByUserId(memberId)).isPresent();
+    }
+
+    @Test
+    void onlyAnOwnerCanRevokeAndAnonymousRequestsAreRejected() throws Exception {
+        UserInvite invite = createInvite("protegido@example.com");
+
+        mockMvc.perform(post("/invites/{id}/revoke", invite.getId()).cookie(authCookie(createMember())))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/invites/{id}/revoke", invite.getId()))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(userInviteRepository.findById(invite.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserInviteStatus.PENDING);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM activity_log WHERE resource_id = ? AND action = 'member_invite_revoked'",
+                Long.class, invite.getId())).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DECLINED", "REVOKED"})
+    void cannotRevokeAnInviteThatIsNoLongerPending(String statusName) throws Exception {
+        UserInvite invite = createInvite("terminal@example.com");
+        invite.setStatus(UserInviteStatus.valueOf(statusName));
+        userInviteRepository.save(invite);
+
+        mockMvc.perform(post("/invites/{id}/revoke", invite.getId()).cookie(authCookie(admin())))
+                .andExpect(status().isNotFound());
+
+        assertThat(userInviteRepository.findById(invite.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserInviteStatus.valueOf(statusName));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM activity_log WHERE resource_id = ? AND action = 'member_invite_revoked'",
+                Long.class, invite.getId())).isZero();
+    }
+
+    @Test
+    void revokingAnUnknownInviteReturnsNotFound() throws Exception {
+        mockMvc.perform(post("/invites/{id}/revoke", UUID.randomUUID()).cookie(authCookie(admin())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void nonOwnerMemberCannotInviteAnyone() throws Exception {
         User member = createMember();
 
@@ -121,6 +205,139 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.email").value("validar@example.com"))
                 .andExpect(jsonPath("$.remainingSeconds").value(7 * 24 * 60 * 60));
+    }
+
+    @Test
+    void inviteeCanDeclineAValidInviteWithoutAuthenticationAndItCannotBeAccepted() throws Exception {
+        UserInvite invite = createInvite("recusar@example.com");
+        String body = """
+                { "email": "%s", "token": "%s" }
+                """.formatted(invite.getEmail(), invite.getToken());
+
+        mockMvc.perform(post("/invites/decline")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Cache-Control", "no-store"));
+
+        assertThat(userInviteRepository.findByEmailAndToken(invite.getEmail(), invite.getToken())
+                        .orElseThrow()
+                        .getStatus())
+                .isEqualTo(UserInviteStatus.DECLINED);
+
+        mockMvc.perform(post("/invites/validate")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Convite indisponível"));
+
+        mockMvc.perform(post("/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s", "token": "%s", "name": "Novo Colaborador",
+                                  "password": "password123", "confirmPassword": "password123"
+                                }
+                                """.formatted(invite.getEmail(), invite.getToken())))
+                .andExpect(status().isNotFound());
+
+        assertThat(userRepository.findByEmail(invite.getEmail())).isEmpty();
+    }
+
+    @Test
+    void declineReturnsTheSameUnavailableResponseForExpiredAndUnknownInvites() throws Exception {
+        UserInvite expiredInvite = createInvite(
+                "expirado-para-recusar@example.com", OffsetDateTime.now(clock).minusSeconds(1));
+        RequestPostProcessor remoteAddress = uniqueRemoteAddress();
+
+        mockMvc.perform(post("/invites/decline")
+                        .with(remoteAddress)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "token": "%s" }
+                                """.formatted(expiredInvite.getEmail(), expiredInvite.getToken())))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.message").value("Convite indisponível"));
+
+        mockMvc.perform(post("/invites/decline")
+                        .with(remoteAddress)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "token": "inexistente" }
+                                """.formatted(expiredInvite.getEmail())))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.message").value("Convite indisponível"));
+
+        assertThat(userInviteRepository.findByEmailAndToken(expiredInvite.getEmail(), expiredInvite.getToken())
+                        .orElseThrow()
+                        .getStatus())
+                .isEqualTo(UserInviteStatus.PENDING);
+    }
+
+    @Test
+    void declineInviteIsRateLimitedSeparatelyByPath() throws Exception {
+        String body = """
+                { "email": "unknown@example.com", "token": "unknown" }
+                """;
+        RequestPostProcessor remoteAddress = uniqueRemoteAddress();
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/invites/decline")
+                            .with(remoteAddress)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isNotFound());
+        }
+
+        mockMvc.perform(post("/invites/decline")
+                        .with(remoteAddress)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Cache-Control", "no-store"));
+    }
+
+    @Test
+    void ownerCanResendAnInviteAfterItWasDeclined() throws Exception {
+        UserInvite declinedInvite = createInvite("reenviar@example.com");
+        declinedInvite.setStatus(UserInviteStatus.DECLINED);
+        userInviteRepository.save(declinedInvite);
+
+        mockMvc.perform(post("/invites")
+                        .cookie(authCookie(admin()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "reenviar@example.com" }
+                                """))
+                .andExpect(status().isCreated());
+
+        assertThat(userInviteRepository.findAll().stream()
+                        .filter(invite -> invite.getEmail().equals("reenviar@example.com")))
+                .singleElement()
+                .satisfies(invite -> assertThat(invite.getStatus()).isEqualTo(UserInviteStatus.PENDING));
+    }
+
+    @Test
+    void declineInviteIsDocumentedInOpenApi() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/invites/decline'].post.responses['204']").exists())
+                .andExpect(jsonPath("$.paths['/invites/decline'].post.requestBody").exists())
+                .andExpect(jsonPath("$.paths['/invites/{id}/revoke'].post.responses['204']").exists());
+    }
+
+    @Test
+    void declineRejectsInvalidBodyWithoutCachingTheResponse() throws Exception {
+        mockMvc.perform(post("/invites/decline")
+                        .with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string("Cache-Control", "no-store"));
     }
 
     @Test
@@ -309,6 +526,7 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
 
     private Cookie authCookie(User user) {
         String role = workspaceService.getRoleName(user.getId());
-        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), role));
+        var membershipId = workspaceMemberRepository.findByUserId(user.getId()).orElseThrow().getId();
+        return new Cookie("accessToken", jwtService.generateAccessToken(user.getId(), membershipId, role));
     }
 }

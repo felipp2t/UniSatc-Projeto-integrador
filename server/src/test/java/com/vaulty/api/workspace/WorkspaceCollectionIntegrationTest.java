@@ -180,19 +180,19 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void hidesFoldersFromUsersWithoutWorkspaceMembership() throws Exception {
+    void rejectsLegacyTokensFromUsersWithoutWorkspaceMembership() throws Exception {
         User owner = createUser();
         User outsider = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
         UUID folderId = createFolder(owner, workspaceId, "Privada", null);
 
         mockMvc.perform(get("/workspaces/{workspaceId}/collections", workspaceId)
-                        .cookie(authCookie(outsider)))
-                .andExpect(status().isNotFound());
+                        .cookie(authCookieWithoutMembership(outsider)))
+                .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/workspaces/{workspaceId}/collections/{collectionId}/path", workspaceId, folderId)
-                        .cookie(authCookie(outsider)))
-                .andExpect(status().isNotFound());
+                        .cookie(authCookieWithoutMembership(outsider)))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

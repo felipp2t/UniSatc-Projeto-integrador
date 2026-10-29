@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.vaulty.api.dto.invite.InviteValidationRequest;
 import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
 import java.time.Clock;
@@ -29,9 +30,11 @@ class InviteServiceTest {
         invite.setToken("token");
         invite.setExpiresAt(OffsetDateTime.now(clock).plusNanos(remainingNanos));
         when(users.findByEmail(invite.getEmail())).thenReturn(Optional.empty());
-        when(invites.findByEmailAndToken(invite.getEmail(), invite.getToken())).thenReturn(Optional.of(invite));
+        when(invites.findByEmailAndTokenAndStatus(invite.getEmail(), invite.getToken(), UserInviteStatus.PENDING))
+                .thenReturn(Optional.of(invite));
         InviteService service = new InviteService(
-                invites, users, mock(WorkspaceService.class), mock(EmailOutboxService.class), clock, 604800000);
+                invites, users, mock(WorkspaceService.class), mock(EmailOutboxService.class),
+                mock(ActivityLogService.class), clock, 604800000);
 
         var result = service.validate(new InviteValidationRequest(invite.getEmail(), invite.getToken()));
 

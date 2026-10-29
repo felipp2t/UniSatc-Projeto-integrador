@@ -40,6 +40,10 @@ export default defineConfig({
         replacement: phosphorIconsPath,
       },
     ],
+    // Two workers avoid CPU/import contention in the full route integration suite.
+    maxWorkers: 2,
     setupFiles: ['./src/test/setup.ts'],
+    // Full-suite route integration tests can exceed the 5s default under contention.
+    testTimeout: 10_000,
   },
 })
