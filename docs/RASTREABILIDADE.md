@@ -62,11 +62,50 @@ Matriz iniciada em 12/10/2026 como execução documental de L14. Relaciona requi
 | RF46 | RU03 | [#132](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/132), [#133](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/133) | OPEN; implementação/verificação pendentes | a priorizar | Interrupção/cópia/reativação da herança |
 | RF47 | RU03 | [#132](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/132), [#133](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/133) | OPEN; implementação/verificação pendentes | a priorizar | Exibir origens sem ampliar acesso |
 | RF48 | Preservação do conhecimento (ON01) | [#135](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/135), [#136](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/136) | OPEN; implementação/verificação pendentes | a priorizar | Backup de dono, pacote completo e falha |
-| RF49 | Conta/sessão | [#139](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/139), [#140](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/140) | OPEN; implementação/verificação pendentes | a priorizar | Solicitação sem revelar conta e link de uso único |
+| RF49 | Conta/sessão | [#139](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/139), [#140](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/140) | OPEN; frontend desenvolvido e testes registrados abaixo; verificação backend pendente | a priorizar | Solicitação sem revelar conta, link indisponível e retorno ao login; uso único depende de #139 |
 | RF50 | RU03 | [#141](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/141), [#142](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/142) | OPEN; implementação/verificação pendentes | a priorizar | Readmissão limitada sem reativar token antigo |
 | RF51 | RU03 | [#143](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/143), [#80](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/80) | OPEN; implementação/verificação pendentes | a priorizar | Renomeação de papel sem afetar atribuições |
 | RF52 | RU03 | [#130](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/130), [#131](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/131) | OPEN; implementação/verificação pendentes | a priorizar | Listagem por Gestão de grupos |
 | RF53 | RU03 | [#130](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/130), [#131](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/131) | OPEN; implementação/verificação pendentes | a priorizar | Renomeação de grupo preserva vínculos |
+
+### Evidência frontend RF49 — 29/10/2026
+
+As telas existentes de solicitação e redefinição apresentam mensagem genérica, tratam link indisponível (incluindo token só com espaços), preservam a senha válida e distinguem erros de validação, limite de tentativas, servidor e rede. Após redefinir, tentam encerrar a sessão, usam limpeza local sem callback se o logout falhar e retornam ao login sem token no redirect.
+
+No snapshot `bff8edd` (29/10/2026), no ambiente Windows com Node.js 22.16.0 e Vitest 5.0.5, foram aprovados **110 testes em 6 arquivos**. Comando executado em `web/`:
+
+```sh
+node ./node_modules/vitest/vitest.mjs run src/pages/recuperacao-senha.test.tsx src/auth/session.test.ts src/router.integration.test.ts src/components/route-error.integration.test.tsx src/pages/_protected/index.integration.test.tsx src/pages/cadastro.test.tsx
+```
+
+A suíte completa desse snapshot também passou em três execuções consecutivas: **194 testes em 22 arquivos** por execução.
+
+No snapshot `94f4351`, a seleção focal passou com **69 testes em 3 arquivos** (um subconjunto da suíte, não testes adicionais), e a suíte completa passou com **205 testes em 22 arquivos**. Comandos executados em `web/`:
+
+```sh
+node ./node_modules/vitest/vitest.mjs run src/api/errors.test.ts src/pages/recuperacao-senha.test.tsx src/pages/cadastro.test.tsx
+node ./node_modules/vitest/vitest.mjs run
+```
+
+No snapshot `d5eeb9b` (31/10/2026), o helper de mensagens foi testado diretamente em `src/auth/auth-error-message.test.ts`. A suíte completa passou isolada com **209 testes em 23 arquivos**; uma execução concorrente falhou em dois testes de cadastro, que passaram isolados, sem causa confirmada. Após corrigir as esperas assíncronas da região `status`, o arquivo de recuperação passou com **40 testes**. Comandos executados em `web/`:
+
+```sh
+node ./node_modules/vitest/vitest.mjs run
+node ./node_modules/vitest/vitest.mjs run src/pages/recuperacao-senha.test.tsx
+```
+
+Também passaram o check estático de 113 arquivos, TypeScript e build.
+
+Na revisão de 31/10/2026, sobre o snapshot de trabalho derivado de `d5eeb9b`, a suíte completa passou com **210 testes em 23 arquivos** e os testes de cadastro/recuperação passaram com **61 testes em 2 arquivos**. Comandos executados em `web/`:
+
+```sh
+pnpm test
+pnpm test src/pages/cadastro.test.tsx src/pages/recuperacao-senha.test.tsx
+```
+
+Os resultados históricos acima identificam o commit correspondente a cada contagem; a execução focal é um subconjunto da suíte completa.
+
+Essa evidência cobre comportamento frontend e sessão local. Validade real de uma hora, uso único, invalidação de links anteriores e revogação de sessões no banco dependem da verificação backend em #139; os mocks frontend não comprovam esses critérios. O registro não declara fechamento de #140.
 
 ## Matriz não funcional
 

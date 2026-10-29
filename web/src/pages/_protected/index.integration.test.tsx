@@ -16,6 +16,7 @@ import type { SessionService } from '@/auth/session'
 import type { RouterContext } from '@/router-context'
 import { routerDefaults } from '@/router-defaults'
 import { renderWithProviders } from '@/test/render'
+import { createSessionStub } from '@/test/session-stub'
 import '@/test/dom-setup'
 
 const folderAId = '00000000-0000-0000-0000-000000000001'
@@ -104,16 +105,10 @@ function itemPage(page = 0, type: 'link' | 'secret' | 'text' = 'text') {
 }
 
 function createSession(): SessionService {
-  return {
-    dispose: vi.fn(),
-    handleSessionExpired: vi.fn(),
-    initialize: vi.fn().mockResolvedValue(undefined),
-    logout: vi.fn().mockResolvedValue(undefined),
-    setNavigateToLogin: vi.fn(),
+  return createSessionStub({
     status: 'authenticated',
-    updateUser: vi.fn(),
     user: { email: 'user@example.com', id: 'user-1', name: 'User' },
-  }
+  })
 }
 
 async function renderAt(entry: string) {

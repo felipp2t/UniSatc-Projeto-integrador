@@ -1,10 +1,14 @@
 import { useForm, useSelector } from '@tanstack/react-form'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { cn } from 'cn'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { authApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
+import {
+  getApiErrorMessage,
+  RATE_LIMITED_MESSAGE,
+  SERVER_UNAVAILABLE_MESSAGE,
+} from '@/api/get-api-error-message'
 import {
   authButtonClassName,
   authErrorClassName,
@@ -13,7 +17,7 @@ import {
   authSecretContainerClassName,
   authSecretInputClassName,
 } from '@/components/auth-form-styles'
-import { BrandMark } from '@/components/invite-status'
+import { BrandMark, InviteStatus } from '@/components/invite-status'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -33,18 +37,47 @@ export const Route = createFileRoute('/redefinir-senha')({
 
 function ResetPasswordPage() {
   const { token } = Route.useSearch()
+  const [rejectedToken, setRejectedToken] = useState<string>()
+  const navigate = useNavigate({ from: '/redefinir-senha' })
+  const startNewRequest = useCallback(
+    () => navigate({ to: '/esqueci-senha' }),
+    [navigate]
+  )
+  const rejectToken = useCallback(() => setRejectedToken(token), [token])
+  if (!token?.trim() || rejectedToken === token) {
+    return (
+      <InviteStatus
+        action={startNewRequest}
+        actionLabel='Solicitar novo link'
+        message='Este link não está disponível. Inicie uma nova solicitação de recuperação de senha.'
+        title='Link indisponível'
+      />
+    )
+  }
+
+  return (
+    <ResetPasswordForm
+      key={token}
+      onTokenRejected={rejectToken}
+      token={token}
+    />
+  )
+}
+
+function ResetPasswordForm({
+  onTokenRejected,
+  token,
+}: {
+  onTokenRejected: () => void
+  token: string
+}) {
   const { session } = Route.useRouteContext()
   const navigate = useNavigate({ from: '/redefinir-senha' })
   const formId = useId()
   const [error, setError] = useState<string>()
-  const [unavailable, setUnavailable] = useState(!token)
   const form = useForm({
     defaultValues: { confirmPassword: '', newPassword: '' },
     onSubmit: async ({ value }) => {
-      if (!token) {
-        setUnavailable(true)
-        return
-      }
       setError(undefined)
       try {
         await authApi.resetPassword({
@@ -55,18 +88,27 @@ function ResetPasswordPage() {
       } catch (cause) {
         const apiError = toApiError(cause)
         if (apiError.isUnauthorized) {
-          setUnavailable(true)
+          onTokenRejected()
           return
         }
         setError(
-          apiError.isRateLimited
-            ? 'Muitas tentativas. Aguarde um pouco e tente novamente.'
-            : 'Não foi possível redefinir a senha agora. Verifique sua conexão e tente novamente.'
+          getApiErrorMessage(apiError, {
+            fallback: 'Não foi possível redefinir a senha. Tente novamente.',
+            serverError: SERVER_UNAVAILABLE_MESSAGE,
+            statusMessages: {
+              400: 'Confira os dados informados e tente novamente.',
+              429: RATE_LIMITED_MESSAGE,
+            },
+          })
         )
         return
       }
 
-      session.handleSessionExpired()
+      try {
+        await session.logout()
+      } catch {
+        session.clearLocalSession()
+      }
       appToast.success('Senha redefinida. Entre novamente com sua nova senha.')
       await navigate({
         replace: true,
@@ -78,7 +120,12 @@ function ResetPasswordPage() {
       onSubmit: z
         .object({
           confirmPassword: z.string(),
-          newPassword: z.string().min(8, 'Use pelo menos 8 caracteres.'),
+          newPassword: z
+            .string()
+            .min(8, 'Use pelo menos 8 caracteres.')
+            .refine((password) => password.trim().length > 0, {
+              message: 'A senha não pode conter apenas espaços.',
+            }),
         })
         .refine((value) => value.newPassword === value.confirmPassword, {
           message: 'As senhas devem ser iguais.',
@@ -95,36 +142,6 @@ function ResetPasswordPage() {
     },
     [form]
   )
-
-  if (unavailable) {
-    return (
-      <main className='flex min-h-svh flex-col items-center justify-center bg-background p-6 md:p-10'>
-        <section
-          aria-labelledby={`${formId}-title`}
-          className='flex w-full max-w-sm flex-col items-center gap-4 text-center'
-        >
-          <BrandMark />
-          <h1 className='font-bold text-xl' id={`${formId}-title`}>
-            Link indisponível
-          </h1>
-          <p className='text-muted-foreground text-sm'>
-            Este link não está disponível. Inicie uma nova solicitação de
-            recuperação de senha.
-          </p>
-          <Link
-            className={cn(
-              authButtonClassName,
-              'inline-flex h-9 w-full items-center justify-center bg-primary px-4 py-2 font-mono text-primary-foreground text-xs uppercase'
-            )}
-            to='/esqueci-senha'
-          >
-            Solicitar novo link
-          </Link>
-        </section>
-      </main>
-    )
-  }
-
   return (
     <main className='flex min-h-svh flex-col items-center justify-center bg-background p-6 md:p-10'>
       <section aria-labelledby={`${formId}-title`} className='w-full max-w-sm'>
@@ -173,6 +190,9 @@ function ResetPasswordPage() {
                         onValueChange={field.handleChange}
                         placeholder={placeholder}
                         value={field.state.value}
+                        visibilityLabel={
+                          isNewPassword ? 'nova senha' : 'confirmação da senha'
+                        }
                       />
                       <FieldError className={authErrorClassName} id={errorId}>
                         {field.state.meta.errors[0]?.message}

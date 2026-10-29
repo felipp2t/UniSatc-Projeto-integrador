@@ -9,7 +9,10 @@ import {
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { authApi } from '@/api/endpoints'
-import { toApiError } from '@/api/errors'
+import {
+  getApiErrorMessage,
+  SERVER_UNAVAILABLE_MESSAGE,
+} from '@/api/get-api-error-message'
 import { sanitizeInternalRedirect } from '@/auth/redirect'
 import {
   authButtonClassName,
@@ -53,11 +56,14 @@ function LoginPage() {
           password: value.password,
         })
       } catch (cause) {
-        const apiError = toApiError(cause)
         setError(
-          apiError.isRateLimited
-            ? 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.'
-            : 'E-mail ou senha inválidos.'
+          getApiErrorMessage(cause, {
+            fallback: 'E-mail ou senha inválidos.',
+            serverError: SERVER_UNAVAILABLE_MESSAGE,
+            statusMessages: {
+              429: 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.',
+            },
+          })
         )
         return
       }
@@ -85,7 +91,7 @@ function LoginPage() {
     }),
     validators: {
       onSubmit: z.object({
-        email: z.email('Informe um e-mail válido.'),
+        email: z.string().trim().pipe(z.email('Informe um e-mail válido.')),
         password: z
           .string()
           .min(6, 'A senha deve ter pelo menos 6 caracteres.'),
@@ -169,20 +175,12 @@ function LoginPage() {
                       field.state.meta.isTouched && !field.state.meta.isValid
                     return (
                       <Field data-invalid={invalid}>
-                        <div className='flex items-center justify-between'>
-                          <FieldLabel
-                            className={authLabelClassName}
-                            htmlFor={field.name}
-                          >
-                            Senha
-                          </FieldLabel>
-                          <Link
-                            className={authLinkClassName}
-                            to='/esqueci-senha'
-                          >
-                            Esqueceu a senha?
-                          </Link>
-                        </div>
+                        <FieldLabel
+                          className={authLabelClassName}
+                          htmlFor={field.name}
+                        >
+                          Senha
+                        </FieldLabel>
                         <SecretInput
                           aria-describedby={invalid ? errorId : undefined}
                           aria-invalid={invalid}
@@ -196,12 +194,16 @@ function LoginPage() {
                           onValueChange={field.handleChange}
                           placeholder='123456'
                           value={field.state.value}
+                          visibilityLabel='senha'
                         />
                         <FieldError className={authErrorClassName} id={errorId}>
                           {field.state.meta.errors[0]?.message ? (
                             <p>{field.state.meta.errors[0].message}</p>
                           ) : null}
                         </FieldError>
+                        <Link className={authLinkClassName} to='/esqueci-senha'>
+                          Esqueceu a senha?
+                        </Link>
                       </Field>
                     )
                   }}

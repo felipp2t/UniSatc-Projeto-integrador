@@ -3,7 +3,11 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { authApi } from '@/api/endpoints'
-import { toApiError } from '@/api/errors'
+import {
+  getApiErrorMessage,
+  RATE_LIMITED_MESSAGE,
+  SERVER_UNAVAILABLE_MESSAGE,
+} from '@/api/get-api-error-message'
 import {
   authButtonClassName,
   authErrorClassName,
@@ -35,16 +39,21 @@ function ForgotPasswordPage() {
       setError(undefined)
       setMessage(undefined)
       try {
-        await authApi.forgotPassword({ email: value.email.trim() })
+        await authApi.forgotPassword({ email: value.email })
         setMessage(
           'Se houver uma conta com esse e-mail, você receberá orientações para redefinir a senha.'
         )
       } catch (cause) {
-        const apiError = toApiError(cause)
         setError(
-          apiError.isRateLimited
-            ? 'Muitas tentativas. Aguarde um pouco e tente novamente.'
-            : 'Não foi possível solicitar a redefinição agora. Verifique sua conexão e tente novamente.'
+          getApiErrorMessage(cause, {
+            fallback:
+              'Não foi possível solicitar a redefinição. Tente novamente.',
+            serverError: SERVER_UNAVAILABLE_MESSAGE,
+            statusMessages: {
+              400: 'Confira o e-mail informado e tente novamente.',
+              429: RATE_LIMITED_MESSAGE,
+            },
+          })
         )
       }
     },
@@ -110,11 +119,13 @@ function ForgotPasswordPage() {
                 )
               }}
             </form.Field>
-            {message ? (
-              <p className='text-muted-foreground text-sm' role='status'>
-                {message}
-              </p>
-            ) : null}
+            <p
+              aria-live='polite'
+              className='text-muted-foreground text-sm'
+              role='status'
+            >
+              {message}
+            </p>
             {error ? (
               <p className='text-destructive text-sm' role='alert'>
                 {error}

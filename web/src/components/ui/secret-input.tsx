@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input'
 interface SecretInputProps extends React.ComponentProps<'input'> {
   containerClassName?: string
   onValueChange?: (value: string) => void
+  visibilityLabel?: string
 }
 
 export function SecretInput({
   className,
   containerClassName,
   onValueChange,
+  visibilityLabel = 'conteúdo',
   ...props
 }: SecretInputProps) {
   const [visible, setVisible] = useState(false)
@@ -34,7 +36,7 @@ export function SecretInput({
         type={visible ? 'text' : 'password'}
       />
       <Button
-        aria-label={visible ? 'Ocultar conteúdo' : 'Mostrar conteúdo'}
+        aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${visibilityLabel}`}
         className='mr-1'
         onClick={handleToggle}
         size='icon'

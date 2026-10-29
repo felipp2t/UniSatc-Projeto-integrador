@@ -14,6 +14,7 @@ import type { SessionService } from '@/auth/session'
 import type { RouterContext } from '@/router-context'
 import { routerDefaults } from '@/router-defaults'
 import { renderWithProviders } from '@/test/render'
+import { createSessionStub } from '@/test/session-stub'
 
 const workspaceApiMocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -64,16 +65,10 @@ const members = [
 ]
 
 function createSession(userId: string): SessionService {
-  return {
-    dispose: vi.fn(),
-    handleSessionExpired: vi.fn(),
-    initialize: vi.fn().mockResolvedValue(undefined),
-    logout: vi.fn().mockResolvedValue(undefined),
-    setNavigateToLogin: vi.fn(),
+  return createSessionStub({
     status: 'authenticated',
-    updateUser: vi.fn(),
     user: { email: 'user@example.com', id: userId, name: 'User' },
-  }
+  })
 }
 
 async function renderWorkspaceSettings(userId: string) {

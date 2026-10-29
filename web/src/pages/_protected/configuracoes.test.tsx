@@ -14,6 +14,7 @@ import type { SessionService } from '@/auth/session'
 import type { RouterContext } from '@/router-context'
 import { routerDefaults } from '@/router-defaults'
 import { renderWithProviders } from '@/test/render'
+import { createSessionStub } from '@/test/session-stub'
 
 const apiMocks = vi.hoisted(() => ({
   changePassword: vi.fn(),
@@ -39,16 +40,10 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
 import { routeTree } from '@/route-tree.gen'
 
 function createSession(): SessionService {
-  return {
-    dispose: vi.fn(),
-    handleSessionExpired: vi.fn(),
-    initialize: vi.fn().mockResolvedValue(undefined),
-    logout: vi.fn().mockResolvedValue(undefined),
-    setNavigateToLogin: vi.fn(),
+  return createSessionStub({
     status: 'authenticated',
-    updateUser: vi.fn(),
     user: { email: 'user@example.com', id: 'user-1', name: 'Conta Atual' },
-  }
+  })
 }
 
 async function renderAccountSettings() {
