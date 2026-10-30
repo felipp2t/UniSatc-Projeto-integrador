@@ -70,7 +70,7 @@ public class WorkspaceActivityService {
         authorization.require(userId, workspace, "activity", "read");
         validateFilters(page, size, from, to, action, resourceType);
 
-        boolean owner = workspace.getOwner().getId().equals(userId);
+        boolean owner = authorization.isOwner(userId, workspace);
         var query = new StringBuilder(BASE_QUERY);
         var parameters = new MapSqlParameterSource()
                 .addValue("workspaceId", workspaceId)

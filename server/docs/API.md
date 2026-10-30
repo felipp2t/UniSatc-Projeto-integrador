@@ -338,7 +338,7 @@ O que a função faz:
 **`GET /workspaces/{workspaceId}/members`** — autenticado (cookie `accessToken`), com vínculo ao workspace.
 
 Retorna `id`, `userId`, `name`, `roleId` e `roleName` dos membros do workspace. O campo `email`
-é incluído apenas quando o solicitante é o dono atual do workspace, conforme o estado persistido
+é incluído apenas quando o solicitante tem atualmente o papel `Owner`, conforme o estado persistido
 no banco. Para os demais membros, a propriedade `email` é omitida da resposta, inclusive para o
 próprio solicitante; a visibilidade não é decidida pela claim `role` do JWT.
 
@@ -350,6 +350,70 @@ próprio solicitante; a visibilidade não é decidida pela claim `role` do JWT.
 
 O refinamento de permissões para conteúdo, grupos e herança de pastas é tratado nas dependências
 #130 e #132; esta rota descreve apenas a listagem e a visibilidade dos dados de membro.
+
+---
+
+## RF17 — Atribuição de papel a um membro
+
+**`PUT /workspaces/{workspaceId}/members/{memberId}/role`** — autenticado, somente donos.
+
+Body: `{ "roleId": "uuid" }`. Retorna o membro atualizado, com `email`.
+
+Dono é qualquer membro com o papel `Owner`; o workspace pode ter vários. Como só donos atribuem
+papéis, somente um dono existente concede o papel `Owner`. A troca que deixaria o workspace sem
+nenhum dono é rejeitada; os donos são travados durante a operação para que trocas simultâneas não
+contornem a regra. Atribuir o papel que o membro já tem não altera nada.
+
+A mudança é registrada como `member_role_changed` (com `previousRoleId` e `roleId`) e o membro
+recebe a notificação genérica de acesso atualizado. O filtro JWT lê o papel atual do banco a cada
+requisição, então a mudança vale antes do limite de 15 minutos do token.
+
+| | |
+|---|---|
+| Sucesso | `200`, membro atualizado |
+| `400` | `roleId` ausente |
+| `401` | não autenticado |
+| `403` | solicitante não é dono |
+| `404` | workspace, membro ou papel inexistente |
+| `409` | rebaixaria o último dono |
+
+---
+
+## RF18, RF19, RF20 e RF22 — Papéis
+
+Todas as rotas exigem autenticação e o papel `Owner`; outros membros recebem `403` e quem não é
+membro do workspace recebe `404`.
+
+Os papéis `Owner` e `Member` são protegidos (`builtIn: true`) e não podem ser excluídos. Nomes têm
+de 1 a 50 caracteres, sem espaços nas extremidades, e são únicos no workspace ignorando maiúsculas
+e acentos (migration V21, mesma normalização de pastas, itens e grupos).
+
+### Listar papéis
+
+**`GET /workspaces/{workspaceId}/roles`**
+
+Retorna `[{ "id", "name", "builtIn", "memberCount" }]`, ordenado por nome.
+
+### Criar papel
+
+**`POST /workspaces/{workspaceId}/roles`** — body `{ "name": "Financeiro" }`.
+
+O papel nasce sem permissões. Responde `201` com o papel criado, `400` para nome inválido e `409`
+para nome equivalente a um existente. Registra `role_created`.
+
+### Consultar permissões de um papel
+
+**`GET /workspaces/{workspaceId}/roles/{roleId}/permissions`**
+
+Retorna `[{ "resource", "action" }]`. A ação `all` é expandida nas ações individuais; o papel
+`Owner` retorna o catálogo completo. Papel de outro workspace ou inexistente responde `404`.
+
+### Excluir papel
+
+**`DELETE /workspaces/{workspaceId}/roles/{roleId}`**
+
+Responde `204` e remove também as permissões do papel. Registra `role_deleted`. Responde `409` para
+os papéis protegidos ou para papel atribuído a algum membro; troque o papel dos membros antes.
 
 ---
 
@@ -697,6 +761,12 @@ eventos role-permission end-to-end (CA01).
 | RF05 | PATCH | `/me/password` | Cookie `accessToken` |
 | RF06 | PATCH | `/me` | Cookie `accessToken` |
 | RF07 | GET | `/me` | Cookie `accessToken` |
+| RF15 | GET | `/workspaces/{workspaceId}/members` | Cookie `accessToken` |
+| RF17 | PUT | `/workspaces/{workspaceId}/members/{memberId}/role` | Cookie `accessToken` + dono |
+| RF20 | GET | `/workspaces/{workspaceId}/roles` | Cookie `accessToken` + dono |
+| RF18 | POST | `/workspaces/{workspaceId}/roles` | Cookie `accessToken` + dono |
+| RF22 | GET | `/workspaces/{workspaceId}/roles/{roleId}/permissions` | Cookie `accessToken` + dono |
+| RF19 | DELETE | `/workspaces/{workspaceId}/roles/{roleId}` | Cookie `accessToken` + dono |
 | RF23 | POST | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
 | RF26 | GET | `/workspaces/{workspaceId}/collections` | Cookie `accessToken` |
 | RF27 | GET | `/workspaces/{workspaceId}/collections/{collectionId}/path` | Cookie `accessToken` |
