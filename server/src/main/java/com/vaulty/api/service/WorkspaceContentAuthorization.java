@@ -59,6 +59,14 @@ public class WorkspaceContentAuthorization {
         return workspace;
     }
 
+    public Workspace requireOwnerOrNotFound(UUID userId, UUID workspaceId) {
+        Workspace workspace = requireWorkspace(userId, workspaceId);
+        if (!isOwner(userId, workspace)) {
+            throw new ResourceNotFoundException("Workspace não encontrado");
+        }
+        return workspace;
+    }
+
     @Transactional
     public void requireOwnerForUpdate(UUID userId, UUID workspaceId) {
         workspaceRepository.findByIdForUpdate(workspaceId)

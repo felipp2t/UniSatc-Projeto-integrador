@@ -80,7 +80,7 @@ public class WorkspaceService {
 
     @Transactional
     public WorkspaceResponse update(UUID ownerId, UUID workspaceId, UpdateWorkspaceRequest request) {
-        Workspace workspace = authorization.requireOwner(ownerId, workspaceId);
+        Workspace workspace = authorization.requireOwnerOrNotFound(ownerId, workspaceId);
 
         Map<String, Object> previous = new LinkedHashMap<>();
         previous.put("name", workspace.getName());

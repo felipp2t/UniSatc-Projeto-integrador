@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkspaceRoleService {
 
     private static final String DUPLICATE_NAME_CONSTRAINT = "uq_workspace_role_workspace_name";
+    private static final String BUILT_IN_NAME_CONSTRAINT = "ck_workspace_role_builtin_names";
     private static final String MEMBER_ROLE_FK = "workspace_member_role_id_fkey";
 
     private final WorkspaceRoleRepository roleRepository;
@@ -47,7 +48,8 @@ public class WorkspaceRoleService {
         try {
             role = roleRepository.saveAndFlush(role);
         } catch (DataIntegrityViolationException exception) {
-            if (PersistenceConstraints.causedBy(exception, DUPLICATE_NAME_CONSTRAINT)) {
+            if (PersistenceConstraints.causedBy(
+                    exception, DUPLICATE_NAME_CONSTRAINT, BUILT_IN_NAME_CONSTRAINT)) {
                 throw new ConflictException("Já existe um papel com esse nome neste workspace");
             }
             throw exception;
