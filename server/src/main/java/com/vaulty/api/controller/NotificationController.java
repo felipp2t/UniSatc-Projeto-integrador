@@ -26,8 +26,15 @@ public class NotificationController {
     @GetMapping
     public NotificationPageResponse list(@AuthenticationPrincipal UUID recipientId,
                                           @RequestParam(defaultValue = "0") int page,
-                                          @RequestParam(defaultValue = "20") int size) {
-        return notificationService.list(recipientId, page, size);
+                                          @RequestParam(defaultValue = "20") int size,
+                                          @RequestParam(defaultValue = "false") boolean unread) {
+        return notificationService.list(recipientId, page, size, unread);
+    }
+
+    @PatchMapping("/read")
+    public ResponseEntity<Void> markAllRead(@AuthenticationPrincipal UUID recipientId) {
+        notificationService.markAllRead(recipientId);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{notificationId}/read")

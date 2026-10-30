@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -29,24 +30,30 @@ public class NotificationService {
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_STREAMS_PER_USER = 5;
-    private static final long STREAM_TIMEOUT_MS = 30 * 60 * 1000L;
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    // O stream não sobrevive ao token de acesso que o abriu; a reconexão exige uma sessão válida.
+    private final long streamTimeoutMs;
     private final Map<UUID, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
-    public NotificationService(NotificationRepository notificationRepository, UserRepository userRepository) {
+    public NotificationService(NotificationRepository notificationRepository, UserRepository userRepository,
+                               @Value("${jwt.access-token-expiration-ms}") long streamTimeoutMs) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
+        this.streamTimeoutMs = streamTimeoutMs;
     }
 
     @Transactional(readOnly = true)
-    public NotificationPageResponse list(UUID recipientId, int page, int size) {
+    public NotificationPageResponse list(UUID recipientId, int page, int size, boolean unreadOnly) {
         validatePage(page, size);
         var pageable = PageRequest.of(page, size,
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        return NotificationPageResponse.from(notificationRepository.findAllByRecipientId(recipientId, pageable)
-                .map(NotificationResponse::from));
+        var notifications = unreadOnly
+                ? notificationRepository.findAllByRecipientIdAndReadAtIsNull(recipientId, pageable)
+                : notificationRepository.findAllByRecipientId(recipientId, pageable);
+        return NotificationPageResponse.from(notifications.map(NotificationResponse::from),
+                notificationRepository.countByRecipientIdAndReadAtIsNull(recipientId));
     }
 
     @Transactional
@@ -54,6 +61,11 @@ public class NotificationService {
         if (notificationRepository.markRead(notificationId, recipientId, OffsetDateTime.now()) == 0) {
             throw new ResourceNotFoundException("Notificação não encontrada");
         }
+    }
+
+    @Transactional
+    public void markAllRead(UUID recipientId) {
+        notificationRepository.markAllRead(recipientId, OffsetDateTime.now());
     }
 
     @Transactional
@@ -73,7 +85,7 @@ public class NotificationService {
     }
 
     public SseEmitter subscribe(UUID recipientId) {
-        SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
+        SseEmitter emitter = new SseEmitter(streamTimeoutMs);
         emitters.compute(recipientId, (ignored, userEmitters) -> {
             Set<SseEmitter> registered = userEmitters == null ? ConcurrentHashMap.newKeySet() : userEmitters;
             if (registered.size() >= MAX_STREAMS_PER_USER) {
@@ -116,22 +128,32 @@ public class NotificationService {
         }
     }
 
+    // Proxies costumam encerrar conexões ociosas; o comentário SSE mantém o stream aberto sem gerar evento.
+    public void sendHeartbeat() {
+        emitters.forEach((recipientId, userEmitters) -> userEmitters.forEach(emitter ->
+                send(recipientId, emitter, SseEmitter.event().comment("keep-alive"))));
+    }
+
     private void emit(UUID recipientId, UUID notificationId) {
         Set<SseEmitter> userEmitters = emitters.get(recipientId);
         if (userEmitters == null) {
             return;
         }
         for (SseEmitter emitter : userEmitters) {
+            send(recipientId, emitter, SseEmitter.event().name("notification").id(notificationId.toString())
+                    .data(notificationId));
+        }
+    }
+
+    private void send(UUID recipientId, SseEmitter emitter, SseEmitter.SseEventBuilder event) {
+        try {
+            emitter.send(event);
+        } catch (Exception exception) {
+            removeEmitter(recipientId, emitter);
             try {
-                emitter.send(SseEmitter.event().name("notification").id(notificationId.toString())
-                        .data(notificationId));
-            } catch (Exception exception) {
-                removeEmitter(recipientId, emitter);
-                try {
-                    emitter.completeWithError(exception);
-                } catch (IllegalStateException ignored) {
-                    // The connection may already have completed.
-                }
+                emitter.completeWithError(exception);
+            } catch (IllegalStateException ignored) {
+                // The connection may already have completed.
             }
         }
     }
