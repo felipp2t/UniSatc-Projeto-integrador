@@ -3,6 +3,8 @@ package com.vaulty.api.service;
 import com.vaulty.api.dto.workspace.WorkspacePermission;
 import com.vaulty.api.dto.workspace.WorkspacePermissionsResponse;
 import com.vaulty.api.entity.Workspace;
+import com.vaulty.api.entity.WorkspaceMember;
+import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.RolePermissionRepository;
@@ -13,6 +15,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -38,33 +41,64 @@ public class WorkspaceContentAuthorization {
     }
 
     public boolean allows(UUID userId, Workspace workspace, String resource, String action) {
-        if (workspace.getOwner().getId().equals(userId)) {
-            return true;
+        var role = requireMember(userId, workspace.getId()).getRole();
+        return role.isOwnerRole() || permissionRepository.allows(role.getId(), resource, action);
+    }
+
+    public boolean isOwner(UUID userId, Workspace workspace) {
+        return memberRepository.findByWorkspaceIdAndUserId(workspace.getId(), userId)
+                .map(member -> member.getRole().isOwnerRole())
+                .orElse(false);
+    }
+
+    public Workspace requireOwner(UUID userId, UUID workspaceId) {
+        Workspace workspace = requireWorkspace(userId, workspaceId);
+        if (!isOwner(userId, workspace)) {
+            throw new ForbiddenException("Permissão insuficiente");
         }
-        var member = memberRepository.findByWorkspaceIdAndUserId(workspace.getId(), userId)
+        return workspace;
+    }
+
+    public Workspace requireOwnerOrNotFound(UUID userId, UUID workspaceId) {
+        Workspace workspace = requireWorkspace(userId, workspaceId);
+        if (!isOwner(userId, workspace)) {
+            throw new ResourceNotFoundException("Workspace não encontrado");
+        }
+        return workspace;
+    }
+
+    @Transactional
+    public void requireOwnerForUpdate(UUID userId, UUID workspaceId) {
+        workspaceRepository.findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        return permissionRepository.allows(member.getRole().getId(), resource, action);
+        var member = requireMember(userId, workspaceId);
+        if (!member.getRole().isOwnerRole()) {
+            throw new ForbiddenException("Permissão insuficiente");
+        }
     }
 
     public WorkspacePermissionsResponse permissions(UUID userId, UUID workspaceId) {
-        Workspace workspace = requireWorkspace(userId, workspaceId);
-        boolean isOwner = workspace.getOwner().getId().equals(userId);
-        var member = memberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        List<WorkspacePermission> permissions;
-        if (isOwner) {
-            permissions = Stream.concat(RESOURCES.stream().flatMap(resource -> ACTIONS.stream()
+        var role = requireMember(userId, workspaceId).getRole();
+        return new WorkspacePermissionsResponse(role.isOwnerRole(), role.getId().toString(),
+                role.getName(), rolePermissions(role));
+    }
+
+    public List<WorkspacePermission> rolePermissions(WorkspaceRole role) {
+        if (role.isOwnerRole()) {
+            return Stream.concat(RESOURCES.stream().flatMap(resource -> ACTIONS.stream()
                             .map(action -> new WorkspacePermission(resource, action))),
                     Stream.of(new WorkspacePermission("group", "manage"))).toList();
-        } else {
-            permissions = permissionRepository.findAllByRoleId(member.getRole().getId()).stream()
-                    .flatMap(permission -> ("all".equals(permission.getAction())
-                            ? ("group".equals(permission.getResource()) ? Stream.of("manage") : ACTIONS.stream())
-                            : Stream.of(permission.getAction()))
-                            .map(action -> new WorkspacePermission(permission.getResource(), action)))
-                    .distinct().toList();
         }
-        return new WorkspacePermissionsResponse(isOwner, member.getRole().getId().toString(),
-                member.getRole().getName(), permissions);
+        return permissionRepository.findAllByRoleId(role.getId()).stream()
+                .flatMap(permission -> ("all".equals(permission.getAction())
+                        ? ("group".equals(permission.getResource()) ? Stream.of("manage") : ACTIONS.stream())
+                        : Stream.of(permission.getAction()))
+                        .map(action -> new WorkspacePermission(permission.getResource(), action)))
+                .distinct().toList();
+    }
+
+    private WorkspaceMember requireMember(UUID userId, UUID workspaceId) {
+        return memberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
     }
 }

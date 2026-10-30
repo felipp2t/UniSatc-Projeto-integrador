@@ -9,7 +9,6 @@ import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.enums.ActivityAction;
 import com.vaulty.api.enums.ActivityActorContext;
 import com.vaulty.api.enums.ActivityResourceType;
-import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
@@ -33,6 +32,7 @@ public class WorkspaceService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceMapper workspaceMapper;
     private final ActivityLogService activityLogService;
+    private final WorkspaceContentAuthorization authorization;
 
     @Transactional
     public WorkspaceMember addAsMember(User user) {
@@ -47,10 +47,7 @@ public class WorkspaceService {
     @Transactional(readOnly = true)
     public Workspace requireOwner(UUID userId) {
         Workspace workspace = singleton();
-        if (!workspace.getOwner().getId().equals(userId)) {
-            throw new ForbiddenException("Apenas o dono do workspace pode executar esta ação");
-        }
-        return workspace;
+        return authorization.requireOwner(userId, workspace.getId());
     }
 
     @Transactional(readOnly = true)
@@ -83,8 +80,7 @@ public class WorkspaceService {
 
     @Transactional
     public WorkspaceResponse update(UUID ownerId, UUID workspaceId, UpdateWorkspaceRequest request) {
-        Workspace workspace = workspaceRepository.findByIdAndOwnerId(workspaceId, ownerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        Workspace workspace = authorization.requireOwnerOrNotFound(ownerId, workspaceId);
 
         Map<String, Object> previous = new LinkedHashMap<>();
         previous.put("name", workspace.getName());

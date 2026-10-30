@@ -26,6 +26,16 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
 
     Optional<WorkspaceMember> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
 
+    boolean existsByRoleId(UUID roleId);
+
+    @Query("""
+            select member from WorkspaceMember member
+            where member.workspace.id = :workspaceId and member.role.name = :ownerRoleName
+            order by member.id
+            """)
+    List<WorkspaceMember> findOwners(
+            @Param("workspaceId") UUID workspaceId, @Param("ownerRoleName") String ownerRoleName);
+
     @Query("""
             select member from WorkspaceMember member
             join fetch member.role
