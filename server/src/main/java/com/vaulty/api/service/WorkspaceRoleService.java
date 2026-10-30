@@ -68,7 +68,7 @@ public class WorkspaceRoleService {
 
     @Transactional
     public void delete(UUID userId, UUID workspaceId, UUID roleId) {
-        authorization.requireOwner(userId, workspaceId);
+        authorization.requireOwnerForUpdate(userId, workspaceId);
         var role = roleRepository.findByIdAndWorkspaceIdForUpdate(roleId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel não encontrado"));
         if (role.isProtected()) {

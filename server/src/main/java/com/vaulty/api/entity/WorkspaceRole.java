@@ -59,4 +59,5 @@ public class WorkspaceRole {
     public boolean isProtected() {
         return isProtectedName(name);
     }
+
 }

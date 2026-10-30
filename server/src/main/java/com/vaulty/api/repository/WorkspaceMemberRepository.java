@@ -1,12 +1,10 @@
 package com.vaulty.api.repository;
 
 import com.vaulty.api.entity.WorkspaceMember;
-import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -30,13 +28,12 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
 
     boolean existsByRoleId(UUID roleId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select member from WorkspaceMember member
             where member.workspace.id = :workspaceId and member.role.name = :ownerRoleName
             order by member.id
             """)
-    List<WorkspaceMember> findOwnersForUpdate(
+    List<WorkspaceMember> findOwners(
             @Param("workspaceId") UUID workspaceId, @Param("ownerRoleName") String ownerRoleName);
 
     @Query("""

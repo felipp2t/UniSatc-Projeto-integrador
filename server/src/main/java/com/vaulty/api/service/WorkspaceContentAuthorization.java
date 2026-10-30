@@ -15,6 +15,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -58,8 +59,17 @@ public class WorkspaceContentAuthorization {
         return workspace;
     }
 
+    @Transactional
+    public void requireOwnerForUpdate(UUID userId, UUID workspaceId) {
+        workspaceRepository.findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        var member = requireMember(userId, workspaceId);
+        if (!member.getRole().isOwnerRole()) {
+            throw new ForbiddenException("Permissão insuficiente");
+        }
+    }
+
     public WorkspacePermissionsResponse permissions(UUID userId, UUID workspaceId) {
-        requireWorkspace(userId, workspaceId);
         var role = requireMember(userId, workspaceId).getRole();
         return new WorkspacePermissionsResponse(role.isOwnerRole(), role.getId().toString(),
                 role.getName(), rolePermissions(role));

@@ -7,7 +7,6 @@ import com.vaulty.api.enums.ActivityAction;
 import com.vaulty.api.enums.ActivityActorContext;
 import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ConflictException;
-import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
@@ -49,12 +48,8 @@ public class WorkspaceMemberService {
     @Transactional
     public WorkspaceMemberResponse changeRole(UUID userId, UUID workspaceId, UUID memberId,
                                               ChangeMemberRoleRequest request) {
-        authorization.requireOwner(userId, workspaceId);
-        // Trava os donos para que trocas simultâneas não deixem o workspace sem nenhum.
-        var owners = workspaceMemberRepository.findOwnersForUpdate(workspaceId, WorkspaceRole.OWNER_ROLE_NAME);
-        if (owners.stream().noneMatch(owner -> owner.getUser().getId().equals(userId))) {
-            throw new ForbiddenException("Permissão insuficiente");
-        }
+        authorization.requireOwnerForUpdate(userId, workspaceId);
+        var owners = workspaceMemberRepository.findOwners(workspaceId, WorkspaceRole.OWNER_ROLE_NAME);
         var member = workspaceMemberRepository.findByIdAndWorkspaceId(memberId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Membro não encontrado"));
         var role = workspaceRoleRepository.findByIdAndWorkspaceId(request.roleId(), workspaceId)
