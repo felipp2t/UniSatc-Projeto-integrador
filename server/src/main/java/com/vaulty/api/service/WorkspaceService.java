@@ -47,7 +47,10 @@ public class WorkspaceService {
     @Transactional(readOnly = true)
     public Workspace requireOwner(UUID userId) {
         Workspace workspace = singleton();
-        if (!workspace.getOwner().getId().equals(userId)) {
+        boolean owner = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace.getId(), userId)
+                .map(member -> member.getRole().isOwnerRole())
+                .orElse(false);
+        if (!owner) {
             throw new ForbiddenException("Apenas o dono do workspace pode executar esta ação");
         }
         return workspace;

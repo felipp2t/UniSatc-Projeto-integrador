@@ -74,6 +74,13 @@ abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
         workspaceMemberRepository.save(member);
     }
 
+    protected void assignRole(User user, UUID workspaceId, String roleName) {
+        WorkspaceMember membership = workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(workspaceId, user.getId()).orElseThrow();
+        membership.setRole(workspaceRoleRepository.findByWorkspaceIdAndName(workspaceId, roleName).orElseThrow());
+        workspaceMemberRepository.saveAndFlush(membership);
+    }
+
     protected Cookie authCookie(User user) {
         WorkspaceMember membership = workspaceMemberRepository.findByUserId(user.getId()).orElseThrow();
         return new Cookie("accessToken", jwtService.generateAccessToken(

@@ -47,4 +47,16 @@ public class WorkspaceRole {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
+
+    public static boolean isProtectedName(String name) {
+        return OWNER_ROLE_NAME.equals(name) || MEMBER_ROLE_NAME.equals(name);
+    }
+
+    public boolean isOwnerRole() {
+        return OWNER_ROLE_NAME.equals(name);
+    }
+
+    public boolean isProtected() {
+        return isProtectedName(name);
+    }
 }

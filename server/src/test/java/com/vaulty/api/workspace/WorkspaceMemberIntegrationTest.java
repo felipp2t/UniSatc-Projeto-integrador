@@ -164,9 +164,8 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         addMember(currentOwner, workspaceResponse.id());
         var formerOwnerCookie = authCookie(formerOwner);
 
-        var workspace = workspaceRepository.findById(workspaceResponse.id()).orElseThrow();
-        workspace.setOwner(currentOwner);
-        workspaceRepository.saveAndFlush(workspace);
+        assignRole(currentOwner, workspaceResponse.id(), WorkspaceRole.OWNER_ROLE_NAME);
+        assignRole(formerOwner, workspaceResponse.id(), WorkspaceRole.MEMBER_ROLE_NAME);
         entityManager.clear();
 
         String formerOwnerResponse = mockMvc.perform(get("/workspaces/{workspaceId}/members", workspaceResponse.id())

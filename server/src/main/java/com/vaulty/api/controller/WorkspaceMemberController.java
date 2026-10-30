@@ -1,14 +1,18 @@
 package com.vaulty.api.controller;
 
 import com.vaulty.api.controller.docs.WorkspaceMemberControllerDocs;
+import com.vaulty.api.dto.workspace.ChangeMemberRoleRequest;
 import com.vaulty.api.dto.workspace.WorkspaceMemberResponse;
 import com.vaulty.api.service.WorkspaceMemberService;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,5 +28,13 @@ public class WorkspaceMemberController implements WorkspaceMemberControllerDocs 
     public List<WorkspaceMemberResponse> list(
             @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId) {
         return workspaceMemberService.list(userId, workspaceId);
+    }
+
+    @PutMapping("/{memberId}/role")
+    @Override
+    public WorkspaceMemberResponse changeRole(
+            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId, @PathVariable UUID memberId,
+            @Valid @RequestBody ChangeMemberRoleRequest request) {
+        return workspaceMemberService.changeRole(userId, workspaceId, memberId, request);
     }
 }
