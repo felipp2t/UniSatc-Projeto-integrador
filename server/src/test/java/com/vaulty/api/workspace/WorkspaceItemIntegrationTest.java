@@ -1,6 +1,7 @@
 package com.vaulty.api.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaulty.api.dto.item.CreateItemRequest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.WorkspaceRole;
+import com.vaulty.api.service.SecretCipher;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +36,9 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Autowired private ObjectMapper objectMapper;
     @Autowired private EntityManager entityManager;
+    @Autowired private SecretCipher secretCipher;
     private final List<UUID> committedConflictTestItems = new ArrayList<>();
+    private final List<UUID> committedSecretTestItems = new ArrayList<>();
 
     @AfterEach
     void cleanupCommittedConflictTestItems() {
@@ -42,6 +47,11 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
             jdbcTemplate.update("DELETE FROM item WHERE id = ?", itemId);
         }
         committedConflictTestItems.clear();
+        for (UUID itemId : committedSecretTestItems) {
+            jdbcTemplate.update("DELETE FROM activity_log WHERE resource_id = ?", itemId);
+            jdbcTemplate.update("DELETE FROM item WHERE id = ?", itemId);
+        }
+        committedSecretTestItems.clear();
     }
 
     @Test
@@ -214,6 +224,78 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
                         .cookie(authCookie(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.value").value("valor-privado"));
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void missingOrInvalidEncryptionKeyRollsBackSecretCreationAndUpdate() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        UUID secretId = createItem(owner, workspaceId, "secret", "Credencial", null, null, null, "original-secret");
+        committedSecretTestItems.add(secretId);
+        String encryptedBefore = jdbcTemplate.queryForObject(
+                "SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId);
+        var cookie = authCookie(owner);
+
+        try {
+            for (String brokenKey : new String[] {"", "invalid-base64"}) {
+                ReflectionTestUtils.setField(secretCipher, "configuredKey", brokenKey);
+                mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                                .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"type\":\"secret\",\"title\":\"Não criar\",\"value\":\"create-secret\"}"))
+                        .andExpect(status().isServiceUnavailable())
+                        .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("create-secret"))));
+                assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM item WHERE workspace_id = ? AND title = 'Não criar'", Integer.class, workspaceId))
+                        .isZero();
+
+                mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}", workspaceId, secretId)
+                                .cookie(cookie).contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"title\":\"Credencial alterada\",\"value\":\"replacement-secret\"}"))
+                        .andExpect(status().isServiceUnavailable())
+                        .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("replacement-secret"))));
+                assertThat(jdbcTemplate.queryForObject("SELECT title FROM item WHERE id = ?", String.class, secretId))
+                        .isEqualTo("Credencial");
+                assertThat(jdbcTemplate.queryForObject(
+                        "SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId))
+                        .isEqualTo(encryptedBefore);
+            }
+        } finally {
+            ReflectionTestUtils.setField(secretCipher, "configuredKey", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+        }
+
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId).cookie(cookie))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.value").value("original-secret"));
+    }
+
+    @Test
+    void revealFailsWithoutReturningSecretWhenCiphertextIsCorruptedOrKeyDiffers() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        String secretValue = "must-never-appear-in-error";
+        UUID secretId = createItem(owner, workspaceId, "secret", "Credencial", null, null, null, secretValue);
+        String encrypted = jdbcTemplate.queryForObject(
+                "SELECT value FROM item_secret WHERE item_id = ?", String.class, secretId);
+
+        ReflectionTestUtils.setField(secretCipher, "configuredKey", "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=");
+        try {
+            assertThatThrownBy(() -> mockMvc.perform(get(
+                            "/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId)
+                            .cookie(authCookie(owner))))
+                    .hasMessageNotContaining(secretValue)
+                    .hasCauseInstanceOf(IllegalStateException.class);
+        } finally {
+            ReflectionTestUtils.setField(secretCipher, "configuredKey", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+        }
+
+        jdbcTemplate.update("UPDATE item_secret SET value = 'corrupted-ciphertext' WHERE item_id = ?", secretId);
+        entityManager.clear();
+        assertThatThrownBy(() -> mockMvc.perform(get(
+                        "/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId)
+                        .cookie(authCookie(owner))))
+                .hasMessageNotContaining(secretValue)
+                .hasMessageNotContaining(encrypted)
+                .hasCauseInstanceOf(IllegalStateException.class);
     }
 
     @Test
