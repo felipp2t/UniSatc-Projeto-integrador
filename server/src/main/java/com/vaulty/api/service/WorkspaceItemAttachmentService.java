@@ -127,7 +127,12 @@ public class WorkspaceItemAttachmentService {
         var before = itemSnapshot(item, oldFile);
 
         try {
-            requireStorage().put(upload.key, upload.content, upload.mimeType);
+            try {
+                requireStorage().put(upload.key, upload.content, upload.mimeType);
+            } catch (RuntimeException exception) {
+                throw new StorageUnavailableException(
+                        "Não foi possível substituir o anexo; o arquivo anterior continua disponível.");
+            }
             item.setType(upload.image ? "image" : "file");
             itemRepository.saveAndFlush(item);
             newFile.setItemId(itemId);

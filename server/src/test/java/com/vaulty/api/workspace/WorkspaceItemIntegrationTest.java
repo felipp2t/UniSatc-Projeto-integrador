@@ -135,6 +135,57 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
+    void listAndSearchFilterSecretsBeforePaginationCountsAndRequireMembershipAndReadPermission() throws Exception {
+        User owner = createUser();
+        User member = createUser();
+        User outsider = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(member, workspaceId);
+        UUID roleId = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, member.getId())
+                .orElseThrow().getRole().getId();
+        UUID folderId = createFolder(owner, workspaceId, "Pasta isolada");
+        createItem(owner, workspaceId, "text", "Visível Alpha", null, "A", null, null);
+        createItem(owner, workspaceId, "text", "Visível Beta", null, "B", null, null);
+        createItem(owner, workspaceId, "secret", "Visível Segredo", null, null, null, "private-value");
+        createItem(owner, workspaceId, "text", "Dentro da pasta", folderId, "Pasta", null, null);
+        var memberCookie = authCookie(member);
+
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(memberCookie).param("page", "0").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("Visível Alpha"))
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(memberCookie).param("page", "1").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].title").value("Visível Beta"))
+                .andExpect(jsonPath("$.totalItems").value(2));
+
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId)
+                        .cookie(memberCookie).param("q", "Visível").param("page", "0").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("Visível Alpha"))
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(memberCookie).param("collectionId", folderId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("Dentro da pasta"));
+
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookieWithoutMembership(outsider)))
+                .andExpect(status().isUnauthorized());
+        jdbcTemplate.update("DELETE FROM role_permission WHERE role_id = ? AND resource = 'item' AND action = 'read'",
+                roleId);
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId).cookie(memberCookie))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void searchesTitlesWithoutExposingSecretValueAndDecryptsOnlyOnReveal() throws Exception {
         User owner = createUser();
         UUID workspaceId = configureWorkspace(owner).id();

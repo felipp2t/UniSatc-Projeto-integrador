@@ -7,4 +7,8 @@ public class StorageUnavailableException extends ApiException {
     public StorageUnavailableException() {
         super("Storage de anexos não está configurado", HttpStatus.SERVICE_UNAVAILABLE);
     }
+
+    public StorageUnavailableException(String message) {
+        super(message, HttpStatus.SERVICE_UNAVAILABLE);
+    }
 }
