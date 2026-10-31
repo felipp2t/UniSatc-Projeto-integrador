@@ -26,6 +26,7 @@ import com.vaulty.api.repository.WorkspaceMemberRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,6 +57,8 @@ public class AuthService {
 
     private final WorkspaceMemberRepository workspaceMemberRepository;
 
+    private final WorkspaceContentAuthorization workspaceContentAuthorization;
+
     private final ActivityLogService activityLogService;
 
     private final Clock clock;
@@ -85,6 +88,8 @@ public class AuthService {
 
             WorkspaceMemberRepository workspaceMemberRepository,
 
+            WorkspaceContentAuthorization workspaceContentAuthorization,
+
             ActivityLogService activityLogService,
 
             Clock clock,
@@ -104,6 +109,7 @@ public class AuthService {
         this.credentialService = credentialService;
         this.workspaceService = workspaceService;
         this.workspaceMemberRepository = workspaceMemberRepository;
+        this.workspaceContentAuthorization = workspaceContentAuthorization;
         this.activityLogService = activityLogService;
         this.clock = clock;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
@@ -229,7 +235,12 @@ public class AuthService {
         refreshToken.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(refreshTokenExpirationMs)));
         refreshTokenRepository.save(refreshToken);
 
-        String accessToken = jwtService.generateAccessToken(userId, membership.getId(), membership.getRole().getName());
+        List<String> permissions = workspaceContentAuthorization
+                .permissions(userId, membership.getWorkspace().getId()).permissions().stream()
+                .map(permission -> permission.resource() + ":" + permission.action())
+                .toList();
+        String accessToken = jwtService.generateAccessToken(
+                userId, membership.getId(), membership.getRole().getName(), permissions);
 
         return new TokenPair(accessToken, refreshToken.getToken());
     }
