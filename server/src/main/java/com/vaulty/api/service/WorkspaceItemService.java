@@ -27,7 +27,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +42,7 @@ public class WorkspaceItemService {
     private final WorkspaceItemSecretRepository secretRepository;
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceContentAuthorization authorization;
+    private final EffectiveContentAccess contentAccess;
     private final SecretCipher secretCipher;
     private final ActivityLogService activityLogService;
     private final WorkspaceItemAttachmentService attachmentService;
@@ -58,6 +58,7 @@ public class WorkspaceItemService {
         var collection = request.collectionId() == null ? null
                 : collectionRepository.findByIdAndWorkspaceId(request.collectionId(), workspaceId)
                         .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
+        if (collection != null) contentAccess.requireCollection(userId, workspace, collection.getId());
 
         var item = new WorkspaceItem();
         item.setWorkspace(workspace);
@@ -94,9 +95,10 @@ public class WorkspaceItemService {
         if (collectionId != null && collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId).isEmpty()) {
             throw new ResourceNotFoundException("Pasta não encontrada");
         }
-        var pageable = PageRequest.of(page, size, Sort.by("title").ascending().and(Sort.by("id").ascending()));
+        if (collectionId != null) contentAccess.requireCollection(userId, workspace, collectionId);
+        var pageable = PageRequest.of(page, size);
         boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
-        return ItemPageResponse.from(itemRepository.list(workspaceId, collectionId, includeSecrets, pageable)
+        return ItemPageResponse.from(itemRepository.listAccessible(workspaceId, userId, collectionId, includeSecrets, pageable)
                 .map(item -> toResponse(item, false)));
     }
 
@@ -110,9 +112,9 @@ public class WorkspaceItemService {
         }
         var pageable = PageRequest.of(page, size);
         boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
-        return ItemPageResponse.from(itemRepository.searchByTitle(
-                        workspaceId, query.trim(), includeSecrets, pageable)
-                .map(item -> toResponse(item, false)));
+        return ItemPageResponse.from(itemRepository.searchAccessible(
+                        workspaceId, userId, query.trim(), includeSecrets, pageable)
+                .map(item -> toAccessibleResponse(userId, workspace, item, false)));
     }
 
     @Transactional(readOnly = true)
@@ -123,7 +125,8 @@ public class WorkspaceItemService {
         var item = itemRepository.findIncludingArchived(itemId, workspaceId)
                 .filter(found -> includeSecrets || !"secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
-        return toResponse(item, true);
+        contentAccess.requireItem(userId, workspace, itemId);
+        return toAccessibleResponse(userId, workspace, item, true);
     }
 
     @Transactional(readOnly = true)
@@ -134,6 +137,7 @@ public class WorkspaceItemService {
         var item = itemRepository.findIncludingArchived(itemId, workspaceId)
                 .filter(found -> "secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
+        contentAccess.requireItem(userId, workspace, itemId);
         var secret = secretRepository.findById(item.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
         return new SecretValueResponse(secretCipher.decrypt(secret.getValue()));
@@ -148,6 +152,7 @@ public class WorkspaceItemService {
         }
         var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        contentAccess.requireItem(userId, workspace, itemId);
         if ("secret".equals(item.getType())) {
             if (!authorization.allows(userId, workspace, "secret", "read")) {
                 throw new ResourceNotFoundException("Item indisponível");
@@ -172,6 +177,7 @@ public class WorkspaceItemService {
         authorization.require(userId, workspace, "item", "update");
         var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        contentAccess.requireItem(userId, workspace, itemId);
         if ("secret".equals(item.getType())) {
             if (!authorization.allows(userId, workspace, "secret", "read")) {
                 throw new ResourceNotFoundException("Item indisponível");
@@ -192,6 +198,7 @@ public class WorkspaceItemService {
         authorization.require(userId, workspace, "item", "update");
         var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        contentAccess.requireItem(userId, workspace, itemId);
         if ("secret".equals(item.getType())) {
             if (!authorization.allows(userId, workspace, "secret", "read")) {
                 throw new ResourceNotFoundException("Item indisponível");
@@ -214,6 +221,7 @@ public class WorkspaceItemService {
                 .filter(found -> "text".equals(found.getType()) || "link".equals(found.getType())
                         || "secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
+        contentAccess.requireItem(userId, workspace, itemId);
         if ("secret".equals(item.getType())) {
             authorization.require(userId, workspace, "secret", "update");
         }
@@ -237,7 +245,7 @@ public class WorkspaceItemService {
             activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.ITEM_UPDATED,
                     ActivityResourceType.ITEM, itemId,
                     Map.of("before", before, "after", itemSnapshot(item, true)));
-            return toResponse(item, true);
+            return toAccessibleResponse(userId, workspace, item, true);
         } catch (DataIntegrityViolationException exception) {
             if (PersistenceConstraints.causedBy(exception, DUPLICATE_TITLE_CONSTRAINT)) {
                 throw new ConflictException("Título indisponível nesta localização");
@@ -302,6 +310,16 @@ public class WorkspaceItemService {
                 item.getCollection() == null ? null : item.getCollection().getId(),
                 includeContent ? item.getTextContent() : null,
                 includeContent ? item.getLinkUrl() : null, preview, item.getDescription());
+    }
+
+    private ItemResponse toAccessibleResponse(UUID userId, Workspace workspace, WorkspaceItem item,
+                                              boolean includeContent) {
+        var response = toResponse(item, includeContent);
+        return item.getCollection() != null
+                && !contentAccess.canReadCollection(userId, workspace, item.getCollection().getId())
+                ? new ItemResponse(response.id(), response.type(), response.title(), null,
+                        response.textContent(), response.linkUrl(), response.preview(), response.description())
+                : response;
     }
 
     private String truncate(String value) {

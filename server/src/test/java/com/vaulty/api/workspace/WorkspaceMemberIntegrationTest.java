@@ -54,7 +54,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     @Autowired private PlatformTransactionManager transactionManager;
 
     @Test
-    void ownerGetsEveryActionForEveryResource() throws Exception {
+    void ownerGetsEffectivePermissionsIncludingSharingButNotSecretRead() throws Exception {
         User owner = createUser("Proprietário");
         WorkspaceResponse workspace = configureWorkspace(owner);
 
@@ -62,9 +62,10 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isOwner").value(true))
                 .andExpect(jsonPath("$.roleName").value("Owner"))
-                .andExpect(jsonPath("$.permissions.length()").value(36))
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'secret' && @.action == 'read')]").isNotEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'group' && @.action == 'manage')]").isNotEmpty());
+                .andExpect(jsonPath("$.permissions.length()").value(32))
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'group' && @.action == 'manage')]").isNotEmpty())
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'secret' && @.action == 'read')]").isEmpty())
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'sharing' && @.action == 'manage')]").isNotEmpty());
     }
 
     @Test

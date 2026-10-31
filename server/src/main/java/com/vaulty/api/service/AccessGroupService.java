@@ -29,6 +29,7 @@ public class AccessGroupService {
 
     private static final String DUPLICATE_NAME_CONSTRAINT = "uq_access_group_workspace_name";
     private static final String GROUP_MEMBER_FK = "fk_access_group_member_group_workspace";
+    private static final String GROUP_GRANT_FK = "fk_collection_access_grant_group_workspace";
 
     private final AccessGroupRepository groupRepository;
     private final AccessGroupMemberRepository groupMemberRepository;
@@ -90,15 +91,16 @@ public class AccessGroupService {
     public void delete(UUID userId, UUID workspaceId, UUID groupId) {
         requireManager(userId, workspaceId);
         var group = findGroupForUpdate(groupId, workspaceId);
-        if (groupMemberRepository.existsByGroupIdAndWorkspaceId(groupId, workspaceId)) {
-            throw new ConflictException("Remova os integrantes antes de excluir o grupo");
+        if (groupMemberRepository.existsByGroupIdAndWorkspaceId(groupId, workspaceId)
+                || groupRepository.existsFolderGrant(groupId, workspaceId)) {
+            throw new ConflictException("Remova os integrantes e as concessões antes de excluir o grupo");
         }
         try {
             groupRepository.delete(group);
             groupRepository.flush();
         } catch (DataIntegrityViolationException exception) {
-            if (PersistenceConstraints.causedBy(exception, GROUP_MEMBER_FK)) {
-                throw new ConflictException("Remova os integrantes antes de excluir o grupo");
+            if (PersistenceConstraints.causedBy(exception, GROUP_MEMBER_FK, GROUP_GRANT_FK)) {
+                throw new ConflictException("Remova os integrantes e as concessões antes de excluir o grupo");
             }
             throw exception;
         }

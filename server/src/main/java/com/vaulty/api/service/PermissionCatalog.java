@@ -12,7 +12,8 @@ public final class PermissionCatalog {
     private static final List<WorkspacePermission> PERMISSIONS = Stream.concat(
                     RESOURCES.stream().flatMap(resource -> ACTIONS.stream()
                             .map(action -> new WorkspacePermission(resource, action))),
-                    Stream.of(new WorkspacePermission("group", "manage")))
+                    Stream.of(new WorkspacePermission("group", "manage"),
+                            new WorkspacePermission("sharing", "manage")))
             .toList();
 
     private PermissionCatalog() {}
@@ -26,7 +27,8 @@ public final class PermissionCatalog {
     }
 
     public static List<WorkspacePermission> effectiveOwnerPermissions() {
-        return PERMISSIONS.stream().filter(permission -> !"all".equals(permission.action())).toList();
+        return PERMISSIONS.stream().filter(permission -> !"all".equals(permission.action())
+                && !"secret".equals(permission.resource())).toList();
     }
 
     public static List<String> actions(String resource) {
