@@ -72,7 +72,7 @@ Matriz iniciada em 12/10/2026 como execução documental de L14. Relaciona requi
 
 As telas existentes de solicitação e redefinição apresentam mensagem genérica, tratam link indisponível (incluindo token só com espaços), preservam a senha válida e distinguem erros de validação, limite de tentativas, servidor e rede. Após redefinir, tentam encerrar a sessão, usam limpeza local sem callback se o logout falhar e retornam ao login sem token no redirect.
 
-Em 31/10/2026, no commit `5d2e8fc` (branch `feat/140-password-recovery-rf49`, já rebaseada no `develop` `040f0ab`), no ambiente Windows com Node.js 22.16.0 e Vitest 5.0.5, a suíte completa passou com **296 testes em 32 arquivos** e a seleção focal abaixo passou com **86 testes em 3 arquivos** (um subconjunto da suíte completa, não testes adicionais). O arquivo de recuperação sozinho passou com **49 testes**. Comandos executados em `web/`:
+Em 31/10/2026, no commit `a8e59e9` (branch `feat/140-password-recovery-rf49`, já rebaseada no `develop` `040f0ab`), no ambiente Windows com Node.js 22.16.0 e Vitest 5.0.5, a suíte completa passou com **296 testes em 32 arquivos** e a seleção focal abaixo passou com **86 testes em 3 arquivos** (um subconjunto da suíte completa, não testes adicionais). O arquivo de recuperação sozinho passou com **49 testes**. Comandos executados em `web/`:
 
 ```sh
 pnpm test
@@ -80,9 +80,9 @@ pnpm test src/api/get-api-error-message.test.ts src/pages/recuperacao-senha.test
 pnpm test src/pages/recuperacao-senha.test.tsx
 ```
 
-Nesse commit também passaram o check estático (`pnpm check`, 133 arquivos), TypeScript (`pnpm exec tsc -b`) e `pnpm build`. Em commits anteriores (`1d1df3e`), a suíte completa também passou em rodadas sequenciais e com duas execuções simultâneas, sem timeout; no `5d2e8fc`, que só ajusta uma classe de espaçamento no esqueci a senha, foi executada uma vez, de forma sequencial. O espaçamento entre o campo e o botão foi medido no navegador (28px, com a região de status vazia, com erro e com a mensagem visível). A mensagem de erro de rede dos formulários de autenticação e de cadastro por convite agora é a padrão de `src/api/get-api-error-message.ts`.
+Nesse commit também passaram o check estático (`pnpm check`, 133 arquivos), TypeScript (`pnpm exec tsc -b`) e `pnpm build`. Antes de o histórico da branch ser resumido, a suíte completa também passou em rodadas sequenciais e com duas execuções simultâneas, sem timeout; no `a8e59e9`, cujo conteúdo é idêntico ao do último commit anterior ao resumo, ela foi executada uma vez, de forma sequencial. A última alteração de código antes do resumo, um ajuste de classe de espaçamento no esqueci a senha, foi verificada só nessa execução sequencial. O espaçamento entre o campo e o botão foi medido no navegador (28px, com a região de status vazia, com erro e com a mensagem visível). A mensagem de erro de rede dos formulários de autenticação e de cadastro por convite agora é a padrão de `src/api/get-api-error-message.ts`.
 
-As contagens de commits anteriores a esse rebase não são reproduzíveis, porque os SHAs foram reescritos; vale apenas a contagem acima.
+As contagens registradas antes da reescrita do histórico não são reproduzíveis por SHA, porque esses commits deixaram de existir na branch; vale apenas a contagem acima.
 
 Essa evidência cobre comportamento frontend e sessão local. Validade real de uma hora, uso único, invalidação de links anteriores e revogação de sessões no banco dependem da verificação backend em #139; os mocks frontend não comprovam esses critérios. Depois da redefinição o backend remove os refresh tokens e o `/auth/logout` responde 401 sem limpar os cookies; o frontend só limpa o estado local, e o acesso já emitido pode valer por até 15 minutos (limite de #139). O registro não declara fechamento de #140.
 
