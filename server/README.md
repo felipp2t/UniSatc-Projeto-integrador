@@ -101,15 +101,17 @@ completa de conteúdo granular.
 | RF02 | POST | `/auth/login` | Não | `{ email, password }` | 200, seta cookies | 401 credenciais inválidas |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` | — | 200, roda os cookies | 401 refresh token inválido/expirado |
 | RF04 | POST | `/auth/logout` | Cookie `refreshToken` | — | 204, limpa os cookies | 401 refresh token inválido |
-| RF49 | POST | `/auth/forgot-password` | Não | `{ email }` | 204 (sempre, mesmo se o e-mail não existir) | — |
-| RF49 | POST | `/auth/reset-password` | Não | `{ token, newPassword, confirmPassword }` | 204 | 400 senhas não conferem, 401 token inválido/expirado |
+| RF49 | POST | `/auth/forgot-password` | Não | `{ email }` | 204 sem corpo (sempre, exista ou não a conta) | 429 limite por IP |
+| RF49 | POST | `/auth/reset-password` | Não | `{ token, newPassword, confirmPassword }` | 204 sem corpo, sem iniciar sessão | 400 senhas não conferem, 401 token inválido/expirado/utilizado, 429 limite por IP |
 | RF05 | PATCH | `/me/password` | Sim | `{ currentPassword, newPassword, confirmPassword }` | 204 | 400 senha atual incorreta ou senhas não conferem, 401 não autenticado |
 | RF06 | PATCH | `/me` | Sim | `{ name }` | 204 | 400 nome inválido (< 3 caracteres) |
 | RF07 | GET | `/me` | Sim | — | 200 `{ id, name, email }` | 401 não autenticado |
 
 Trocar a senha (RF05) e redefini-la via e-mail (RF49) invalidam todos os refresh tokens e todos os
-tokens de redefinição pendentes do usuário, forçando novo login em outras sessões e impedindo o
-reuso de links antigos.
+tokens de redefinição pendentes do usuário. Access tokens já emitidos podem continuar válidos por
+até 15 minutos. Na recuperação, a interface apresenta a mensagem neutra definida em RF49-CA01; após
+sucesso encaminha ao login sem sessão automática (RF49-CA06); diante de `401`, informa que o link está
+indisponível e oferece nova solicitação (RF49-CA07). Esses comportamentos de interface pertencem à #140.
 
 `GET /invites` lista apenas convites ainda não expirados cujo e-mail não pertence a uma conta; a
 resposta inclui `id`, `email`, `invitedByUserId`, `invitedByName`, `createdAt` e `expiresAt`.

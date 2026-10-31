@@ -31,11 +31,28 @@ public interface AuthControllerDocs {
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400")})
     ResponseEntity<Void> register(RegisterRequest request);
 
-    @Operation(summary = "Solicita redefinição de senha")
-    @ApiResponse(responseCode = "204")
+    @Operation(
+            summary = "Solicita redefinição de senha",
+            description = "RF49-CA01: retorna a mesma resposta sem revelar se o e-mail possui conta. "
+                    + "RF49-CA02: o link vale por uma hora. RF49-CA04: quando há conta, invalida links "
+                    + "anteriores e envia um link novo.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Solicitação aceita; corpo vazio."),
+        @ApiResponse(responseCode = "429", description = "Limite de solicitações excedido.")
+    })
     ResponseEntity<Void> forgotPassword(ForgotPasswordRequest request);
 
-    @Operation(summary = "Redefine a senha com token")
-    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "400"), @ApiResponse(responseCode = "401")})
+    @Operation(
+            summary = "Redefine a senha com token",
+            description = "RF49-CA02: o token é válido por uma hora. RF49-CA03: o token é de uso único. "
+                    + "RF49-CA05: a redefinição invalida links de recuperação pendentes e refresh tokens. "
+                    + "RF49-CA06: não inicia sessão nem emite cookies. RF49-CA07: token indisponível "
+                    + "não altera a senha e permite nova solicitação.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Senha redefinida; corpo vazio."),
+        @ApiResponse(responseCode = "400", description = "Corpo inválido ou senhas não coincidem."),
+        @ApiResponse(responseCode = "401", description = "Token inexistente, expirado ou já utilizado."),
+        @ApiResponse(responseCode = "429", description = "Limite de tentativas excedido.")
+    })
     ResponseEntity<Void> resetPassword(ResetPasswordRequest request);
 }

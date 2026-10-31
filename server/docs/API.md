@@ -225,7 +225,10 @@ O que a função faz:
 **`POST /auth/forgot-password`** — sem autenticação.
 
 Dispara um e-mail (JavaMail) com um link de redefinição de senha, se o e-mail informado tiver
-conta.
+conta. A API não confirma a existência da conta: para ambos os casos retorna `204` sem corpo.
+O texto apresentado à pessoa é responsabilidade da interface (RF49-CA01): “Se houver uma conta com
+esse e-mail, você receberá orientações para redefinir a senha.” A resposta não afirma que o e-mail
+foi entregue.
 
 O que a função faz:
 1. Busca o usuário por `email`. Se não existir, não faz nada — mas a resposta é idêntica à do
@@ -240,6 +243,10 @@ O que a função faz:
 | Sucesso | `204` sempre, exista ou não o e-mail |
 | `429` | mais de 5 tentativas por IP em 1 minuto (rate limit) |
 
+O link é válido por uma hora (RF49-CA02). Cada nova solicitação para uma conta remove seus tokens
+anteriores antes de criar outro (RF49-CA04). A API não define a mensagem visual após a solicitação;
+a interface deve exibir o mesmo texto para e-mails cadastrados e inexistentes.
+
 ---
 
 ## RF49 — Redefinição de senha
@@ -248,6 +255,13 @@ O que a função faz:
 
 Define uma nova senha a partir do token recebido por e-mail (RF49).
 
+O token só pode ser usado enquanto válido e ainda não utilizado (RF49-CA02, RF49-CA03 e
+RF49-CA04). Token inexistente, expirado ou já consumido resulta em `401` sem alterar a senha
+(RF49-CA07). A redefinição concluída retorna `204` sem corpo e sem emitir cookies, portanto não
+inicia sessão automaticamente (RF49-CA06).
+Cabe à interface informar a conclusão e encaminhar a pessoa ao login; para `401`, deve informar
+que o link está indisponível e oferecer uma nova solicitação (RF49-CA07).
+
 O que a função faz:
 1. Valida que `newPassword == confirmPassword` (senão `400`).
 2. Busca o `PasswordResetToken` (senão `401`).
@@ -255,14 +269,15 @@ O que a função faz:
    tokens expirados.
 4. Grava o novo `password_hash` (Argon2) no usuário associado ao token.
 5. **Deleta todos os refresh tokens e todos os tokens de redefinição do usuário** — o link se
-   torna de uso único e qualquer outra sessão/dispositivo precisa autenticar de novo.
+   torna de uso único e sessões anteriores não podem ser renovadas. Access tokens já emitidos são
+   stateless e podem permanecer válidos até expirarem, por no máximo 15 minutos (RF49-CA05).
 
 | | |
 |---|---|
 | Request body | `{ "token": string, "newPassword": string (min 8), "confirmPassword": string (min 8) }` |
 | Sucesso | `204` |
 | `400` | senhas não conferem, ou corpo inválido |
-| `401` | token inexistente ou expirado |
+| `401` | token inexistente, expirado ou já utilizado |
 | `429` | mais de 5 tentativas por IP em 1 minuto (rate limit) |
 
 ---
