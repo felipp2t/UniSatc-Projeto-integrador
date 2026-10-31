@@ -683,12 +683,21 @@ com chave estrangeira para o destinatário (`ON DELETE CASCADE`) e índice por d
 exemplo `{ "event": "PROFILE_UPDATED" }`; os títulos e textos são fixos e não incluem referências,
 títulos de recursos, links nem segredos. Notificações não concedem nem verificam acesso a recursos.
 
-**`GET /notifications?page=0&size=20`** — autenticado (cookie `accessToken`).
+**`GET /notifications?page=0&size=20&unread=false`** — autenticado (cookie `accessToken`).
 
 Lista somente as notificações do usuário autenticado, da mais recente para a mais antiga (ID como
-desempate). `page` começa em `0` (padrão `0`) e `size` tem padrão `20`. A requisição responde `400`
+desempate). `page` começa em `0` (padrão `0`) e `size` tem padrão `20`. Com `unread=true`, lista
+apenas as não lidas (`readAt` nulo). A requisição responde `400`
 se `page` for negativo, se `size` estiver fora do intervalo `1`–`100`, ou se `page × size` exceder
 `2147483647`, limite do deslocamento da paginação JPA.
+
+`unreadCount` é o total de não lidas do usuário, independente do filtro e da página, para o badge
+do centro de notificações. A migration `V22` cria o índice `ix_notification_recipient_read_created`
+para a listagem filtrada e a contagem.
+
+Como os avisos são fixos e não carregam títulos, caminhos nem links de recursos, não há referência
+antiga a revalidar antes de apresentá-los (RF38-CA03). Se um produtor passar a incluir referências
+(#42, #132), elas precisam ser conferidas contra o acesso atual nesta listagem.
 
 Sucesso (`200`):
 ```json
@@ -704,7 +713,8 @@ Sucesso (`200`):
   "page": 0,
   "size": 20,
   "totalItems": 1,
-  "totalPages": 1
+  "totalPages": 1,
+  "unreadCount": 1
 }
 ```
 
@@ -719,11 +729,22 @@ preserva o `readAt` original. ID inexistente ou pertencente a outro usuário res
 | `401` | não autenticado |
 | `404` | notificação inexistente ou não pertencente ao usuário |
 
+**`PATCH /notifications/read`** — autenticado (cookie `accessToken`).
+
+Marca como lidas todas as notificações não lidas do usuário autenticado e responde `204`. Avisos já
+lidos mantêm o `readAt` original e notificações de outros usuários nunca são alteradas. Repetir a
+chamada é seguro.
+
 **`GET /notifications/stream`** — autenticado (cookie `accessToken`), `text/event-stream`.
 
-Abre um stream SSE por usuário. São permitidas até cinco conexões simultâneas por usuário; uma
-conexão adicional responde `429`. Cada stream expira após 30 minutos e deve ser reaberto pelo
-cliente. Ao receber uma notificação, o stream envia o evento `notification`, com o ID da
+Abre um stream SSE por usuário (RF40/RNF09). SSE foi mantido no lugar do WebSocket previsto no
+levantamento porque a entrega é só do servidor para o cliente e o refinamento não exige uma
+tecnologia específica. São permitidas até cinco conexões simultâneas por usuário; uma
+conexão adicional responde `429`. Cada stream expira junto com a validade do token de acesso
+(`jwt.access-token-expiration-ms`, 15 minutos por padrão) e deve ser reaberto pelo cliente; assim
+uma sessão expirada ou revogada não continua ouvindo. A cada 25 segundos
+(`app.notifications.heartbeat-interval-ms`) o servidor envia o comentário SSE `:keep-alive`, que
+não é um evento e evita que proxies encerrem a conexão ociosa. Ao receber uma notificação, o stream envia o evento `notification`, com o ID da
 notificação como `id` SSE e como dado JSON (string UUID), por exemplo:
 
 ```text
@@ -740,10 +761,9 @@ que originou o aviso.
 Trocas de perfil (`PATCH /me`) e senha (`PATCH /me/password`) geram os eventos fixos
 `PROFILE_UPDATED` e `PASSWORD_CHANGED`. Produtores futuros de mudanças de acesso podem chamar
 `NotificationService.accessChanged(Collection<UUID> affectedRecipients)`, que deduplica os IDs e
-emite o aviso fixo `ACCESS_CHANGED`. Os CRUDs de papéis, grupos, compartilhamentos e herança de
-permissões ainda não existem; a integração futura está prevista na issue #130 e no trabalho de
-gestão de papéis. Portanto, esta issue não completa o fan-out efetivo dessas alterações nem os
-eventos role-permission end-to-end (CA01).
+emite o aviso fixo `ACCESS_CHANGED`. A troca de papel de um membro (RF17) já usa esse aviso. Grupos,
+compartilhamentos, herança e alterações das permissões de um papel ainda não emitem avisos; esse
+fan-out pertence às issues #42 e #132.
 
 ## Tabela-resumo
 
@@ -786,6 +806,7 @@ eventos role-permission end-to-end (CA01).
 | RF— | GET | `/workspaces/{workspaceId}/groups/{groupId}/members` | Cookie `accessToken` + `group/manage` |
 | RF— | PUT | `/workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}` | Cookie `accessToken` + `group/manage` |
 | RF— | DELETE | `/workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}` | Cookie `accessToken` + `group/manage` |
-| — | GET | `/notifications` | Cookie `accessToken` |
-| — | PATCH | `/notifications/{notificationId}/read` | Cookie `accessToken` |
+| RF38 | GET | `/notifications` | Cookie `accessToken` |
+| RF39 | PATCH | `/notifications/{notificationId}/read` | Cookie `accessToken` |
+| RF39 | PATCH | `/notifications/read` | Cookie `accessToken` |
 | — | GET | `/notifications/stream` | Cookie `accessToken` |
