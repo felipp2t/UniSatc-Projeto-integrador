@@ -6,17 +6,24 @@ import {
 } from '@phosphor-icons/react'
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
 import { isForbiddenOrNotFound } from '@/api/http-status'
 import {
   getMemberPermissions,
-  isWorkspaceOwner,
+  isOwnerRole,
   type MemberPermissions,
 } from '@/api/member-permissions'
-import type { WorkspaceMemberResponse } from '@/api/types'
-import { workspaceMembersQueryKey } from '@/api/workspace-keys'
+import type {
+  WorkspaceMemberResponse,
+  WorkspaceRoleResponse,
+} from '@/api/types'
+import {
+  workspaceMembersQueryKey,
+  workspaceRolesQueryKey,
+} from '@/api/workspace-keys'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { ChangeMemberRoleDialog } from '@/components/change-member-role-dialog'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { Button } from '@/components/ui/button'
@@ -33,6 +40,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useChangeMemberRole } from '@/hooks/use-change-member-role'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
@@ -55,14 +63,41 @@ function WorkspaceSettingsPage() {
     },
     queryKey: workspaceMembersQueryKey(workspaceId),
   })
+  const currentUserRole = members.data?.find(
+    (member) => member.userId === session.user?.id
+  )?.roleName
+  const isOwner = isOwnerRole(currentUserRole)
+  const roles = useQuery({
+    enabled: Boolean(workspaceId && isOwner),
+    queryFn: async () => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      return (await workspaceApi.listRoles(workspaceId)).data
+    },
+    queryKey: workspaceRolesQueryKey(workspaceId),
+  })
   const retryWorkspaces = useCallback(async () => {
     await workspaces.refetch()
   }, [workspaces.refetch])
   const retryMembers = useCallback(async () => {
     await members.refetch()
   }, [members.refetch])
-  const isOwner = isWorkspaceOwner(session.user?.id, currentWorkspace?.ownerId)
-  const roles = useMemo(
+  const retryRoles = useCallback(async () => {
+    await roles.refetch()
+  }, [roles.refetch])
+  const roleChange = useChangeMemberRole({
+    currentUserId: session.user?.id,
+    roles: roles.data,
+    workspaceId,
+  })
+  const roleSelectionDisabled =
+    isOwner &&
+    (roles.isPending ||
+      roles.isError ||
+      roleChange.isChangingRole ||
+      (roles.data?.length ?? 0) === 0)
+  const rolesLoadError =
+    isOwner && roles.isError ? <RolesLoadError onRetry={retryRoles} /> : null
+  const roleNames = useMemo(
     () =>
       [
         ...new Set((members.data ?? []).map((member) => member.roleName)),
@@ -181,7 +216,7 @@ function WorkspaceSettingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value='all'>Todos os cargos</SelectItem>
-                    {roles.map((role) => (
+                    {roleNames.map((role) => (
                       <SelectItem key={role} value={role}>
                         {role}
                       </SelectItem>
@@ -190,14 +225,16 @@ function WorkspaceSettingsPage() {
                 </Select>
               </div>
               <MembersList
-                currentUserId={session.user?.id}
+                currentUserRole={currentUserRole}
                 filteredMembers={filteredMembers}
                 isOwner={isOwner}
                 memberAccessDenied={memberAccessDenied}
                 members={members}
+                onChangeRole={roleChange.requestRoleChange}
                 onRetry={retryMembers}
-                roles={roles}
-                workspaceOwnerId={currentWorkspace.ownerId}
+                roleSelectionDisabled={roleSelectionDisabled}
+                roles={roles.data ?? []}
+                rolesLoadError={rolesLoadError}
               />
             </TabsContent>
             {isOwner ? (
@@ -208,6 +245,7 @@ function WorkspaceSettingsPage() {
           </Tabs>
         </section>
       </div>
+      <ChangeMemberRoleDialog roleChange={roleChange} />
     </main>
   )
 }
@@ -217,19 +255,23 @@ function MembersList({
   isOwner,
   memberAccessDenied,
   members,
-  currentUserId,
   onRetry,
   roles,
-  workspaceOwnerId,
+  roleSelectionDisabled,
+  rolesLoadError,
+  onChangeRole,
+  currentUserRole,
 }: {
-  currentUserId: string | undefined
   filteredMembers: WorkspaceMemberResponse[]
   isOwner: boolean
   memberAccessDenied: boolean
   members: UseQueryResult<WorkspaceMemberResponse[]>
   onRetry: () => Promise<void>
-  roles: string[]
-  workspaceOwnerId: string | undefined
+  roles: WorkspaceRoleResponse[]
+  roleSelectionDisabled: boolean
+  rolesLoadError: ReactNode
+  onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
+  currentUserRole: string | undefined
 }) {
   if (members.isPending) return <LoadingState label='Carregando membros…' />
   if (members.isError) {
@@ -263,38 +305,61 @@ function MembersList({
     )
   }
 
+  const ownerCount = members.data.filter((member) =>
+    isOwnerRole(member.roleName)
+  ).length
   const membersWithPermissions = filteredMembers.map((member) => ({
     member,
     permissions: getMemberPermissions({
-      currentUserId,
-      memberUserId: member.userId,
-      workspaceOwnerId,
+      currentUserRole,
+      memberRoleName: member.roleName,
+      ownerCount,
     }),
   }))
   return (
-    <div className='max-h-120 overflow-auto border border-border'>
-      <table
-        aria-label='Membros e cargos'
-        className='w-full table-fixed border-collapse text-left'
-      >
-        <colgroup>
-          <col />
-          <col className='w-24 md:w-36' />
-          {isOwner ? <col className='w-11 md:w-15' /> : null}
-        </colgroup>
-        <tbody className='divide-y divide-border'>
-          {membersWithPermissions.map(({ member, permissions }, index) => (
-            <MemberRow
-              index={index}
-              isOwner={isOwner}
-              key={member.id}
-              member={member}
-              permissions={permissions}
-              roles={roles}
-            />
-          ))}
-        </tbody>
-      </table>
+    <>
+      {rolesLoadError}
+      <div className='max-h-120 overflow-auto border border-border'>
+        <table
+          aria-label='Membros e cargos'
+          className='w-full table-fixed border-collapse text-left'
+        >
+          <colgroup>
+            <col />
+            <col className='w-24 md:w-36' />
+            {isOwner ? <col className='w-11 md:w-15' /> : null}
+          </colgroup>
+          <tbody className='divide-y divide-border'>
+            {membersWithPermissions.map(({ member, permissions }, index) => (
+              <MemberRow
+                index={index}
+                isOwner={isOwner}
+                key={member.id}
+                member={member}
+                onChangeRole={onChangeRole}
+                permissions={permissions}
+                roleSelectDisabled={
+                  roleSelectionDisabled || permissions.isLastOwner
+                }
+                roles={roles}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function RolesLoadError({ onRetry }: { onRetry: () => Promise<void> }) {
+  return (
+    <div className='flex items-center justify-between border border-destructive/40 p-3'>
+      <p className='text-destructive text-xs' role='alert'>
+        Não foi possível carregar os cargos.
+      </p>
+      <Button onClick={onRetry} size='sm' variant='outline'>
+        Recarregar cargos
+      </Button>
     </div>
   )
 }
@@ -305,14 +370,22 @@ function MemberRow({
   member,
   permissions,
   roles,
+  roleSelectDisabled,
+  onChangeRole,
 }: {
   index: number
   isOwner: boolean
   member: WorkspaceMemberResponse
   permissions: MemberPermissions
-  roles: string[]
+  roles: WorkspaceRoleResponse[]
+  roleSelectDisabled: boolean
+  onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
 }) {
   const { name } = member
+  const handleRoleChange = useCallback(
+    (roleId: string) => onChangeRole(member, roleId),
+    [member, onChangeRole]
+  )
 
   return (
     <tr className={index % 2 === 0 ? 'bg-card' : 'bg-muted/10'}>
@@ -337,22 +410,31 @@ function MemberRow({
         </div>
       </td>
       <td className='px-1 py-3 md:px-2'>
-        <Select disabled value={member.roleName}>
-          <SelectTrigger
-            aria-label={`Cargo de ${name}`}
-            className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
-            title={permissions.changeRoleReason ?? 'Cargo disponível.'}
+        {isOwner ? (
+          <Select
+            disabled={roleSelectDisabled}
+            onValueChange={handleRoleChange}
+            value={member.roleId}
           >
-            <SelectValue className='truncate' />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map((role) => (
-              <SelectItem className='uppercase' key={role} value={role}>
-                {role}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              aria-label={`Cargo de ${name}`}
+              className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
+            >
+              <SelectValue className='truncate'>{member.roleName}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map((role) => (
+                <SelectItem className='uppercase' key={role.id} value={role.id}>
+                  {role.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className='font-mono text-primary text-xs uppercase'>
+            {member.roleName}
+          </span>
+        )}
       </td>
       {isOwner ? (
         <td className='px-2 py-3 text-right md:px-4'>

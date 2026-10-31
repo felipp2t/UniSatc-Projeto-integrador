@@ -52,7 +52,7 @@ public class WorkspaceMemberService {
     @Transactional
     public WorkspaceMemberResponse changeRole(UUID userId, UUID workspaceId, UUID memberId,
                                               ChangeMemberRoleRequest request) {
-        authorization.requireOwnerForUpdate(userId, workspaceId);
+        var workspace = authorization.requireOwnerForUpdate(userId, workspaceId);
         var owners = workspaceMemberRepository.findOwners(workspaceId, WorkspaceRole.OWNER_ROLE_NAME);
         var member = workspaceMemberRepository.findByIdAndWorkspaceId(memberId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Membro não encontrado"));
@@ -68,6 +68,14 @@ public class WorkspaceMemberService {
 
         var before = accessNotifications.snapshot(workspaceId);
         member.setRole(role);
+        if (previousRole.isOwnerRole() && workspace.getOwner().getId().equals(member.getUser().getId())) {
+            var successor = owners.stream()
+                    .filter(owner -> !owner.getId().equals(memberId))
+                    .findFirst()
+                    .orElseThrow(() -> new ConflictException("O workspace precisa manter ao menos um dono"));
+            workspace.setOwner(successor.getUser());
+            workspaceRepository.save(workspace);
+        }
         workspaceMemberRepository.saveAndFlush(member);
         activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
                 ActivityAction.MEMBER_ROLE_CHANGED, ActivityResourceType.MEMBER, memberId,

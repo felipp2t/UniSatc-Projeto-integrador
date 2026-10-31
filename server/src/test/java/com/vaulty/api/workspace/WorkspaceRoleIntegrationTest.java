@@ -221,6 +221,7 @@ class WorkspaceRoleIntegrationTest extends WorkspaceIntegrationSupport {
         User coOwner = createUser("Co-dono");
         WorkspaceResponse workspace = configureWorkspace(owner);
         addMember(coOwner, workspace.id());
+        UUID customRoleId = createRole(owner, workspace.id(), "Financeiro");
         UUID ownerRoleId = workspaceRoleRepository
                 .findByWorkspaceIdAndName(workspace.id(), WorkspaceRole.OWNER_ROLE_NAME).orElseThrow().getId();
         UUID memberRoleId = workspaceRoleRepository
@@ -231,8 +232,19 @@ class WorkspaceRoleIntegrationTest extends WorkspaceIntegrationSupport {
 
         changeRole(owner, workspace.id(), memberId(coOwner, workspace.id()), ownerRoleId)
                 .andExpect(status().isOk());
-        changeRole(coOwner, workspace.id(), memberId(owner, workspace.id()), memberRoleId)
+        changeRole(owner, workspace.id(), memberId(owner, workspace.id()), memberRoleId)
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/workspaces/{workspaceId}", workspace.id()).cookie(authCookie(coOwner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownerId").value(coOwner.getId().toString()));
+        mockMvc.perform(put("/workspaces/{workspaceId}/sharing/roles/{roleId}/manager", workspace.id(), customRoleId)
+                        .cookie(authCookie(coOwner)).param("enabled", "true"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(put("/workspaces/{workspaceId}/sharing/roles/{roleId}/manager", workspace.id(), customRoleId)
+                        .cookie(authCookie(owner)).param("enabled", "false"))
+                .andExpect(status().isForbidden());
+
         changeRole(coOwner, workspace.id(), memberId(coOwner, workspace.id()), memberRoleId)
                 .andExpect(status().isConflict());
     }
