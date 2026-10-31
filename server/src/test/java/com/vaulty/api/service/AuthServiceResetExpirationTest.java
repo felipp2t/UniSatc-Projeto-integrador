@@ -52,6 +52,7 @@ class AuthServiceResetExpirationTest {
                 credentials,
                 mock(WorkspaceService.class),
                 mock(WorkspaceMemberRepository.class),
+                mock(WorkspaceContentAuthorization.class),
                 mock(ActivityLogService.class),
                 Clock.fixed(now, ZoneOffset.UTC),
                 604_800_000,
