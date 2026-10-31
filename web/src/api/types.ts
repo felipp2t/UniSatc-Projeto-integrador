@@ -85,3 +85,28 @@ export type WorkspaceMemberDto =
   components['schemas']['WorkspaceMemberResponse']
 export type { WorkspaceMemberResponse } from './workspace-members'
 export type WorkspaceResponse = components['schemas']['WorkspaceResponse']
+export interface WorkspacePermissionsResponse {
+  isOwner: boolean
+  permissions: {
+    resource:
+      | 'workspace'
+      | 'collection'
+      | 'item'
+      | 'secret'
+      | 'member'
+      | 'role'
+      | 'activity'
+      | 'group'
+      | 'sharing'
+    action:
+      | 'read'
+      | 'create'
+      | 'update'
+      | 'delete'
+      | 'invite'
+      | 'all'
+      | 'manage'
+  }[]
+  roleId: string
+  roleName: string
+}
