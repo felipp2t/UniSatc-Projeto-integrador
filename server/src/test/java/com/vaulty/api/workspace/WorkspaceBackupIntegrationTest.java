@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.vaulty.api.entity.User;
@@ -40,5 +41,18 @@ class WorkspaceBackupIntegrationTest extends WorkspaceIntegrationSupport {
         } finally {
             Files.deleteIfExists(archive);
         }
+    }
+
+    @Test
+    void backupFailureReturnsGenericServiceUnavailableResponse() throws Exception {
+        User owner = createUser("Proprietário");
+        configureWorkspace(owner);
+        when(backupService.create(owner.getId()))
+                .thenThrow(mock(WorkspaceBackupService.BackupGenerationException.class));
+
+        mockMvc.perform(post("/workspaces/backup").cookie(authCookie(owner)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value("Backup não concluído; tente novamente"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("cause"))));
     }
 }
