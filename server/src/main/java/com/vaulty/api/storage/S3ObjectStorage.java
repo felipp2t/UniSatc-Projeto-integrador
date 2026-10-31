@@ -24,7 +24,7 @@ public class S3ObjectStorage implements ObjectStorage {
                     PutObjectRequest.builder().bucket(bucket).key(key).contentType(mimeType).build(),
                     RequestBody.fromBytes(content));
         } catch (SdkException exception) {
-            throw storageFailure();
+            throw storageFailure(exception);
         }
     }
 
@@ -33,7 +33,7 @@ public class S3ObjectStorage implements ObjectStorage {
         try {
             return client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build()).asByteArray();
         } catch (SdkException exception) {
-            throw storageFailure();
+            throw storageFailure(exception);
         }
     }
 
@@ -42,11 +42,11 @@ public class S3ObjectStorage implements ObjectStorage {
         try {
             client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
         } catch (SdkException exception) {
-            throw storageFailure();
+            throw storageFailure(exception);
         }
     }
 
-    private IllegalStateException storageFailure() {
-        return new IllegalStateException("Object storage operation failed");
+    private StorageOperationException storageFailure(SdkException cause) {
+        return new StorageOperationException("Object storage operation failed", cause);
     }
 }

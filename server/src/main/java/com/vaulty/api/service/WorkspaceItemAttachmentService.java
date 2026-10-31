@@ -18,6 +18,7 @@ import com.vaulty.api.repository.WorkspaceItemFileRepository;
 import com.vaulty.api.repository.WorkspaceItemMediaRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.storage.ObjectStorage;
+import com.vaulty.api.storage.StorageOperationException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -129,9 +130,9 @@ public class WorkspaceItemAttachmentService {
         try {
             try {
                 requireStorage().put(upload.key, upload.content, upload.mimeType);
-            } catch (RuntimeException exception) {
+            } catch (StorageOperationException exception) {
                 throw new StorageUnavailableException(
-                        "Não foi possível substituir o anexo; o arquivo anterior continua disponível.");
+                        "Não foi possível substituir o anexo; o arquivo anterior continua disponível.", exception);
             }
             item.setType(upload.image ? "image" : "file");
             itemRepository.saveAndFlush(item);

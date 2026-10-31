@@ -1,6 +1,7 @@
 package com.vaulty.api.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.storage.ObjectStorage;
+import com.vaulty.api.storage.StorageOperationException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
@@ -86,7 +88,7 @@ class WorkspaceItemAttachmentIntegrationTest extends WorkspaceIntegrationSupport
 
         UUID itemId = createAttachment(owner, workspaceId, "original.txt", "previous attachment".getBytes(StandardCharsets.UTF_8));
         String oldKey = jdbcTemplate.queryForObject("SELECT storage_key FROM item_file WHERE item_id = ?", String.class, itemId);
-        doThrow(new IllegalStateException("storage unavailable"))
+        doThrow(new StorageOperationException("storage unavailable", new IllegalStateException("cause")))
                 .when(storage).put(org.mockito.ArgumentMatchers.argThat(key -> !key.equals(oldKey)),
                         any(byte[].class), anyString());
 
@@ -99,6 +101,26 @@ class WorkspaceItemAttachmentIntegrationTest extends WorkspaceIntegrationSupport
         assertThat(jdbcTemplate.queryForObject("SELECT storage_key FROM item_file WHERE item_id = ?", String.class, itemId))
                 .isEqualTo(oldKey);
         verify(storage, never()).delete(oldKey);
+    }
+
+    @Test
+    void unexpectedReplacementFailureIsNotReportedAsStorageUnavailable() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        doAnswer(invocation -> null).when(storage).put(anyString(), any(byte[].class), anyString());
+        UUID itemId = createAttachment(owner, workspaceId, "original.txt", "previous attachment".getBytes(StandardCharsets.UTF_8));
+        String oldKey = jdbcTemplate.queryForObject("SELECT storage_key FROM item_file WHERE item_id = ?", String.class, itemId);
+        doThrow(new IllegalStateException("programming failure"))
+                .when(storage).put(org.mockito.ArgumentMatchers.argThat(key -> !key.equals(oldKey)),
+                        any(byte[].class), anyString());
+
+        assertThatThrownBy(() -> replaceAttachment(owner, workspaceId, itemId, "replacement.txt",
+                "new bytes".getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(jakarta.servlet.ServletException.class)
+                .hasCauseInstanceOf(IllegalStateException.class);
+
+        assertThat(jdbcTemplate.queryForObject("SELECT storage_key FROM item_file WHERE item_id = ?", String.class, itemId))
+                .isEqualTo(oldKey);
     }
 
     private UUID createAttachment(User owner, UUID workspaceId, String filename, byte[] bytes) throws Exception {
