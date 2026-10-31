@@ -8,10 +8,17 @@ import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.service.WorkspaceActivityService;
 import com.vaulty.api.service.WorkspaceContentAuthorization;
 import com.vaulty.api.service.WorkspaceService;
+import com.vaulty.api.service.WorkspaceBackupService;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.nio.file.Files;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -31,6 +38,7 @@ public class WorkspaceController implements WorkspaceControllerDocs {
     private final WorkspaceService workspaceService;
     private final WorkspaceActivityService activityService;
     private final WorkspaceContentAuthorization authorization;
+    private final WorkspaceBackupService backupService;
 
     @GetMapping("/{workspaceId}/me/permissions")
     @Override
@@ -57,6 +65,22 @@ public class WorkspaceController implements WorkspaceControllerDocs {
                                     @PathVariable UUID workspaceId,
                                     @Valid @RequestBody UpdateWorkspaceRequest request) {
         return workspaceService.update(userId, workspaceId, request);
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/backup")
+    public ResponseEntity<StreamingResponseBody> backup(@AuthenticationPrincipal UUID userId) {
+        WorkspaceBackupService.BackupFile backup = backupService.create(userId);
+        StreamingResponseBody body = output -> {
+            try (backup) {
+                Files.copy(backup.path(), output);
+                output.flush();
+            }
+        };
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename("vaulty-backup.zip").build().toString())
+                .body(body);
     }
 
     @GetMapping("/{workspaceId}/activity")
