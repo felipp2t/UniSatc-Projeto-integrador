@@ -39,4 +39,5 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, UUID> {
 
     @Query("select workspace from Workspace workspace join fetch workspace.owner")
     Optional<Workspace> findSingleton();
+
 }
