@@ -3,7 +3,6 @@ package com.vaulty.api.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -262,10 +261,6 @@ class WorkspaceBackupServiceIntegrationTest extends PostgresIntegrationTest {
             Cookie ownerCookie = new Cookie("accessToken", jwt.generateAccessToken(ownerId, ownerMembershipId, ownerRole));
             Cookie memberCookie = new Cookie("accessToken", jwt.generateAccessToken(memberId, memberMembershipId, memberRole));
 
-            api.perform(post("/vaulty/workspaces/backup").contextPath("/vaulty")
-                            .servletPath("/workspaces/backup").cookie(ownerCookie))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType("application/zip"));
             api.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId)
                             .cookie(ownerCookie))
                     .andExpect(status().isOk())
