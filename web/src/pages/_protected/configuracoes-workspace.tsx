@@ -4,18 +4,28 @@ import {
   TrashIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
-import { type UseQueryResult, useQuery } from '@tanstack/react-query'
+import {
+  type UseQueryResult,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
 import { isForbiddenOrNotFound } from '@/api/http-status'
 import {
   getMemberPermissions,
-  isWorkspaceOwner,
   type MemberPermissions,
 } from '@/api/member-permissions'
-import type { WorkspaceMemberResponse } from '@/api/types'
-import { workspaceMembersQueryKey } from '@/api/workspace-keys'
+import type {
+  WorkspaceMemberResponse,
+  WorkspaceRoleResponse,
+} from '@/api/types'
+import {
+  workspaceMembersQueryKey,
+  workspaceRolesQueryKey,
+} from '@/api/workspace-keys'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
@@ -32,6 +42,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { appToast } from '@/components/ui/toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
@@ -44,6 +55,7 @@ function WorkspaceSettingsPage() {
   const { session } = Route.useRouteContext()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
+  const queryClient = useQueryClient()
   const workspaces = useCurrentWorkspace()
   const currentWorkspace = workspaces.data
   const workspaceId = currentWorkspace?.id
@@ -55,14 +67,49 @@ function WorkspaceSettingsPage() {
     },
     queryKey: workspaceMembersQueryKey(workspaceId),
   })
+  const roles = useQuery({
+    enabled: Boolean(workspaceId && members.data?.some(
+      (member) => member.userId === session.user?.id && member.roleName.toLocaleLowerCase() === 'owner'
+    )),
+    queryFn: async () => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      return (await workspaceApi.listRoles(workspaceId)).data
+    },
+    queryKey: workspaceRolesQueryKey(workspaceId),
+  })
   const retryWorkspaces = useCallback(async () => {
     await workspaces.refetch()
   }, [workspaces.refetch])
   const retryMembers = useCallback(async () => {
     await members.refetch()
   }, [members.refetch])
-  const isOwner = isWorkspaceOwner(session.user?.id, currentWorkspace?.ownerId)
-  const roles = useMemo(
+  const retryRoles = useCallback(async () => {
+    await roles.refetch()
+  }, [roles.refetch])
+  const changeRole = useMutation({
+    mutationFn: ({ memberId, roleId }: { memberId: string; roleId: string }) => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      return workspaceApi.changeMemberRole(workspaceId, memberId, roleId)
+    },
+    onError: () => appToast.error('Não foi possível alterar o cargo.'),
+    onSuccess: async () => {
+      appToast.success('Cargo alterado com sucesso.')
+      await queryClient.invalidateQueries({
+        queryKey: workspaceMembersQueryKey(workspaceId),
+      })
+      await queryClient.invalidateQueries({
+        queryKey: workspaceRolesQueryKey(workspaceId),
+      })
+    },
+  })
+  const isOwner = Boolean(
+    members.data?.some(
+      (member) =>
+        member.userId === session.user?.id &&
+        member.roleName.toLocaleLowerCase() === 'owner'
+    )
+  )
+  const roleNames = useMemo(
     () =>
       [
         ...new Set((members.data ?? []).map((member) => member.roleName)),
@@ -181,7 +228,7 @@ function WorkspaceSettingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value='all'>Todos os cargos</SelectItem>
-                    {roles.map((role) => (
+                    {roleNames.map((role) => (
                       <SelectItem key={role} value={role}>
                         {role}
                       </SelectItem>
@@ -196,7 +243,36 @@ function WorkspaceSettingsPage() {
                 memberAccessDenied={memberAccessDenied}
                 members={members}
                 onRetry={retryMembers}
-                roles={roles}
+                roles={roles.data ?? []}
+                isRolesLoading={roles.isPending}
+                isRolesError={roles.isError}
+                onRetryRoles={retryRoles}
+                isChangingRole={changeRole.isPending}
+                onChangeRole={(member, roleId) => {
+                  const ownerRole = roles.data?.find(
+                    (role) => role.name.toLocaleLowerCase() === 'owner'
+                  )
+                  if (
+                    ownerRole &&
+                    member.roleId === ownerRole.id &&
+                    roleId !== ownerRole.id &&
+                    ownerRole.memberCount <= 1
+                  ) {
+                    appToast.error('O último dono não pode perder esse cargo.')
+                    return
+                  }
+                  const roleName = roles.data?.find(
+                    (role) => role.id === roleId
+                  )?.name
+                  if (
+                    roleName &&
+                    window.confirm(
+                      `Alterar o cargo de ${member.name} para ${roleName}?`
+                    )
+                  ) {
+                    changeRole.mutate({ memberId: member.id, roleId })
+                  }
+                }}
                 workspaceOwnerId={currentWorkspace.ownerId}
               />
             </TabsContent>
@@ -220,6 +296,11 @@ function MembersList({
   currentUserId,
   onRetry,
   roles,
+  isRolesLoading,
+  isRolesError,
+  onRetryRoles,
+  isChangingRole,
+  onChangeRole,
   workspaceOwnerId,
 }: {
   currentUserId: string | undefined
@@ -228,7 +309,12 @@ function MembersList({
   memberAccessDenied: boolean
   members: UseQueryResult<WorkspaceMemberResponse[]>
   onRetry: () => Promise<void>
-  roles: string[]
+  roles: WorkspaceRoleResponse[]
+  isRolesLoading: boolean
+  isRolesError: boolean
+  onRetryRoles: () => Promise<void>
+  isChangingRole: boolean
+  onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
   workspaceOwnerId: string | undefined
 }) {
   if (members.isPending) return <LoadingState label='Carregando membros…' />
@@ -272,30 +358,46 @@ function MembersList({
     }),
   }))
   return (
-    <div className='max-h-120 overflow-auto border border-border'>
-      <table
-        aria-label='Membros e cargos'
-        className='w-full table-fixed border-collapse text-left'
-      >
-        <colgroup>
-          <col />
-          <col className='w-24 md:w-36' />
-          {isOwner ? <col className='w-11 md:w-15' /> : null}
-        </colgroup>
-        <tbody className='divide-y divide-border'>
-          {membersWithPermissions.map(({ member, permissions }, index) => (
-            <MemberRow
-              index={index}
-              isOwner={isOwner}
-              key={member.id}
-              member={member}
-              permissions={permissions}
-              roles={roles}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {isOwner && isRolesError ? (
+        <div className='flex items-center justify-between border border-destructive/40 p-3'>
+          <p className='text-destructive text-xs' role='alert'>
+            Não foi possível carregar os cargos.
+          </p>
+          <Button onClick={onRetryRoles} size='sm' variant='outline'>
+            Recarregar cargos
+          </Button>
+        </div>
+      ) : null}
+      <div className='max-h-120 overflow-auto border border-border'>
+        <table
+          aria-label='Membros e cargos'
+          className='w-full table-fixed border-collapse text-left'
+        >
+          <colgroup>
+            <col />
+            <col className='w-24 md:w-36' />
+            {isOwner ? <col className='w-11 md:w-15' /> : null}
+          </colgroup>
+          <tbody className='divide-y divide-border'>
+            {membersWithPermissions.map(({ member, permissions }, index) => (
+              <MemberRow
+                index={index}
+                isOwner={isOwner}
+                key={member.id}
+                member={member}
+                permissions={permissions}
+                roles={roles}
+                isRolesLoading={isRolesLoading}
+                isRolesError={isRolesError}
+                isChangingRole={isChangingRole}
+                onChangeRole={onChangeRole}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
@@ -305,12 +407,20 @@ function MemberRow({
   member,
   permissions,
   roles,
+  isRolesLoading,
+  isRolesError,
+  isChangingRole,
+  onChangeRole,
 }: {
   index: number
   isOwner: boolean
   member: WorkspaceMemberResponse
   permissions: MemberPermissions
-  roles: string[]
+  roles: WorkspaceRoleResponse[]
+  isRolesLoading: boolean
+  isRolesError: boolean
+  isChangingRole: boolean
+  onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
 }) {
   const { name } = member
 
@@ -337,18 +447,24 @@ function MemberRow({
         </div>
       </td>
       <td className='px-1 py-3 md:px-2'>
-        <Select disabled value={member.roleName}>
+        <Select
+          disabled={
+            !isOwner || isRolesLoading || isRolesError || isChangingRole || roles.length === 0
+          }
+          onValueChange={(roleId) => onChangeRole(member, roleId)}
+          value={member.roleId}
+        >
           <SelectTrigger
             aria-label={`Cargo de ${name}`}
             className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
-            title={permissions.changeRoleReason ?? 'Cargo disponível.'}
+            title={!isOwner ? 'Somente donos podem alterar cargos.' : 'Alterar cargo.'}
           >
             <SelectValue className='truncate' />
           </SelectTrigger>
           <SelectContent>
             {roles.map((role) => (
-              <SelectItem className='uppercase' key={role} value={role}>
-                {role}
+              <SelectItem className='uppercase' key={role.id} value={role.id}>
+                {role.name}
               </SelectItem>
             ))}
           </SelectContent>

@@ -23,7 +23,11 @@ import type {
   WorkspaceMemberDto,
   WorkspaceResponse,
 } from './types'
-import { workspaceMembersSchema } from './workspace-members'
+import {
+  workspaceMemberSchema,
+  workspaceMembersSchema,
+  workspaceRolesSchema,
+} from './workspace-members'
 
 export const authApi = {
   forgotPassword: (request: ForgotPasswordRequest) =>
@@ -57,6 +61,31 @@ export const workspaceApi = {
     const parsed = workspaceMembersSchema.safeParse(response.data)
     if (!parsed.success) {
       throw new Error('A resposta da API contém membros inválidos.')
+    }
+    return { ...response, data: parsed.data }
+  },
+  listRoles: async (workspaceId: string) => {
+    const response = await apiClient.get<unknown>(
+      `/workspaces/${workspaceId}/roles`
+    )
+    const parsed = workspaceRolesSchema.safeParse(response.data)
+    if (!parsed.success) {
+      throw new Error('A resposta da API contém cargos inválidos.')
+    }
+    return { ...response, data: parsed.data }
+  },
+  changeMemberRole: async (
+    workspaceId: string,
+    memberId: string,
+    roleId: string
+  ) => {
+    const response = await apiClient.put<unknown>(
+      `/workspaces/${workspaceId}/members/${memberId}/role`,
+      { roleId }
+    )
+    const parsed = workspaceMemberSchema.safeParse(response.data)
+    if (!parsed.success) {
+      throw new Error('A resposta da API contém um membro inválido.')
     }
     return { ...response, data: parsed.data }
   },

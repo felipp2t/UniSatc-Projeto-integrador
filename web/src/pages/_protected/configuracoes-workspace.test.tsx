@@ -17,8 +17,10 @@ import { renderWithProviders } from '@/test/render'
 import { createSessionStub } from '@/test/session-stub'
 
 const workspaceApiMocks = vi.hoisted(() => ({
+  changeMemberRole: vi.fn(),
   list: vi.fn(),
   listMembers: vi.fn(),
+  listRoles: vi.fn(),
 }))
 const inviteApiMocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -36,8 +38,10 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
     },
     workspaceApi: {
       ...actual.workspaceApi,
+      changeMemberRole: workspaceApiMocks.changeMemberRole,
       list: workspaceApiMocks.list,
       listMembers: workspaceApiMocks.listMembers,
+      listRoles: workspaceApiMocks.listRoles,
     },
   }
 })
@@ -52,6 +56,7 @@ const members = [
     email: 'ana@example.com',
     id: 'membership-1',
     name: 'Ana Owner',
+    roleId: 'role-owner',
     roleName: 'owner',
     userId: ownerId,
   },
@@ -59,6 +64,7 @@ const members = [
     email: 'bia@example.com',
     id: 'membership-2',
     name: 'Bia Member',
+    roleId: 'role-member',
     roleName: 'member',
     userId: 'member-2',
   },
@@ -69,6 +75,15 @@ function createSession(userId: string): SessionService {
     status: 'authenticated',
     user: { email: 'user@example.com', id: userId, name: 'User' },
   })
+}
+
+function mockConfirm(result: boolean) {
+  const confirm = vi.fn().mockReturnValue(result)
+  Object.defineProperty(window, 'confirm', {
+    configurable: true,
+    value: confirm,
+  })
+  return confirm
 }
 
 async function renderWorkspaceSettings(userId: string) {
@@ -107,6 +122,13 @@ beforeEach(() => {
     data: [{ id: workspaceId, name: 'Workspace', ownerId }],
   })
   workspaceApiMocks.listMembers.mockResolvedValue({ data: members })
+  workspaceApiMocks.listRoles.mockResolvedValue({
+    data: [
+      { builtIn: true, id: 'role-owner', memberCount: 1, name: 'owner' },
+      { builtIn: true, id: 'role-member', memberCount: 1, name: 'member' },
+    ],
+  })
+  workspaceApiMocks.changeMemberRole.mockResolvedValue({ data: members[1] })
   inviteApiMocks.create.mockResolvedValue(undefined)
   inviteApiMocks.list.mockResolvedValue({ data: [] })
 })
@@ -148,7 +170,6 @@ describe('workspace members settings', () => {
     expect(
       screen.queryByRole('columnheader', { name: 'E-mail' })
     ).not.toBeInTheDocument()
-    expect(screen.getByText('member')).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Remover Bia Member' })
     ).not.toBeInTheDocument()
@@ -210,18 +231,18 @@ describe('workspace members settings', () => {
     expect(inviteApiMocks.list).toHaveBeenCalledTimes(2)
   })
 
-  it('shows disabled role and removal controls with unavailable titles', async () => {
+  it('shows the role selector to owners and keeps removal unavailable', async () => {
     await renderWorkspaceSettings(ownerId)
 
     const ownerRole = await screen.findByRole('combobox', {
       name: 'Cargo de Bia Member',
     })
-    expect(ownerRole).toHaveTextContent('member')
-    expect(ownerRole).toBeDisabled()
-    expect(ownerRole).toHaveAttribute(
-      'title',
-      'A alteração de cargo ainda não está disponível na API.'
-    )
+    await waitFor(() => expect(ownerRole).toBeEnabled())
+    const user = userEvent.setup()
+    await user.click(ownerRole)
+    expect(await screen.findByRole('option', { name: 'member' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'owner' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
     const removeButton = await screen.findByRole('button', {
       name: 'Remover Bia Member',
     })
@@ -232,7 +253,80 @@ describe('workspace members settings', () => {
     )
   })
 
-  it('protects the workspace owner by owner ID, independent of displayed roles', async () => {
+  it('confirms and changes a member role using the membership ID', async () => {
+    const user = userEvent.setup()
+    const confirm = mockConfirm(true)
+    await renderWorkspaceSettings(ownerId)
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Cargo de Bia Member' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'owner' }))
+
+    expect(confirm).toHaveBeenCalledWith('Alterar o cargo de Bia Member para owner?')
+    await waitFor(() => {
+      expect(workspaceApiMocks.changeMemberRole).toHaveBeenCalledWith(
+        workspaceId,
+        'membership-2',
+        'role-owner'
+      )
+    })
+  })
+
+  it('does not change a role when the owner cancels confirmation', async () => {
+    const user = userEvent.setup()
+    mockConfirm(false)
+    await renderWorkspaceSettings(ownerId)
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Cargo de Bia Member' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'owner' }))
+
+    expect(workspaceApiMocks.changeMemberRole).not.toHaveBeenCalled()
+  })
+
+  it('blocks demoting the only owner', async () => {
+    const user = userEvent.setup()
+    const confirm = mockConfirm(true)
+    await renderWorkspaceSettings(ownerId)
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Cargo de Ana Owner' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'member' }))
+    expect(workspaceApiMocks.changeMemberRole).not.toHaveBeenCalled()
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('allows demoting an owner when another owner remains', async () => {
+    const user = userEvent.setup()
+    mockConfirm(true)
+    workspaceApiMocks.listMembers.mockResolvedValue({
+      data: [members[0], { ...members[1], roleId: 'role-owner', roleName: 'owner' }],
+    })
+    workspaceApiMocks.listRoles.mockResolvedValue({
+      data: [
+        { builtIn: true, id: 'role-owner', memberCount: 2, name: 'owner' },
+        { builtIn: true, id: 'role-member', memberCount: 0, name: 'member' },
+      ],
+    })
+    await renderWorkspaceSettings(ownerId)
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Cargo de Ana Owner' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'member' }))
+
+    await waitFor(() =>
+      expect(workspaceApiMocks.changeMemberRole).toHaveBeenCalledWith(
+        workspaceId,
+        'membership-1',
+        'role-member'
+      )
+    )
+  })
+
+  it('uses the active role to determine member management access', async () => {
     workspaceApiMocks.listMembers.mockResolvedValue({
       data: [
         { ...members[0], roleName: 'member' },
@@ -242,23 +336,15 @@ describe('workspace members settings', () => {
     await renderWorkspaceSettings(ownerId)
 
     expect(
-      await screen.findByRole('button', { name: 'Remover Ana Owner' })
+      await screen.findByRole('combobox', { name: 'Cargo de Ana Owner' })
     ).toBeDisabled()
     expect(
-      screen.getByRole('button', { name: 'Remover Ana Owner' })
-    ).toHaveAttribute(
-      'title',
-      'O último dono do workspace não pode ser removido.'
-    )
-    expect(
-      screen.getByRole('button', { name: 'Remover Bia Member' })
+      screen.getByRole('combobox', { name: 'Cargo de Bia Member' })
     ).toBeDisabled()
     expect(
-      screen.getByRole('button', { name: 'Remover Bia Member' })
-    ).toHaveAttribute(
-      'title',
-      'A remoção ainda não está disponível na API do servidor.'
-    )
+      screen.queryByRole('button', { name: 'Remover Ana Owner' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Convites' })).not.toBeInTheDocument()
   })
 
   it('does not open a removal dialog when the API does not support removal', async () => {
