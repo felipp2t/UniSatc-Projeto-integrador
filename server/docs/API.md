@@ -830,9 +830,11 @@ aviso.
 `PATCH /me` e `PATCH /me/password` geram `PROFILE_UPDATED` e `PASSWORD_CHANGED`. Mudanças de
 papel, permissões do papel, grupos, associação de membros a grupos, concessões individuais/grupo/
 todos, herança e remoção de membership notificam os membros cujo acesso efetivo a coleções ou itens
-mudou, inclusive por herança. Alterações nas permissões de um papel também avisam os membros desse
-papel mesmo quando o acesso a conteúdo não mudou. Adicionar ou remover membro de grupo também é
-considerado. Os destinatários são deduplicados por operação; operações sem mudança não geram aviso.
+mudou, inclusive por herança. Alterar o papel de um membro também o notifica, pois a mudança pode
+afetar permissões de ações mesmo sem alterar a leitura de conteúdo. Alterações nas permissões de um
+papel avisam seus membros mesmo quando o acesso a conteúdo não mudou. Adicionar ou remover membro de
+grupo também é considerado. Os destinatários são deduplicados por operação; operações sem mudança não
+geram aviso.
 
 O evento `ACCESS_CHANGED` usa texto fixo e genérico, sem título, caminho, link ou referência ao
 recurso perdido. Referências de notificações legadas desse evento também são substituídas ao
