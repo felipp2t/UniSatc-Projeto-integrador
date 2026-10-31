@@ -209,6 +209,23 @@ describe('session service', () => {
     session.dispose()
   })
 
+  it('clears local session state without invoking the expiration navigation callback', async () => {
+    const session = createSessionService()
+    const navigateToLogin = vi.fn()
+    getMe.mockResolvedValue({
+      data: { email: 'user@example.com', id: 'user-id', name: 'User' },
+    })
+    session.setNavigateToLogin(navigateToLogin)
+    await session.initialize()
+
+    session.clearLocalSession()
+
+    expect(session.status).toBe('unauthenticated')
+    expect(session.user).toBeUndefined()
+    expect(navigateToLogin).not.toHaveBeenCalled()
+    session.dispose()
+  })
+
   it('does not restore a user when initialization finishes after logout', async () => {
     const session = createSessionService()
     let resolveGetMe!: (value: {

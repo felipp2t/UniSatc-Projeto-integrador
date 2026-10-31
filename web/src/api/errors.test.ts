@@ -19,6 +19,12 @@ describe('ApiError', () => {
     expect(new ApiError('client', 400).isServerError).toBe(false)
   })
 
+  it('classifies the full server status range from HTTP 500 upward', () => {
+    expect(new ApiError('client boundary', 499).isServerError).toBe(false)
+    expect(new ApiError('server boundary', 500).isServerError).toBe(true)
+    expect(new ApiError('server upper range', 599).isServerError).toBe(true)
+  })
+
   it.each(['ECONNABORTED', 'ETIMEDOUT'])(
     'classifies %s as a transport error',
     (code) => {

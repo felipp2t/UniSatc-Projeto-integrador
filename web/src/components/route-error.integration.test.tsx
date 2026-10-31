@@ -16,6 +16,7 @@ import { ApiError } from '@/api/errors'
 import type { SessionService } from '@/auth/session'
 import type { RouterContext } from '@/router-context'
 import { routerDefaults } from '@/router-defaults'
+import { createSessionStub } from '@/test/session-stub'
 import '@/test/dom-setup'
 
 const routeMatchWarningPattern = /Error in route match/
@@ -34,16 +35,11 @@ beforeEach(() => {
 })
 
 function createSession(initialize: () => Promise<void>): SessionService {
-  return {
-    dispose: vi.fn(),
-    handleSessionExpired: vi.fn(),
+  return createSessionStub({
     initialize,
-    logout: vi.fn(),
-    setNavigateToLogin: vi.fn(),
     status: 'authenticated',
-    updateUser: vi.fn(),
     user: { email: 'user@example.com', id: 'user-id', name: 'User' },
-  }
+  })
 }
 
 function createTestRouter(child: () => ReactElement, session: SessionService) {

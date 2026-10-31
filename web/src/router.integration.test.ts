@@ -14,6 +14,7 @@ import {
   type PermissionChecker,
 } from '@/auth/permissions'
 import type { SessionService, SessionStatus } from '@/auth/session'
+import { createSessionStub } from '@/test/session-stub'
 import { Route as ProtectedSplatRoute } from './pages/_protected/$'
 import { routeTree } from './route-tree.gen'
 import type { RouterContext } from './router-context'
@@ -33,21 +34,16 @@ function createSession(
   status: SessionStatus,
   initializeError?: ApiError
 ): SessionService {
-  return {
-    dispose: vi.fn(),
-    handleSessionExpired: vi.fn(),
+  return createSessionStub({
     initialize: vi.fn(() =>
       initializeError ? Promise.reject(initializeError) : Promise.resolve()
     ),
-    logout: vi.fn(),
-    setNavigateToLogin: vi.fn(),
     status,
-    updateUser: vi.fn(),
     user:
       status === 'authenticated'
         ? { email: 'user@example.com', id: 'user-id', name: 'User' }
         : undefined,
-  }
+  })
 }
 
 function createApplicationRouter(
