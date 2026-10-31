@@ -388,6 +388,9 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(notificationRepository.findAll()).singleElement()
                 .satisfies(notification -> assertThat(notification.getRecipient().getId()).isEqualTo(owner.getId()));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void failedRealtimeSendDoesNotUndoPersistedNotification() {
         User owner = createUser();

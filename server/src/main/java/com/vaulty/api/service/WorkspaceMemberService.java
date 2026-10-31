@@ -73,7 +73,8 @@ public class WorkspaceMemberService {
                 ActivityAction.MEMBER_ROLE_CHANGED, ActivityResourceType.MEMBER, memberId,
                 Map.of("workspaceMemberId", memberId, "previousRoleId", previousRole.getId(),
                         "roleId", role.getId()));
-        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspaceId));
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspaceId),
+                List.of(member.getUser().getId()));
         return workspaceMapper.toResponse(member, true);
     }
 

@@ -235,7 +235,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         entityManager.clear();
         mockMvc.perform(get("/workspaces/{workspaceId}/collections/{collectionId}/path", workspaceId, collectionId)
                         .cookie(authCookie(successor)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
         notificationRepository.deleteAll();
 
         var ownerMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, owner.getId())

@@ -2,9 +2,13 @@ package com.vaulty.api.service;
 
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.exception.ResourceNotFoundException;
+import java.util.HashMap;
+import java.util.HashSet;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -14,6 +18,72 @@ public class EffectiveContentAccess {
 
     public EffectiveContentAccess(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    public Map<UUID, Set<String>> readableResourcesByMember(UUID workspaceId) {
+        return jdbc.query("""
+                WITH RECURSIVE workspace_row AS (
+                    SELECT id, owner_id FROM workspace WHERE id = ?
+                ), members AS (
+                    SELECT wm.id, wm.user_id FROM workspace_member wm
+                    JOIN workspace_row w ON w.id = wm.workspace_id
+                ), collections AS (
+                    SELECT c.id, c.parent_id, c.inherit_access FROM collection c
+                    JOIN workspace_row w ON w.id = c.workspace_id
+                ), items AS (
+                    SELECT i.id, i.collection_id FROM item i
+                    JOIN workspace_row w ON w.id = i.workspace_id
+                ), collection_chain(collection_id, ancestor_id, parent_id, inherit_access) AS (
+                    SELECT id, id, parent_id, inherit_access FROM collections
+                    UNION ALL
+                    SELECT chain.collection_id, parent.id, parent.parent_id, parent.inherit_access
+                    FROM collection_chain chain JOIN collections parent ON parent.id = chain.parent_id
+                    WHERE chain.inherit_access = TRUE
+                ), collection_access(user_id, collection_id) AS (
+                    SELECT m.user_id, c.id FROM members m CROSS JOIN collections c
+                    JOIN workspace_row w ON w.owner_id = m.user_id
+                    UNION
+                    SELECT m.user_id, chain.collection_id
+                    FROM members m
+                    JOIN access_group_member gm ON gm.workspace_member_id = m.id
+                    JOIN collection_access_grant g ON g.group_id = gm.group_id
+                    JOIN collection_chain chain ON chain.ancestor_id = g.collection_id
+                    UNION
+                    SELECT m.user_id, chain.collection_id
+                    FROM members m
+                    JOIN collection_chain chain ON TRUE
+                    JOIN collection_public_grant g ON g.collection_id = chain.ancestor_id
+                    UNION
+                    SELECT m.user_id, chain.collection_id FROM members m
+                    JOIN collection_chain chain ON chain.parent_id IS NULL AND chain.inherit_access = TRUE
+                ), item_access(user_id, item_id) AS (
+                    SELECT m.user_id, i.id FROM members m CROSS JOIN items i
+                    JOIN workspace_row w ON w.owner_id = m.user_id
+                    UNION
+                    SELECT m.user_id, i.id FROM members m CROSS JOIN items i WHERE i.collection_id IS NULL
+                    UNION
+                    SELECT access.user_id, i.id FROM items i
+                    JOIN collection_chain chain ON chain.collection_id = i.collection_id
+                    JOIN collection_access access ON access.collection_id = chain.ancestor_id
+                    UNION
+                    SELECT m.user_id, i.id FROM items i
+                    JOIN item_member_grant g ON g.item_id = i.id
+                    JOIN members m ON m.id = g.workspace_member_id
+                )
+                SELECT user_id, 'member' AS resource_key FROM members
+                UNION ALL
+                SELECT user_id, 'c:' || collection_id::text FROM collection_access
+                UNION ALL
+                SELECT user_id, 'i:' || item_id::text FROM item_access
+                """, resultSet -> {
+            Map<UUID, Set<String>> resources = new HashMap<>();
+            while (resultSet.next()) {
+                UUID userId = resultSet.getObject("user_id", UUID.class);
+                resources.computeIfAbsent(userId, ignored -> new HashSet<>()).add(resultSet.getString("resource_key"));
+            }
+            resources.replaceAll((ignored, values) -> Set.copyOf(values));
+            return Map.copyOf(resources);
+        }, workspaceId);
     }
 
     public boolean canReadCollection(UUID userId, Workspace workspace, UUID collectionId) {
