@@ -17,7 +17,7 @@ import {
   authSecretContainerClassName,
   authSecretInputClassName,
 } from '@/components/auth-form-styles'
-import { BrandMark, InviteStatus } from '@/components/invite-status'
+import { AuthStatus, BrandMark } from '@/components/auth-status'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -46,7 +46,7 @@ function ResetPasswordPage() {
   const rejectToken = useCallback(() => setRejectedToken(token), [token])
   if (!token?.trim() || rejectedToken === token) {
     return (
-      <InviteStatus
+      <AuthStatus
         action={startNewRequest}
         actionLabel='Solicitar novo link'
         message='Este link não está disponível. Inicie uma nova solicitação de recuperação de senha.'

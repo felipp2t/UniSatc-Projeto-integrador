@@ -8,6 +8,7 @@ import {
   RATE_LIMITED_MESSAGE,
   SERVER_UNAVAILABLE_MESSAGE,
 } from '@/api/get-api-error-message'
+import { AuthStatus, BrandMark } from '@/components/auth-status'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { SecretInput } from '@/components/ui/secret-input'
-import { BrandMark, InviteStatus, unavailableMessage } from './invite-status'
+import { unavailableMessage } from './invite-status'
 
 const registrationSchema = z
   .object({
@@ -128,19 +129,19 @@ export function InviteRegistrationForm({
 
   if (remainingSeconds === 0) {
     return (
-      <InviteStatus message={unavailableMessage} title='Convite indisponível' />
+      <AuthStatus message={unavailableMessage} title='Convite indisponível' />
     )
   }
 
   if (inviteUnavailable) {
     return (
-      <InviteStatus message={unavailableMessage} title='Convite indisponível' />
+      <AuthStatus message={unavailableMessage} title='Convite indisponível' />
     )
   }
 
   if (completionError) {
     return (
-      <InviteStatus
+      <AuthStatus
         action={onGoToLogin}
         actionLabel='Ir para o login'
         message={completionError}

@@ -189,6 +189,29 @@ describe('solicitação de recuperação de senha', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('moves focus to the generic success message and then to the login link', async () => {
+    forgotPassword.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    await renderPage('/esqueci-senha')
+
+    await user.tab()
+    const email = screen.getByLabelText('E-mail')
+    expect(email).toHaveFocus()
+    await user.type(email, 'conta@example.com')
+    await user.tab()
+    const submit = screen.getByRole('button', { name: 'Enviar orientações' })
+    expect(submit).toHaveFocus()
+    await user.keyboard('{Enter}')
+
+    const status = await screen.findByRole('status')
+    await waitFor(() => expect(status).toHaveFocus())
+    expect(status).toHaveTextContent(
+      'Se houver uma conta com esse e-mail, você receberá orientações para redefinir a senha.'
+    )
+    await user.tab()
+    expect(screen.getByRole('link', { name: 'Voltar ao login' })).toHaveFocus()
+  })
+
   it('does not send an invalid email and offers the login link', async () => {
     const user = userEvent.setup()
     await renderPage('/esqueci-senha')
@@ -268,6 +291,23 @@ describe('solicitação de recuperação de senha', () => {
       })
     }
   )
+
+  it('does not move focus to an error message', async () => {
+    forgotPassword.mockRejectedValue(new ApiError('DETALHE INTERNO', 500))
+    const user = userEvent.setup()
+    await renderPage('/esqueci-senha')
+
+    await user.type(screen.getByLabelText('E-mail'), 'conta@example.com')
+    const submit = screen.getByRole('button', { name: 'Enviar orientações' })
+    await user.click(submit)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(
+      'Serviço temporariamente indisponível. Tente novamente em alguns instantes.'
+    )
+    expect(alert).not.toHaveFocus()
+    expect(screen.getByRole('status')).not.toHaveFocus()
+  })
 })
 
 describe('redefinição de senha', () => {

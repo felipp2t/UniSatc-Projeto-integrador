@@ -1,6 +1,6 @@
 import { useForm, useSelector } from '@tanstack/react-form'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { z } from 'zod'
 import { authApi } from '@/api/endpoints'
 import {
@@ -15,7 +15,7 @@ import {
   authLabelClassName,
   authLinkClassName,
 } from '@/components/auth-form-styles'
-import { BrandMark } from '@/components/invite-status'
+import { BrandMark } from '@/components/auth-status'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -33,6 +33,7 @@ function ForgotPasswordPage() {
   const formId = useId()
   const [message, setMessage] = useState<string>()
   const [error, setError] = useState<string>()
+  const messageRef = useRef<HTMLParagraphElement>(null)
   const form = useForm({
     defaultValues: { email: '' },
     onSubmit: async ({ value }) => {
@@ -63,6 +64,11 @@ function ForgotPasswordPage() {
   })
   const submitting = useSelector(form.store, (state) => state.isSubmitting)
   const canSubmit = useSelector(form.store, (state) => state.canSubmit)
+  useEffect(() => {
+    if (message) {
+      messageRef.current?.focus()
+    }
+  }, [message])
   const submit = useCallback(
     (event: React.SubmitEvent<HTMLFormElement>) => {
       event.preventDefault()
@@ -121,8 +127,10 @@ function ForgotPasswordPage() {
             </form.Field>
             <p
               aria-live='polite'
-              className='text-muted-foreground text-sm'
+              className='text-muted-foreground text-sm empty:sr-only'
+              ref={messageRef}
               role='status'
+              tabIndex={-1}
             >
               {message}
             </p>

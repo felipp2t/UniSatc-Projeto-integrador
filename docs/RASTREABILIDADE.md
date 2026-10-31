@@ -72,40 +72,19 @@ Matriz iniciada em 12/10/2026 como execução documental de L14. Relaciona requi
 
 As telas existentes de solicitação e redefinição apresentam mensagem genérica, tratam link indisponível (incluindo token só com espaços), preservam a senha válida e distinguem erros de validação, limite de tentativas, servidor e rede. Após redefinir, tentam encerrar a sessão, usam limpeza local sem callback se o logout falhar e retornam ao login sem token no redirect.
 
-No snapshot `bff8edd` (29/10/2026), no ambiente Windows com Node.js 22.16.0 e Vitest 5.0.5, foram aprovados **110 testes em 6 arquivos**. Comando executado em `web/`:
-
-```sh
-node ./node_modules/vitest/vitest.mjs run src/pages/recuperacao-senha.test.tsx src/auth/session.test.ts src/router.integration.test.ts src/components/route-error.integration.test.tsx src/pages/_protected/index.integration.test.tsx src/pages/cadastro.test.tsx
-```
-
-A suíte completa desse snapshot também passou em três execuções consecutivas: **194 testes em 22 arquivos** por execução.
-
-No snapshot `94f4351`, a seleção focal passou com **69 testes em 3 arquivos** (um subconjunto da suíte, não testes adicionais), e a suíte completa passou com **205 testes em 22 arquivos**. Comandos executados em `web/`:
-
-```sh
-node ./node_modules/vitest/vitest.mjs run src/api/errors.test.ts src/pages/recuperacao-senha.test.tsx src/pages/cadastro.test.tsx
-node ./node_modules/vitest/vitest.mjs run
-```
-
-No snapshot `d5eeb9b` (31/10/2026), o helper de mensagens foi testado diretamente em `src/auth/auth-error-message.test.ts`. A suíte completa passou isolada com **209 testes em 23 arquivos**; uma execução concorrente falhou em dois testes de cadastro, que passaram isolados, sem causa confirmada. Após corrigir as esperas assíncronas da região `status`, o arquivo de recuperação passou com **40 testes**. Comandos executados em `web/`:
-
-```sh
-node ./node_modules/vitest/vitest.mjs run
-node ./node_modules/vitest/vitest.mjs run src/pages/recuperacao-senha.test.tsx
-```
-
-Também passaram o check estático de 113 arquivos, TypeScript e build.
-
-Na revisão de 31/10/2026, sobre o snapshot de trabalho derivado de `d5eeb9b`, a suíte completa passou com **210 testes em 23 arquivos** e os testes de cadastro/recuperação passaram com **61 testes em 2 arquivos**. Comandos executados em `web/`:
+Em 31/10/2026, no commit `5d2e8fc` (branch `feat/140-password-recovery-rf49`, já rebaseada no `develop` `040f0ab`), no ambiente Windows com Node.js 22.16.0 e Vitest 5.0.5, a suíte completa passou com **296 testes em 32 arquivos** e a seleção focal abaixo passou com **86 testes em 3 arquivos** (um subconjunto da suíte completa, não testes adicionais). O arquivo de recuperação sozinho passou com **49 testes**. Comandos executados em `web/`:
 
 ```sh
 pnpm test
-pnpm test src/pages/cadastro.test.tsx src/pages/recuperacao-senha.test.tsx
+pnpm test src/api/get-api-error-message.test.ts src/pages/recuperacao-senha.test.tsx src/pages/cadastro.test.tsx
+pnpm test src/pages/recuperacao-senha.test.tsx
 ```
 
-Os resultados históricos acima identificam o commit correspondente a cada contagem; a execução focal é um subconjunto da suíte completa.
+Nesse commit também passaram o check estático (`pnpm check`, 133 arquivos), TypeScript (`pnpm exec tsc -b`) e `pnpm build`. Em commits anteriores (`1d1df3e`), a suíte completa também passou em rodadas sequenciais e com duas execuções simultâneas, sem timeout; no `5d2e8fc`, que só ajusta uma classe de espaçamento no esqueci a senha, foi executada uma vez, de forma sequencial. O espaçamento entre o campo e o botão foi medido no navegador (28px, com a região de status vazia, com erro e com a mensagem visível). A mensagem de erro de rede dos formulários de autenticação e de cadastro por convite agora é a padrão de `src/api/get-api-error-message.ts`.
 
-Essa evidência cobre comportamento frontend e sessão local. Validade real de uma hora, uso único, invalidação de links anteriores e revogação de sessões no banco dependem da verificação backend em #139; os mocks frontend não comprovam esses critérios. O registro não declara fechamento de #140.
+As contagens de commits anteriores a esse rebase não são reproduzíveis, porque os SHAs foram reescritos; vale apenas a contagem acima.
+
+Essa evidência cobre comportamento frontend e sessão local. Validade real de uma hora, uso único, invalidação de links anteriores e revogação de sessões no banco dependem da verificação backend em #139; os mocks frontend não comprovam esses critérios. Depois da redefinição o backend remove os refresh tokens e o `/auth/logout` responde 401 sem limpar os cookies; o frontend só limpa o estado local, e o acesso já emitido pode valer por até 15 minutos (limite de #139). O registro não declara fechamento de #140.
 
 ## Matriz não funcional
 
