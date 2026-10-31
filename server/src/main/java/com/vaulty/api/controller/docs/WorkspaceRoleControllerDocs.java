@@ -2,6 +2,8 @@ package com.vaulty.api.controller.docs;
 
 import com.vaulty.api.dto.role.RoleRequest;
 import com.vaulty.api.dto.role.RoleResponse;
+import com.vaulty.api.dto.workspace.RolePermissionsRequest;
+import com.vaulty.api.dto.workspace.RolePermissionsResponse;
 import com.vaulty.api.dto.workspace.WorkspacePermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -45,4 +47,17 @@ public interface WorkspaceRoleControllerDocs {
             @ApiResponse(responseCode = "409")})
     ResponseEntity<Void> delete(@Parameter(hidden = true) UUID userId, @PathVariable UUID workspaceId,
                                 @PathVariable UUID roleId);
+
+    @Operation(summary = "Lista o catálogo de permissões disponíveis")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
+            @ApiResponse(responseCode = "404")})
+    ResponseEntity<List<WorkspacePermission>> catalog(@Parameter(hidden = true) UUID userId,
+                                                       @PathVariable UUID workspaceId);
+
+    @Operation(summary = "Substitui as permissões de um papel")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+            @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
+    ResponseEntity<RolePermissionsResponse> replacePermissions(
+            @Parameter(hidden = true) UUID userId, @PathVariable UUID workspaceId, @PathVariable UUID roleId,
+            @Valid @RequestBody RolePermissionsRequest request);
 }

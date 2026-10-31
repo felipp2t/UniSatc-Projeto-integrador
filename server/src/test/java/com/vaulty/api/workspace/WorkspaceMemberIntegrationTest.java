@@ -62,7 +62,8 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isOwner").value(true))
                 .andExpect(jsonPath("$.roleName").value("Owner"))
-                .andExpect(jsonPath("$.permissions.length()").value(31))
+                .andExpect(jsonPath("$.permissions.length()").value(36))
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'secret' && @.action == 'read')]").isNotEmpty())
                 .andExpect(jsonPath("$.permissions[?(@.resource == 'group' && @.action == 'manage')]").isNotEmpty());
     }
 
