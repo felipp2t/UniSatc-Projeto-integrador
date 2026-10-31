@@ -1,11 +1,33 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  createPermissionChecker,
   denyAllPermissions,
   enforceRoutePermission,
   type PermissionChecker,
 } from './permissions'
 
 describe('permission guards', () => {
+  it('checks effective resource permissions', () => {
+    const checker = createPermissionChecker([
+      { action: 'read', resource: 'item' },
+      { action: 'create', resource: 'collection' },
+    ])
+
+    expect(checker.can('item', 'read')).toBe(true)
+    expect(checker.can('item', 'create')).toBe(false)
+    expect(checker.can('collection', 'create')).toBe(true)
+  })
+
+  it('expands all actions for a resource', () => {
+    const checker = createPermissionChecker([
+      { action: 'all', resource: 'collection' },
+    ])
+
+    expect(checker.can('collection', 'read')).toBe(true)
+    expect(checker.can('collection', 'delete')).toBe(true)
+    expect(checker.can('item', 'delete')).toBe(false)
+  })
+
   it('denies permissions by default', () => {
     expect(denyAllPermissions.can('workspace', 'read')).toBe(false)
   })
