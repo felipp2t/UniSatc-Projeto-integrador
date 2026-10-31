@@ -85,6 +85,7 @@ describe('endpoint helpers', () => {
       await workspaceApi.list()
       await inviteApi.create(inviteRequest)
       await inviteApi.validate(validationRequest)
+      await inviteApi.decline(validationRequest)
     } finally {
       apiClient.defaults.adapter = previousAdapter
     }
@@ -119,6 +120,14 @@ describe('endpoint helpers', () => {
         data: JSON.stringify(validationRequest),
         method: 'post',
         url: '/invites/validate',
+      })
+    )
+    expect(adapter).toHaveBeenNthCalledWith(
+      6,
+      expect.objectContaining({
+        data: JSON.stringify(validationRequest),
+        method: 'post',
+        url: '/invites/decline',
       })
     )
   })
@@ -192,6 +201,7 @@ describe('auth interceptor contract', () => {
     expect(shouldSkipAuthRefresh('/auth/login?source=invite')).toBe(true)
     expect(shouldSkipAuthRefresh('/auth/refresh#session')).toBe(true)
     expect(shouldSkipAuthRefresh('/invites/validate')).toBe(true)
+    expect(shouldSkipAuthRefresh('/invites/decline')).toBe(true)
     expect(shouldSkipAuthRefresh('/me')).toBe(false)
   })
 
