@@ -135,6 +135,65 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void unreadFilterAndCountIgnoreReadNotificationsAndOtherRecipients() throws Exception {
+        User owner = createUser();
+        User other = createUser();
+        notificationService.profileUpdated(owner.getId());
+        notificationService.passwordChanged(owner.getId());
+        notificationService.passwordChanged(other.getId());
+        Notification read = notificationRepository.findAll().stream()
+                .filter(notification -> notification.getRecipient().getId().equals(owner.getId()))
+                .findFirst().orElseThrow();
+        mockMvc.perform(patch("/notifications/{id}/read", read.getId()).cookie(accessCookie(owner)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/notifications?unread=true").cookie(accessCookie(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.notifications[0].readAt").doesNotExist())
+                .andExpect(jsonPath("$.unreadCount").value(1));
+        mockMvc.perform(get("/notifications?page=0&size=1").cookie(accessCookie(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.unreadCount").value(1));
+    }
+
+    @Test
+    void markAllReadOnlyAffectsOwnUnreadNotificationsAndKeepsExistingReadAt() throws Exception {
+        User owner = createUser();
+        User other = createUser();
+        notificationService.profileUpdated(owner.getId());
+        notificationService.passwordChanged(owner.getId());
+        notificationService.passwordChanged(other.getId());
+        List<Notification> ownNotifications = notificationRepository.findAll().stream()
+                .filter(notification -> notification.getRecipient().getId().equals(owner.getId()))
+                .toList();
+        mockMvc.perform(patch("/notifications/{id}/read", ownNotifications.get(0).getId())
+                        .cookie(accessCookie(owner)))
+                .andExpect(status().isNoContent());
+        var firstReadAt = notificationRepository.findById(ownNotifications.get(0).getId()).orElseThrow().getReadAt();
+
+        mockMvc.perform(patch("/notifications/read").cookie(accessCookie(owner)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(patch("/notifications/read").cookie(accessCookie(owner)))
+                .andExpect(status().isNoContent());
+
+        assertThat(notificationRepository.findById(ownNotifications.get(0).getId()).orElseThrow().getReadAt())
+                .isEqualTo(firstReadAt);
+        assertThat(notificationRepository.findById(ownNotifications.get(1).getId()).orElseThrow().getReadAt())
+                .isNotNull();
+        assertThat(notificationRepository.countByRecipientIdAndReadAtIsNull(owner.getId())).isZero();
+        assertThat(notificationRepository.countByRecipientIdAndReadAtIsNull(other.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void notificationRoutesRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/notifications")).andExpect(status().isUnauthorized());
+        mockMvc.perform(patch("/notifications/read")).andExpect(status().isUnauthorized());
+        mockMvc.perform(patch("/notifications/{id}/read", UUID.randomUUID())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void concurrentMarkReadCallsPreserveTheOriginalReadTimestamp() throws Exception {
         User owner = createUser();
         notificationService.profileUpdated(owner.getId());
@@ -252,6 +311,44 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
             ownerEmitter.complete();
             otherEmitter.complete();
         }
+    }
+
+    @Test
+    void heartbeatKeepsStreamAliveWithoutEmittingNotificationEvents() throws Exception {
+        User owner = createUser();
+        MvcResult ownerStream = openStream(owner);
+        SseEmitter ownerEmitter = streamProbeController.emitterFor(owner.getId());
+
+        try {
+            notificationService.sendHeartbeat();
+
+            String payload = ownerStream.getResponse().getContentAsString();
+            assertThat(payload).contains(":keep-alive").doesNotContain("event:notification");
+            assertThat(notificationRepository.findAll()).isEmpty();
+        } finally {
+            ownerEmitter.complete();
+        }
+    }
+
+    @Test
+    void streamDoesNotOutliveTheAccessToken() {
+        User owner = createUser();
+        SseEmitter emitter = notificationService.subscribe(owner.getId());
+
+        assertThat(emitter.getTimeout()).isEqualTo(900_000L);
+        emitter.complete();
+    }
+
+    @Test
+    void failedRealtimeDeliveryKeepsTheOperationAndThePersistedNotification() {
+        User owner = createUser();
+        SseEmitter brokenStream = notificationService.subscribe(owner.getId());
+        brokenStream.complete();
+
+        notificationService.profileUpdated(owner.getId());
+
+        assertThat(notificationRepository.findAll()).singleElement()
+                .satisfies(notification -> assertThat(notification.getRecipient().getId()).isEqualTo(owner.getId()));
     }
 
     private MvcResult openStream(User user) throws Exception {

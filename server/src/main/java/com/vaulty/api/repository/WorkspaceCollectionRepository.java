@@ -18,6 +18,29 @@ public interface WorkspaceCollectionRepository extends JpaRepository<WorkspaceCo
 
     Page<WorkspaceCollection> findAllByWorkspaceIdAndParentId(UUID workspaceId, UUID parentId, Pageable pageable);
 
+    @Query(value = """
+            WITH RECURSIVE granted_collections(id) AS (
+                SELECT c.id FROM collection c WHERE c.workspace_id=:workspaceId AND c.parent_id IS NULL AND c.inherit_access=TRUE
+                UNION SELECT g.collection_id FROM collection_public_grant g JOIN collection c ON c.id=g.collection_id WHERE c.workspace_id=:workspaceId
+                UNION SELECT g.collection_id FROM collection_access_grant g JOIN access_group_member gm ON gm.group_id=g.group_id JOIN workspace_member wm ON wm.id=gm.workspace_member_id JOIN collection c ON c.id=g.collection_id WHERE wm.user_id=:userId AND wm.workspace_id=:workspaceId
+                UNION SELECT child.id FROM collection child JOIN granted_collections parent ON child.parent_id=parent.id WHERE child.workspace_id=:workspaceId AND child.inherit_access=TRUE
+            ) SELECT c.* FROM collection c JOIN workspace w ON w.id=c.workspace_id
+            WHERE c.workspace_id=:workspaceId AND ((:parentId IS NULL AND c.parent_id IS NULL) OR c.parent_id=:parentId)
+              AND (w.owner_id=:userId OR c.id IN (SELECT id FROM granted_collections))
+            ORDER BY c.name ASC,c.id ASC
+            """, countQuery = """
+            WITH RECURSIVE granted_collections(id) AS (
+                SELECT c.id FROM collection c WHERE c.workspace_id=:workspaceId AND c.parent_id IS NULL AND c.inherit_access=TRUE
+                UNION SELECT g.collection_id FROM collection_public_grant g JOIN collection c ON c.id=g.collection_id WHERE c.workspace_id=:workspaceId
+                UNION SELECT g.collection_id FROM collection_access_grant g JOIN access_group_member gm ON gm.group_id=g.group_id JOIN workspace_member wm ON wm.id=gm.workspace_member_id JOIN collection c ON c.id=g.collection_id WHERE wm.user_id=:userId AND wm.workspace_id=:workspaceId
+                UNION SELECT child.id FROM collection child JOIN granted_collections parent ON child.parent_id=parent.id WHERE child.workspace_id=:workspaceId AND child.inherit_access=TRUE
+            ) SELECT count(*) FROM collection c JOIN workspace w ON w.id=c.workspace_id
+            WHERE c.workspace_id=:workspaceId AND ((:parentId IS NULL AND c.parent_id IS NULL) OR c.parent_id=:parentId)
+              AND (w.owner_id=:userId OR c.id IN (SELECT id FROM granted_collections))
+            """, nativeQuery = true)
+    Page<WorkspaceCollection> findAccessible(@Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId,
+                                              @Param("parentId") UUID parentId, Pageable pageable);
+
     Optional<WorkspaceCollection> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
 
     @Query(value = """

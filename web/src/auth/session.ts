@@ -11,6 +11,7 @@ export type SessionStatus =
   | 'error'
 
 export interface SessionService {
+  clearLocalSession: () => void
   dispose: () => void
   handleSessionExpired: () => void
   initialize: (force?: boolean) => Promise<void>
@@ -125,6 +126,10 @@ class SessionServiceImpl implements SessionService {
     if (!wasInitializing) {
       this.navigateToLogin?.()
     }
+  }
+
+  clearLocalSession() {
+    this.resetSession()
   }
 
   private resetSession() {

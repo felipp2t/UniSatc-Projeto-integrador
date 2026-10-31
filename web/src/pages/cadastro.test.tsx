@@ -14,6 +14,7 @@ import { ApiError } from '@/api/errors'
 import { createQueryClient } from '@/api/query-client'
 import type { SessionService, SessionStatus } from '@/auth/session'
 import { renderWithProviders } from '@/test/render'
+import { createSessionStub } from '@/test/session-stub'
 import { routeTree } from '../route-tree.gen'
 
 const { register, validate } = vi.hoisted(() => ({
@@ -33,9 +34,7 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
 function createSession() {
   let status: SessionStatus = 'unauthenticated'
   let user: SessionService['user']
-  return {
-    dispose: vi.fn(),
-    handleSessionExpired: vi.fn(),
+  const session = createSessionStub({
     initialize: vi.fn(() => {
       status = 'authenticated'
       user = {
@@ -45,16 +44,11 @@ function createSession() {
       }
       return Promise.resolve()
     }),
-    logout: vi.fn(),
-    setNavigateToLogin: vi.fn(),
-    get status() {
-      return status
-    },
-    updateUser: vi.fn(),
-    get user() {
-      return user
-    },
-  } as SessionService
+  })
+  return Object.defineProperties(session, {
+    status: { get: () => status },
+    user: { get: () => user },
+  })
 }
 
 async function renderRegistrationPage(
@@ -91,6 +85,18 @@ async function fillValidRegistration(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Nome'), 'Ana Exemplo')
   await user.type(screen.getByLabelText('Senha'), ' senha segura ')
   await user.type(screen.getByLabelText('Confirmar senha'), ' senha segura ')
+}
+
+function setValidRegistrationValues() {
+  fireEvent.change(screen.getByLabelText('Nome'), {
+    target: { value: 'Ana Exemplo' },
+  })
+  fireEvent.change(screen.getByLabelText('Senha'), {
+    target: { value: ' senha segura ' },
+  })
+  fireEvent.change(screen.getByLabelText('Confirmar senha'), {
+    target: { value: ' senha segura ' },
+  })
 }
 
 afterEach(() => {
@@ -269,13 +275,13 @@ describe('cadastro por convite', () => {
       })
       register.mockRejectedValue(new ApiError('Convite expirado', status))
 
-      const user = userEvent.setup()
       await renderRegistrationPage(
         '/cadastro?email=convidado%40example.com&token=valido'
       )
 
       await screen.findByRole('button', { name: 'CRIAR CONTA' })
-      await fillValidRegistration(user)
+      setValidRegistrationValues()
+      const user = userEvent.setup()
       await user.click(screen.getByRole('button', { name: 'CRIAR CONTA' }))
 
       expect(
@@ -290,15 +296,20 @@ describe('cadastro por convite', () => {
       data: { email: 'convidado@example.com', remainingSeconds: 4000 },
     })
 
-    const user = userEvent.setup()
     await renderRegistrationPage(
       '/cadastro?email=convidado%40example.com&token=valido'
     )
 
     await screen.findByRole('button', { name: 'CRIAR CONTA' })
-    await user.type(screen.getByLabelText('Nome'), 'Al')
-    await user.type(screen.getByLabelText('Senha'), 'curta')
-    await user.type(screen.getByLabelText('Confirmar senha'), 'diferente')
+    fireEvent.change(screen.getByLabelText('Nome'), {
+      target: { value: 'Al' },
+    })
+    fireEvent.change(screen.getByLabelText('Senha'), {
+      target: { value: 'curta' },
+    })
+    fireEvent.change(screen.getByLabelText('Confirmar senha'), {
+      target: { value: 'diferente' },
+    })
     fireEvent.submit(
       screen.getByRole('form', { name: 'Criar sua conta no Vaulty' })
     )
@@ -314,25 +325,27 @@ describe('cadastro por convite', () => {
   })
 
   it.each([
-    [400, 'Confira os dados informados e tente novamente.'],
-    [429, 'Muitas tentativas. Aguarde um pouco e tente novamente.'],
+    ['HTTP 400', 400, 'Confira os dados informados e tente novamente.'],
+    ['HTTP 429', 429, 'Muitas tentativas. Aguarde um pouco e tente novamente.'],
   ])(
-    'shows a recoverable registration message for HTTP %i',
-    async (status, message) => {
+    'shows a recoverable registration message for %s',
+    async (_caseName, status, message) => {
       validate.mockResolvedValue({
         data: { email: 'convidado@example.com', remainingSeconds: 4000 },
       })
-      register.mockRejectedValue(new ApiError('Falha', status))
+      register.mockRejectedValue(new ApiError('DETALHE INTERNO', status))
 
-      const user = userEvent.setup()
       await renderRegistrationPage(
         '/cadastro?email=convidado%40example.com&token=valido'
       )
       await screen.findByRole('button', { name: 'CRIAR CONTA' })
-      await fillValidRegistration(user)
+      setValidRegistrationValues()
+      const user = userEvent.setup()
       await user.click(screen.getByRole('button', { name: 'CRIAR CONTA' }))
 
-      expect(await screen.findByRole('alert')).toHaveTextContent(message)
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(message)
+      expect(alert).not.toHaveTextContent('DETALHE INTERNO')
     }
   )
 
@@ -341,41 +354,64 @@ describe('cadastro por convite', () => {
       data: { email: 'convidado@example.com', remainingSeconds: 4000 },
     })
     register.mockRejectedValue(
-      new ApiError('Falha temporária', undefined, undefined, undefined, {
+      new ApiError('DETALHE INTERNO', undefined, undefined, undefined, {
         networkError: true,
       })
     )
 
-    const user = userEvent.setup()
     await renderRegistrationPage(
       '/cadastro?email=convidado%40example.com&token=valido'
     )
     await screen.findByRole('button', { name: 'CRIAR CONTA' })
-    await fillValidRegistration(user)
+    setValidRegistrationValues()
+    const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'CRIAR CONTA' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Não foi possível criar sua conta. Verifique sua conexão e tente novamente.'
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(
+      'Erro de conexão. Verifique sua internet e tente novamente.'
     )
+    expect(alert).not.toHaveTextContent('DETALHE INTERNO')
   })
 
-  it('shows a recoverable message when registration fails with a server error', async () => {
+  it.each([500, 502, 503, 504])(
+    'shows a service message without backend details when registration fails with HTTP %i',
+    async (status) => {
+      validate.mockResolvedValue({
+        data: { email: 'convidado@example.com', remainingSeconds: 4000 },
+      })
+      register.mockRejectedValue(new ApiError('DETALHE INTERNO', status))
+
+      await renderRegistrationPage(
+        '/cadastro?email=convidado%40example.com&token=valido'
+      )
+      await screen.findByRole('button', { name: 'CRIAR CONTA' })
+      setValidRegistrationValues()
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'CRIAR CONTA' }))
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(
+        'Serviço temporariamente indisponível. Tente novamente em alguns instantes.'
+      )
+      expect(alert).not.toHaveTextContent('DETALHE INTERNO')
+    }
+  )
+
+  it('uses distinct accessible labels for registration password visibility controls', async () => {
     validate.mockResolvedValue({
       data: { email: 'convidado@example.com', remainingSeconds: 4000 },
     })
-    register.mockRejectedValue(new ApiError('Falha do servidor', 500))
-
-    const user = userEvent.setup()
     await renderRegistrationPage(
       '/cadastro?email=convidado%40example.com&token=valido'
     )
-    await screen.findByRole('button', { name: 'CRIAR CONTA' })
-    await fillValidRegistration(user)
-    await user.click(screen.getByRole('button', { name: 'CRIAR CONTA' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Não foi possível criar sua conta. Verifique sua conexão e tente novamente.'
-    )
+    expect(
+      await screen.findByRole('button', { name: 'Mostrar senha' })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Mostrar confirmação da senha' })
+    ).toBeTruthy()
   })
 
   it('shows completed registration when session initialization fails', async () => {

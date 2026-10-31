@@ -5,12 +5,9 @@ import { z } from 'zod'
 import { inviteApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import type { InviteValidationResponse } from '@/api/types'
+import { AuthStatus, BrandMark } from '@/components/auth-status'
 import { InviteRegistrationForm } from '@/components/invite-registration-form'
-import {
-  BrandMark,
-  InviteStatus,
-  unavailableMessage,
-} from '@/components/invite-status'
+import { unavailableMessage } from '@/components/invite-status'
 import { ErrorState } from '@/components/ui/error-state'
 import { OfflineState } from '@/components/ui/offline-state'
 
@@ -82,7 +79,7 @@ function InviteRegistrationPage() {
 
   if (!hasInviteParameters) {
     return (
-      <InviteStatus message={unavailableMessage} title='Convite indisponível' />
+      <AuthStatus message={unavailableMessage} title='Convite indisponível' />
     )
   }
 
@@ -92,7 +89,7 @@ function InviteRegistrationPage() {
 
   if (validationQuery.isPending) {
     return (
-      <InviteStatus
+      <AuthStatus
         message='Estamos conferindo se o convite ainda pode ser usado.'
         title='Validando convite'
       />
@@ -103,16 +100,13 @@ function InviteRegistrationPage() {
     const error = toApiError(validationQuery.error)
     if (error.status === 404) {
       return (
-        <InviteStatus
-          message={unavailableMessage}
-          title='Convite indisponível'
-        />
+        <AuthStatus message={unavailableMessage} title='Convite indisponível' />
       )
     }
 
     if (error.isRateLimited) {
       return (
-        <InviteStatus
+        <AuthStatus
           message='Muitas tentativas. Aguarde um minuto e tente abrir novamente o link do convite.'
           title='Não foi possível validar agora'
         />
@@ -125,7 +119,7 @@ function InviteRegistrationPage() {
   const validation = validationQuery.data
   if (!validation) {
     return (
-      <InviteStatus
+      <AuthStatus
         message='Estamos conferindo se o convite ainda pode ser usado.'
         title='Validando convite'
       />

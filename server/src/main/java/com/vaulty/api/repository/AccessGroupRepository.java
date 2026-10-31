@@ -25,4 +25,8 @@ public interface AccessGroupRepository extends JpaRepository<AccessGroup, UUID> 
             @Param("groupId") UUID groupId, @Param("workspaceId") UUID workspaceId);
 
     boolean existsByIdAndWorkspaceId(UUID id, UUID workspaceId);
+
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM collection_access_grant WHERE group_id = :groupId AND workspace_id = :workspaceId)",
+            nativeQuery = true)
+    boolean existsFolderGrant(@Param("groupId") UUID groupId, @Param("workspaceId") UUID workspaceId);
 }

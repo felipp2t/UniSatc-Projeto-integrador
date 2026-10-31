@@ -229,7 +229,8 @@ public class AuthService {
         refreshToken.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(refreshTokenExpirationMs)));
         refreshTokenRepository.save(refreshToken);
 
-        String accessToken = jwtService.generateAccessToken(userId, membership.getId(), membership.getRole().getName());
+        String accessToken = jwtService.generateAccessToken(
+                userId, membership.getId(), membership.getRole().getName());
 
         return new TokenPair(accessToken, refreshToken.getToken());
     }

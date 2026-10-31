@@ -61,6 +61,84 @@ describe('getApiErrorMessage', () => {
     )
   })
 
+  it('uses the server error message for 5xx responses when configured', () => {
+    expect(
+      getApiErrorMessage(new ApiError('Server detail', 503), {
+        ...options,
+        serverError: 'Server error message',
+      })
+    ).toBe('Server error message')
+  })
+
+  it.each([500, 502, 503, 504])(
+    'uses the server error message for HTTP %i',
+    (status) => {
+      expect(
+        getApiErrorMessage(new ApiError('Server detail', status), {
+          ...options,
+          serverError: 'Server error message',
+        })
+      ).toBe('Server error message')
+    }
+  )
+
+  it('keeps exact 429 and 400 status messages when a server error message is set', () => {
+    const configured = {
+      ...options,
+      serverError: 'Server error message',
+      statusMessages: { 400: 'Bad request message', 429: 'Rate limit message' },
+    }
+
+    expect(getApiErrorMessage(new ApiError('x', 429), configured)).toBe(
+      'Rate limit message'
+    )
+    expect(getApiErrorMessage(new ApiError('x', 400), configured)).toBe(
+      'Bad request message'
+    )
+  })
+
+  it('does not treat HTTP 499 as a server error', () => {
+    expect(
+      getApiErrorMessage(new ApiError('x', 499), {
+        ...options,
+        serverError: 'Server error message',
+      })
+    ).toBe('Fallback message')
+  })
+
+  it('prefers an exact status message over the server error message', () => {
+    expect(
+      getApiErrorMessage(new ApiError('Server detail', 503), {
+        ...options,
+        serverError: 'Server error message',
+        statusMessages: { 503: 'Exact status message' },
+      })
+    ).toBe('Exact status message')
+  })
+
+  it('falls back on 5xx responses without a server error message', () => {
+    expect(
+      getApiErrorMessage(new ApiError('Server detail', 503), options)
+    ).toBe('Fallback message')
+  })
+
+  it('does not use the server error message for client errors or network failures', () => {
+    expect(
+      getApiErrorMessage(new ApiError('Unauthorized', 401), {
+        ...options,
+        serverError: 'Server error message',
+      })
+    ).toBe('Fallback message')
+    expect(
+      getApiErrorMessage(
+        new ApiError('Offline', undefined, undefined, undefined, {
+          networkError: true,
+        }),
+        { ...options, serverError: 'Server error message' }
+      )
+    ).toBe('Network message')
+  })
+
   it('preserves a server message when the caller requests it', () => {
     expect(
       getApiErrorMessage(new ApiError('Server detail', 500), {

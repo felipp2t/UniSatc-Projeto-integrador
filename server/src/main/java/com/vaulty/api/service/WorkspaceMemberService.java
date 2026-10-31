@@ -8,7 +8,9 @@ import com.vaulty.api.enums.ActivityActorContext;
 import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
+import com.vaulty.api.exception.ValidationException;
 import com.vaulty.api.mapper.WorkspaceMapper;
+import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
 import java.util.List;
@@ -28,6 +30,7 @@ public class WorkspaceMemberService {
     private final WorkspaceContentAuthorization authorization;
     private final ActivityLogService activityLogService;
     private final NotificationService notificationService;
+    private final WorkspaceRepository workspaceRepository;
 
     @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> list(UUID userId, UUID workspaceId) {
@@ -70,5 +73,36 @@ public class WorkspaceMemberService {
                         "roleId", role.getId()));
         notificationService.accessChanged(List.of(member.getUser().getId()));
         return workspaceMapper.toResponse(member, true);
+    }
+
+    @Transactional
+    public void remove(UUID userId, UUID workspaceId, UUID membershipId, UUID confirmMemberId) {
+        var workspace = workspaceRepository.findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        authorization.requireOwner(userId, workspaceId);
+        if (confirmMemberId == null || !membershipId.equals(confirmMemberId)) {
+            throw new ValidationException("Confirmação deve identificar o membro removido");
+        }
+        var member = workspaceMemberRepository.findByIdAndWorkspaceId(membershipId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Membro não encontrado"));
+        if (member.getRole().isOwnerRole()) {
+            var owners = workspaceMemberRepository.findOwners(workspaceId, WorkspaceRole.OWNER_ROLE_NAME);
+            var otherOwners = owners.stream()
+                    .filter(owner -> !owner.getId().equals(membershipId))
+                    .toList();
+            if (otherOwners.isEmpty()) {
+                throw new ConflictException("O workspace precisa manter ao menos um dono");
+            }
+            if (workspace.getOwner().getId().equals(member.getUser().getId())) {
+                workspace.setOwner(otherOwners.get(0).getUser());
+                workspaceRepository.save(workspace);
+            }
+        }
+        var removedUser = member.getUser();
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.MEMBER_REMOVED,
+                ActivityResourceType.MEMBER, membershipId,
+                Map.of("userId", removedUser.getId(), "name", removedUser.getName(),
+                        "email", removedUser.getEmail(), "role", member.getRole().getName()));
+        workspaceMemberRepository.delete(member);
     }
 }

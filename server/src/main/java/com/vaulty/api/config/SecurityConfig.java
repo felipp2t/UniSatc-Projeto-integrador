@@ -27,6 +27,8 @@ public class SecurityConfig {
 
             RateLimitFilter rateLimitFilter,
 
+            MaintenanceGateFilter maintenanceGateFilter,
+
             JwtAuthenticationFilter jwtAuthenticationFilter,
 
             ApiAuthenticationEntryPoint authenticationEntryPoint)
@@ -60,6 +62,7 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(maintenanceGateFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

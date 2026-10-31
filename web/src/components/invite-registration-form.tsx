@@ -2,7 +2,13 @@ import { revalidateLogic, useForm, useSelector } from '@tanstack/react-form'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { z } from 'zod'
 import { authApi } from '@/api/endpoints'
-import { type ApiError, toApiError } from '@/api/errors'
+import { toApiError } from '@/api/errors'
+import {
+  getApiErrorMessage,
+  RATE_LIMITED_MESSAGE,
+  SERVER_UNAVAILABLE_MESSAGE,
+} from '@/api/get-api-error-message'
+import { AuthStatus, BrandMark } from '@/components/auth-status'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -12,7 +18,7 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { SecretInput } from '@/components/ui/secret-input'
-import { BrandMark, InviteStatus, unavailableMessage } from './invite-status'
+import { unavailableMessage } from './invite-status'
 
 const registrationSchema = z
   .object({
@@ -65,7 +71,16 @@ export function InviteRegistrationForm({
           return
         }
 
-        setRequestError(getRegistrationError(error))
+        setRequestError(
+          getApiErrorMessage(error, {
+            fallback: 'Não foi possível criar sua conta. Tente novamente.',
+            serverError: SERVER_UNAVAILABLE_MESSAGE,
+            statusMessages: {
+              400: 'Confira os dados informados e tente novamente.',
+              429: RATE_LIMITED_MESSAGE,
+            },
+          })
+        )
         return
       }
 
@@ -114,19 +129,19 @@ export function InviteRegistrationForm({
 
   if (remainingSeconds === 0) {
     return (
-      <InviteStatus message={unavailableMessage} title='Convite indisponível' />
+      <AuthStatus message={unavailableMessage} title='Convite indisponível' />
     )
   }
 
   if (inviteUnavailable) {
     return (
-      <InviteStatus message={unavailableMessage} title='Convite indisponível' />
+      <AuthStatus message={unavailableMessage} title='Convite indisponível' />
     )
   }
 
   if (completionError) {
     return (
-      <InviteStatus
+      <AuthStatus
         action={onGoToLogin}
         actionLabel='Ir para o login'
         message={completionError}
@@ -213,6 +228,7 @@ export function InviteRegistrationForm({
                     onBlur={field.handleBlur}
                     onChange={field.handleChange}
                     value={field.state.value}
+                    visibilityLabel='senha'
                   />
                 )
               }}
@@ -233,6 +249,7 @@ export function InviteRegistrationForm({
                     onBlur={field.handleBlur}
                     onChange={field.handleChange}
                     value={field.state.value}
+                    visibilityLabel='confirmação da senha'
                   />
                 )
               }}
@@ -269,6 +286,7 @@ interface PasswordFieldProps {
   onBlur: () => void
   onChange: (value: string) => void
   value: RegistrationValues[PasswordFieldName]
+  visibilityLabel: string
 }
 
 function RegistrationPasswordField({
@@ -280,6 +298,7 @@ function RegistrationPasswordField({
   name,
   onBlur,
   onChange,
+  visibilityLabel,
   value,
 }: PasswordFieldProps) {
   const inputId = `${formId}-${name}`
@@ -299,6 +318,7 @@ function RegistrationPasswordField({
         onBlur={onBlur}
         onValueChange={onChange}
         value={value}
+        visibilityLabel={visibilityLabel}
       />
       <FieldError errors={errors} id={errorId} />
     </Field>
@@ -317,14 +337,4 @@ function formatRemainingTime(totalSeconds: number) {
     return `${hours} h ${minutes} min`
   }
   return totalSeconds < 60 ? `${totalSeconds} s` : `${minutes} min`
-}
-
-function getRegistrationError(error: ApiError) {
-  if (error.isRateLimited) {
-    return 'Muitas tentativas. Aguarde um pouco e tente novamente.'
-  }
-  if (error.status === 400) {
-    return 'Confira os dados informados e tente novamente.'
-  }
-  return 'Não foi possível criar sua conta. Verifique sua conexão e tente novamente.'
 }

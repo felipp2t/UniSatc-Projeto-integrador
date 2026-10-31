@@ -21,7 +21,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +34,7 @@ public class WorkspaceCollectionService {
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceItemRepository itemRepository;
     private final WorkspaceContentAuthorization authorization;
+    private final EffectiveContentAccess contentAccess;
     private final ActivityLogService activityLogService;
 
     @Transactional
@@ -45,6 +45,7 @@ public class WorkspaceCollectionService {
                 ? null
                 : collectionRepository.findByIdAndWorkspaceId(request.parentId(), workspaceId)
                         .orElseThrow(() -> new ResourceNotFoundException("Pasta pai não encontrada"));
+        if (parent != null) contentAccess.requireCollection(userId, workspace, parent.getId());
 
         var collection = new WorkspaceCollection();
         collection.setWorkspace(workspace);
@@ -72,6 +73,7 @@ public class WorkspaceCollectionService {
         authorization.require(userId, workspace, "collection", "update");
         var collection = collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
+        contentAccess.requireCollection(userId, workspace, collectionId);
         String previousName = collection.getName();
         collection.setName(request.name());
         try {
@@ -94,6 +96,7 @@ public class WorkspaceCollectionService {
         authorization.require(userId, workspace, "collection", "delete");
         var collection = collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
+        contentAccess.requireCollection(userId, workspace, collectionId);
         if (collectionRepository.existsByParentIdAndWorkspaceId(collectionId, workspaceId)
                 || itemRepository.existsByCollectionIdAndWorkspaceId(collectionId, workspaceId)) {
             throw new ConflictException("Pasta não está vazia");
@@ -122,18 +125,19 @@ public class WorkspaceCollectionService {
                             + "e deslocamento não pode exceder " + Integer.MAX_VALUE);
         }
 
-        var pageable = PageRequest.of(page, size, Sort.by("name").ascending().and(Sort.by("id").ascending()));
+        var pageable = PageRequest.of(page, size);
         if (parentId == null) {
             return CollectionPageResponse.from(collectionRepository
-                    .findAllByWorkspaceIdAndParentIsNull(workspaceId, pageable)
+                    .findAccessible(workspaceId, userId, null, pageable)
                     .map(this::toResponse));
         }
 
         if (collectionRepository.findByIdAndWorkspaceId(parentId, workspaceId).isEmpty()) {
             throw new ResourceNotFoundException("Pasta não encontrada");
         }
+        contentAccess.requireCollection(userId, workspace, parentId);
         return CollectionPageResponse.from(collectionRepository
-                .findAllByWorkspaceIdAndParentId(workspaceId, parentId, pageable)
+                .findAccessible(workspaceId, userId, parentId, pageable)
                 .map(this::toResponse));
     }
 
@@ -145,6 +149,7 @@ public class WorkspaceCollectionService {
         if (path.isEmpty()) {
             throw new ResourceNotFoundException("Pasta não encontrada");
         }
+        contentAccess.requireCollection(userId, workspace, collectionId);
         return path.stream().map(entry -> new CollectionPathEntry(entry.getId(), entry.getName())).toList();
     }
 

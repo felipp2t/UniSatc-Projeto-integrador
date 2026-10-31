@@ -80,7 +80,11 @@ public class WorkspaceService {
 
     @Transactional
     public WorkspaceResponse update(UUID ownerId, UUID workspaceId, UpdateWorkspaceRequest request) {
-        Workspace workspace = authorization.requireOwnerOrNotFound(ownerId, workspaceId);
+        Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        if (!authorization.isOwner(ownerId, workspace)) {
+            throw new ResourceNotFoundException("Workspace não encontrado");
+        }
 
         Map<String, Object> previous = new LinkedHashMap<>();
         previous.put("name", workspace.getName());

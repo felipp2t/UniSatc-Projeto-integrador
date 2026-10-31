@@ -18,6 +18,7 @@ import com.vaulty.api.repository.WorkspaceItemFileRepository;
 import com.vaulty.api.repository.WorkspaceItemMediaRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.storage.ObjectStorage;
+import com.vaulty.api.storage.StorageOperationException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -63,6 +64,7 @@ public class WorkspaceItemAttachmentService {
     private final WorkspaceItemMediaRepository mediaRepository;
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceContentAuthorization authorization;
+    private final EffectiveContentAccess contentAccess;
     private final ObjectProvider<ObjectStorage> storageProvider;
     private final ActivityLogService activityLogService;
 
@@ -75,6 +77,7 @@ public class WorkspaceItemAttachmentService {
         var collection = collectionId == null ? null
                 : collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                         .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
+        if (collection != null) contentAccess.requireCollection(userId, workspace, collection.getId());
         validateTitle(title);
 
         var item = new WorkspaceItem();
@@ -115,6 +118,7 @@ public class WorkspaceItemAttachmentService {
         var workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "update");
         var item = attachmentItemForUpdate(workspaceId, itemId);
+        contentAccess.requireItem(userId, workspace, itemId);
         var oldFile = fileRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Anexo não encontrado"));
         var upload = validate(file);
@@ -124,7 +128,12 @@ public class WorkspaceItemAttachmentService {
         var before = itemSnapshot(item, oldFile);
 
         try {
-            requireStorage().put(upload.key, upload.content, upload.mimeType);
+            try {
+                requireStorage().put(upload.key, upload.content, upload.mimeType);
+            } catch (StorageOperationException exception) {
+                throw new StorageUnavailableException(
+                        "Não foi possível substituir o anexo; o arquivo anterior continua disponível.", exception);
+            }
             item.setType(upload.image ? "image" : "file");
             itemRepository.saveAndFlush(item);
             newFile.setItemId(itemId);
@@ -153,6 +162,7 @@ public class WorkspaceItemAttachmentService {
         var workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "update");
         var item = attachmentItemForUpdate(workspaceId, itemId);
+        contentAccess.requireItem(userId, workspace, itemId);
         validateTitle(request.title());
         String description = normalizeDescription(request.description());
         var file = fileRepository.findById(itemId)
@@ -178,6 +188,7 @@ public class WorkspaceItemAttachmentService {
         var workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         var item = attachmentItemForRead(workspaceId, itemId);
+        contentAccess.requireItem(userId, workspace, itemId);
         var file = fileRepository.findById(item.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Anexo não encontrado"));
         return new AttachmentDownload(requireStorage().get(file.getStorageKey()), file.getOriginalName(), file.getMimeType(),

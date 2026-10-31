@@ -5,7 +5,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.vaulty.api.PostgresIntegrationTest;
@@ -192,6 +195,37 @@ class WorkspaceItemDeletionIntegrationTest extends PostgresIntegrationTest {
         assertThat(count("item_file", itemId)).isZero();
         assertThat(count("item_media", itemId)).isZero();
         verify(storage).delete(key);
+    }
+
+    @Test
+    void documentDescriptionPersistsOnCreateAndSurvivesAttachmentReplacement() throws Exception {
+        User owner = user("owner");
+        UUID workspaceId = workspace(owner);
+        MockMultipartFile initial = new MockMultipartFile("file", "guide.png", "image/png", tinyPng());
+        String response = mockMvc.perform(multipart("/workspaces/{workspaceId}/items/attachments", workspaceId)
+                        .file(initial).param("title", "Guide").param("description", "  Uso interno  ")
+                        .cookie(cookie(owner)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID itemId = UUID.fromString(new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(response).get("itemId").asText());
+
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId).cookie(cookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").value("Uso interno"));
+        mockMvc.perform(put("/workspaces/{workspaceId}/items/{itemId}/metadata", workspaceId, itemId)
+                        .cookie(cookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Guide atualizado\",\"description\":\"Nova finalidade\"}"))
+                .andExpect(status().isNoContent());
+        MockMultipartFile replacement = new MockMultipartFile("file", "guide-updated.png", "image/png", tinyPng());
+        mockMvc.perform(multipart("/workspaces/{workspaceId}/items/{itemId}/attachment", workspaceId, itemId)
+                        .file(replacement).with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }).cookie(cookie(owner)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId).cookie(cookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Guide atualizado"))
+                .andExpect(jsonPath("$.description").value("Nova finalidade"));
     }
 
     private User user(String name) {
