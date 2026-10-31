@@ -277,7 +277,7 @@ O que a função faz:
 | Request body | `{ "token": string, "newPassword": string (min 8), "confirmPassword": string (min 8) }` |
 | Sucesso | `204` |
 | `400` | senhas não conferem, ou corpo inválido |
-| `401` | token inexistente ou expirado |
+| `401` | token inexistente, expirado ou já utilizado |
 | `429` | mais de 5 tentativas por IP em 1 minuto (rate limit) |
 
 ---
