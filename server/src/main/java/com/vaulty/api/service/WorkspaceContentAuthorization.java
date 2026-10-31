@@ -67,13 +67,14 @@ public class WorkspaceContentAuthorization {
     }
 
     @Transactional
-    public void requireOwnerForUpdate(UUID userId, UUID workspaceId) {
-        workspaceRepository.findByIdForUpdate(workspaceId)
+    public Workspace requireOwnerForUpdate(UUID userId, UUID workspaceId) {
+        Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
         var member = requireMember(userId, workspaceId);
         if (!member.getRole().isOwnerRole()) {
             throw new ForbiddenException("Permissão insuficiente");
         }
+        return workspace;
     }
 
     public WorkspacePermissionsResponse permissions(UUID userId, UUID workspaceId) {
