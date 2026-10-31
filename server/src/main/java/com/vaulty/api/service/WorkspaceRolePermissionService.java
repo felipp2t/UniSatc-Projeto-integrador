@@ -57,7 +57,7 @@ public class WorkspaceRolePermissionService {
             UUID userId, UUID workspaceId, UUID roleId, RolePermissionsRequest request) {
         requireOwner(userId, workspaceId);
         WorkspaceRole role = findRoleForUpdate(roleId, workspaceId);
-        if (isProtected(role)) {
+        if (role.isProtected()) {
             throw new ValidationException("As permissões do papel inicial não podem ser alteradas");
         }
 
@@ -107,11 +107,6 @@ public class WorkspaceRolePermissionService {
     private WorkspaceRole findRoleForUpdate(UUID roleId, UUID workspaceId) {
         return roleRepository.findByIdAndWorkspaceIdForUpdate(roleId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel não encontrado"));
-    }
-
-    private boolean isProtected(WorkspaceRole role) {
-        return WorkspaceRole.OWNER_ROLE_NAME.equalsIgnoreCase(role.getName())
-                || WorkspaceRole.MEMBER_ROLE_NAME.equalsIgnoreCase(role.getName());
     }
 
     private RolePermissionsResponse response(WorkspaceRole role, List<RolePermission> permissions) {

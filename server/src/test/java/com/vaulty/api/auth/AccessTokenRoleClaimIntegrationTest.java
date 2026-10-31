@@ -150,7 +150,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     @Transactional
-    void currentMembershipRoleOverridesAnOldHigherPermissionClaim() throws Exception {
+    void currentMembershipRoleOverridesAnOldHigherRoleClaim() throws Exception {
         var ownerMembership = workspaceMemberRepository.findByUserId(
                 userRepository.findByEmail(ADMIN_EMAIL).orElseThrow().getId()).orElseThrow();
         var workspace = ownerMembership.getWorkspace();

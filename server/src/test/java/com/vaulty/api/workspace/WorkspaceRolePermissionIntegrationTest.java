@@ -236,7 +236,7 @@ class WorkspaceRolePermissionIntegrationTest extends WorkspaceIntegrationSupport
     }
 
     @Test
-    void refreshClaimsCurrentPermissionsAndExistingTokenUsesPermissionChangesOnNextRequest() throws Exception {
+    void existingAccessTokensUsePermissionChangesOnNextRequest() throws Exception {
         User owner = createUser("Dona");
         User member = createUser("Membro");
         var workspace = configureWorkspace(owner);
@@ -257,7 +257,7 @@ class WorkspaceRolePermissionIntegrationTest extends WorkspaceIntegrationSupport
 
         mockMvc.perform(post("/workspaces/{workspaceId}/collections", workspace.id())
                         .cookie(new jakarta.servlet.http.Cookie("accessToken", accessToken))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"After grant\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Before grant\"}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(put("/workspaces/{workspaceId}/roles/{roleId}/permissions", workspace.id(), role.getId())
                         .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
@@ -272,8 +272,13 @@ class WorkspaceRolePermissionIntegrationTest extends WorkspaceIntegrationSupport
                         .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshValue)))
                 .andExpect(status().isOk()).andReturn();
         String renewedAccessToken = refreshed.getResponse().getCookie("accessToken").getValue();
-        assertThat(jwtService.validateAccessToken(renewedAccessToken).orElseThrow().permissions())
-                .containsExactly("collection:create");
+        var renewedClaims = jwtService.validateAccessToken(renewedAccessToken).orElseThrow();
+        assertThat(renewedClaims.membershipId()).isEqualTo(membership.getId());
+        assertThat(renewedClaims.role()).isEqualTo(role.getName());
+        mockMvc.perform(post("/workspaces/{workspaceId}/collections", workspace.id())
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", renewedAccessToken))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"After refresh\"}"))
+                .andExpect(status().isCreated());
     }
 
     private void assertRejected(User owner, UUID workspaceId, UUID roleId, String permissions) throws Exception {

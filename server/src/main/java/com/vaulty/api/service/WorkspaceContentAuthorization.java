@@ -21,10 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WorkspaceContentAuthorization {
 
-    private static final List<String> RESOURCES =
-            List.of("workspace", "collection", "item", "member", "role", "activity");
-    private static final List<String> ACTIONS = List.of("read", "create", "update", "delete", "invite");
-
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository memberRepository;
     private final RolePermissionRepository permissionRepository;
@@ -42,7 +38,10 @@ public class WorkspaceContentAuthorization {
 
     public boolean allows(UUID userId, Workspace workspace, String resource, String action) {
         var role = requireMember(userId, workspace.getId()).getRole();
-        return role.isOwnerRole() || permissionRepository.allows(role.getId(), resource, action);
+        if (role.isOwnerRole()) {
+            return true;
+        }
+        return permissionRepository.allows(role.getId(), resource, action);
     }
 
     public boolean isOwner(UUID userId, Workspace workspace) {
@@ -85,13 +84,11 @@ public class WorkspaceContentAuthorization {
 
     public List<WorkspacePermission> rolePermissions(WorkspaceRole role) {
         if (role.isOwnerRole()) {
-            return Stream.concat(RESOURCES.stream().flatMap(resource -> ACTIONS.stream()
-                            .map(action -> new WorkspacePermission(resource, action))),
-                    Stream.of(new WorkspacePermission("group", "manage"))).toList();
+            return PermissionCatalog.effectiveOwnerPermissions();
         }
         return permissionRepository.findAllByRoleId(role.getId()).stream()
                 .flatMap(permission -> ("all".equals(permission.getAction())
-                        ? ("group".equals(permission.getResource()) ? Stream.of("manage") : ACTIONS.stream())
+                        ? PermissionCatalog.actions(permission.getResource()).stream()
                         : Stream.of(permission.getAction()))
                         .map(action -> new WorkspacePermission(permission.getResource(), action)))
                 .distinct().toList();
