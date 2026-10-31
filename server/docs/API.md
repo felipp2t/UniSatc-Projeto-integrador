@@ -3,7 +3,7 @@
 Referência detalhada de cada endpoint implementado no backend Java. Para instruções de setup e
 bootstrap do banco, veja [`../README.md`](../README.md).
 
-Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados. A gestão de grupos de acesso está disponível e cada sessão é vinculada ao vínculo atual do membro no workspace; tokens antigos não são reativados por readmissão. Compartilhamento/herança de pastas com grupos (#132/#133) e rotas de remoção de usuários continuam fora deste contrato.
+Os IDs seguem a [especificação de requisitos](../../docs/REQUISITOS.md). Esta página descreve os endpoints implementados. A gestão de grupos, concessões de compartilhamento e herança descritas abaixo estão implementadas nesta branch (#132); a integração de outras superfícies prevista em #133 é separada. Cada sessão é vinculada ao vínculo atual do membro no workspace; tokens antigos não são reativados por readmissão.
 
 Convenções gerais:
 - Todas as respostas de erro seguem o mesmo formato JSON (`GlobalExceptionHandler`):
@@ -27,7 +27,7 @@ Convenções gerais:
   por isso, a resposta HTTP confirma que o e-mail foi enfileirado, não que já foi entregue.
 - Não existe cadastro público: uma conta só nasce quando o dono do workspace envia um convite
   (RF10) e o convidado conclui o cadastro com o token recebido por e-mail (RF01/RF11), entrando no
-  workspace único da empresa com o papel `Member` (acesso inicial, sem RBAC granular ainda).
+  workspace único da empresa com o papel `Member`.
 - Cada sessão está vinculada a um `workspace_member.id`: o JWT de acesso contém `membershipId` e
   o refresh token persistido referencia o mesmo vínculo. Em cada requisição autenticada,
   `JwtAuthenticationFilter` confirma no banco que o vínculo ainda existe para o usuário do JWT e
@@ -39,9 +39,9 @@ Convenções gerais:
   anterior. A migration V20 associa refresh tokens existentes ao vínculo atual do usuário e
   descarta os que não têm vínculo. Portanto, um refresh migrado ainda válido de um membro atual
   pode emitir novo par de tokens; login sem vínculo não emite sessão.
-- Isso documenta somente o comportamento implementado nesta branch. Grupos, concessões, herança e
-  validação granular completa de conteúdo não existem aqui e pertencem às issues #132/#133; não se
-  afirma atendimento integral ao RNF04.
+- A permissão do papel autoriza ações; o acesso efetivo a pastas e itens é verificado separadamente
+  a partir do vínculo atual, concessões e herança no banco em cada requisição. Não se afirma que
+  todas as superfícies previstas em #133 estejam integradas.
 
 ---
 
@@ -581,8 +581,8 @@ segredo nem dados do anexo.
 
 Todas as rotas abaixo exigem autenticação pelo cookie `accessToken`, vínculo atual ao workspace e
 a permissão global `group/manage`. Essa permissão administra grupos e integrantes; ela não concede
-leitura nem acesso a conteúdo. A permissão pode ser atribuída pelo modelo `role_permission`, mas a
-API de administração de papéis ainda não está disponível.
+leitura nem acesso a conteúdo. Papéis podem ser administrados pela API de permissões de papel; a
+permissão de gestão de grupos é distinta de `sharing/manage`.
 
 **`GET /workspaces/{workspaceId}/groups`** lista os grupos do workspace, ordenados por nome e ID.
 Responde `200` com uma lista de `{ "id": "uuid", "name": "Equipe" }`, inclusive quando vazia.
@@ -597,9 +597,8 @@ mesmas regras de validação. Responde `200` com o grupo atualizado; conflito de
 Renomear não altera seus integrantes. Enviar o nome atual não cria evento de histórico.
 
 **`DELETE /workspaces/{workspaceId}/groups/{groupId}`** exclui um grupo vazio e responde `204`.
-Grupo com integrantes retorna `409`; os vínculos precisam ser removidos antes. O backend ainda não
-implementa concessões de acesso de conteúdo a grupos nem compartilhamento/herança de pastas (#132),
-portanto esta rota não documenta nem promete comportamento sobre concessões futuras.
+Grupo com integrantes retorna `409`; grupo usado por uma concessão de pasta também retorna `409`
+para preservar essa origem de acesso. Remova primeiro integrantes e concessões.
 
 **`GET /workspaces/{workspaceId}/groups/{groupId}/members`** lista integrantes atuais com os campos
 `workspaceMemberId`, `userId`, `name` e `email`. `workspaceMemberId` identifica o vínculo atual ao
@@ -624,6 +623,58 @@ eventos de administração de grupo são exclusivos do proprietário do workspac
 com `group/manage` não veem esse histórico. As rotas de grupo ainda não emitem notificações de mudança
 de acesso; quando essa integração for feita, deve chamar `NotificationService.accessChanged(Collection<UUID>)`
 na transação relevante. A migration V19 de grupos sucede a V18 de notificações.
+
+## Compartilhamento, herança e origens de acesso (RF45–RF47, #132)
+
+As rotas abaixo exigem cookie `accessToken` e membership atual no workspace. Alterações de concessão
+e herança exigem `sharing/manage` **e** acesso efetivo à pasta/item alvo; a permissão de ação do
+recurso também continua sendo exigida nas operações de leitura/uso do conteúdo. Portanto, editar
+conteúdo não concede `sharing/manage`, e `group/manage` não concede acesso a conteúdo. O dono tem
+acesso global e recebe `sharing/manage` inicialmente; somente ele pode delegar/remover essa
+permissão via rota mínima `PUT .../roles/{roleId}/manager`. Os papéis iniciais `Owner` e `Member`
+são protegidos. A gestão geral de papéis e seu catálogo canônico pertencem à API de papéis (#26);
+esta rota mínima cobre a delegação de compartilhamento.
+
+Concessões são persistidas no banco, não no JWT. A membership atual, membros de grupos,
+concessões e herança são consultados para cada requisição; alterações desses dados passam a valer
+na próxima requisição sem refresh do token. Alterações de permissões do papel seguem a política
+de atualização do papel documentada acima.
+
+| Método e rota | Resultado | Efeito |
+|---|---|---|
+| `PUT /workspaces/{workspaceId}/sharing/collections/{collectionId}/groups/{groupId}` | `204`, sem corpo | Concede ao grupo acesso à pasta. |
+| `DELETE /workspaces/{workspaceId}/sharing/collections/{collectionId}/groups/{groupId}` | `204`, sem corpo | Remove apenas a concessão desse grupo. |
+| `PUT /workspaces/{workspaceId}/sharing/collections/{collectionId}/everyone` | `204`, sem corpo | Concede acesso ao público atual de membros do workspace, sem expandir pessoas. |
+| `DELETE /workspaces/{workspaceId}/sharing/collections/{collectionId}/everyone` | `204`, sem corpo | Remove apenas essa concessão pública local. |
+| `PUT /workspaces/{workspaceId}/sharing/collections/{collectionId}/inheritance?enabled={true|false}` | `204`, sem corpo | Ativa ou interrompe herança da pasta. |
+| `PUT /workspaces/{workspaceId}/sharing/items/{itemId}/members/{memberId}` | `204`, sem corpo | Concede acesso direto ao item para o ID da membership atual. |
+| `DELETE /workspaces/{workspaceId}/sharing/items/{itemId}/members/{memberId}` | `204`, sem corpo | Remove apenas essa concessão individual. |
+| `GET /workspaces/{workspaceId}/sharing/items/{itemId}/origins` | `200`, array de strings | Lista as origens efetivas para o solicitante. |
+| `GET /workspaces/{workspaceId}/sharing/collections/{collectionId}/origins` | `200`, array de strings | Lista as origens efetivas para o solicitante. |
+| `PUT /workspaces/{workspaceId}/sharing/roles/{roleId}/manager?enabled={true|false}` | `204`, sem corpo | Dono atribui/remove `sharing:manage` de papel customizado. |
+
+As origens são strings tipadas: `group:{groupId}`, `member:{workspaceMemberId}`,
+`public:collection:{collectionId}` e `public:workspace-root`. As rotas de origem retornam
+somente as origens efetivas para o membro autenticado (e exigem acesso de leitura à pasta/item),
+não uma lista de todas as pessoas que podem acessar. Um item na raiz (`collectionId` nulo) tem
+origem `public:workspace-root`; itens em pasta recebem origens das concessões efetivas da pasta,
+além de eventual concessão individual ao membro. As respostas de concessão não têm DTO nem corpo;
+os IDs são UUIDs de workspace, pasta, grupo, item e membership.
+
+Pastas herdam por padrão. A raiz herda o público `public:workspace-root`; subpastas herdam as
+origens efetivas da cadeia ancestral enquanto a herança está ativa. Ao interromper herança, o
+backend copia concessões de grupo como concessões de grupo e o público como concessão pública
+local, sem materializar membros individuais. Isso mantém a audiência atual; para restringir a
+pasta, remova as concessões amplas da pasta. Ao reativar, as origens atuais do pai voltam a ser
+incluídas e as concessões locais permanecem como acessos adicionais. Itens herdam o acesso efetivo
+da pasta e podem ter concessões individuais adicionais.
+
+Remover uma origem não revoga outras: por exemplo, apagar `member:{id}` mantém acesso que venha
+de grupo ou público. Remover uma membership invalida as associações daquele vínculo; uma
+readmissão cria outro ID e não revive uma concessão individual ligada ao vínculo antigo. Mudanças
+na composição dos grupos também são refletidas na requisição seguinte. Grupo com membros ou com
+concessões de pasta não pode ser excluído (`409`). IDs ausentes/fora do workspace retornam `404`;
+falta de vínculo/permissão retorna `403`, e alvo sem acesso efetivo é ocultado como `404`.
 
 ## Histórico de atividades
 
@@ -798,6 +849,13 @@ fan-out pertence às issues #42 e #132.
 | #38 | DELETE | `/workspaces/{workspaceId}/items/{itemId}?confirm=true` | Cookie `accessToken` |
 | RF31 | POST | `/workspaces/{workspaceId}/items/{itemId}/archive` | Cookie `accessToken` |
 | RF32 | POST | `/workspaces/{workspaceId}/items/{itemId}/restore` | Cookie `accessToken` |
+| RF45–RF47 | PUT/DELETE | `/workspaces/{workspaceId}/sharing/collections/{collectionId}/groups/{groupId}` | Cookie `accessToken` + `sharing/manage` + acesso ao alvo |
+| RF45–RF47 | PUT/DELETE | `/workspaces/{workspaceId}/sharing/collections/{collectionId}/everyone` | Cookie `accessToken` + `sharing/manage` + acesso ao alvo |
+| RF46 | PUT | `/workspaces/{workspaceId}/sharing/collections/{collectionId}/inheritance` | Cookie `accessToken` + `sharing/manage` + acesso ao alvo |
+| RF45 | PUT/DELETE | `/workspaces/{workspaceId}/sharing/items/{itemId}/members/{memberId}` | Cookie `accessToken` + `sharing/manage` + acesso ao alvo |
+| RF47 | GET | `/workspaces/{workspaceId}/sharing/items/{itemId}/origins` | Cookie `accessToken` + leitura/acesso ao alvo |
+| RF47 | GET | `/workspaces/{workspaceId}/sharing/collections/{collectionId}/origins` | Cookie `accessToken` + leitura/acesso ao alvo |
+| RF45 | PUT | `/workspaces/{workspaceId}/sharing/roles/{roleId}/manager` | Cookie `accessToken`, somente dono |
 | RF36 | GET | `/workspaces/{workspaceId}/activity` | Cookie `accessToken` |
 | RF— | GET | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |
 | RF— | POST | `/workspaces/{workspaceId}/groups` | Cookie `accessToken` + `group/manage` |

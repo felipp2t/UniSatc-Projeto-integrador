@@ -63,6 +63,7 @@ public class WorkspaceItemAttachmentService {
     private final WorkspaceItemMediaRepository mediaRepository;
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceContentAuthorization authorization;
+    private final EffectiveContentAccess contentAccess;
     private final ObjectProvider<ObjectStorage> storageProvider;
     private final ActivityLogService activityLogService;
 
@@ -75,6 +76,7 @@ public class WorkspaceItemAttachmentService {
         var collection = collectionId == null ? null
                 : collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                         .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
+        if (collection != null) contentAccess.requireCollection(userId, workspace, collection.getId());
         validateTitle(title);
 
         var item = new WorkspaceItem();
@@ -115,6 +117,7 @@ public class WorkspaceItemAttachmentService {
         var workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "update");
         var item = attachmentItemForUpdate(workspaceId, itemId);
+        contentAccess.requireItem(userId, workspace, itemId);
         var oldFile = fileRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Anexo não encontrado"));
         var upload = validate(file);
@@ -153,6 +156,7 @@ public class WorkspaceItemAttachmentService {
         var workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "update");
         var item = attachmentItemForUpdate(workspaceId, itemId);
+        contentAccess.requireItem(userId, workspace, itemId);
         validateTitle(request.title());
         String description = normalizeDescription(request.description());
         var file = fileRepository.findById(itemId)
@@ -178,6 +182,7 @@ public class WorkspaceItemAttachmentService {
         var workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         var item = attachmentItemForRead(workspaceId, itemId);
+        contentAccess.requireItem(userId, workspace, itemId);
         var file = fileRepository.findById(item.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Anexo não encontrado"));
         return new AttachmentDownload(requireStorage().get(file.getStorageKey()), file.getOriginalName(), file.getMimeType(),
