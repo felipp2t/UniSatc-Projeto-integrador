@@ -13,6 +13,7 @@ import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ValidationException;
 import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
+import com.vaulty.api.repository.WorkspaceMemberRepository;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,16 +28,22 @@ public class WorkspaceRolePermissionService {
     private final WorkspaceRoleRepository roleRepository;
     private final RolePermissionRepository permissionRepository;
     private final ActivityLogService activityLogService;
+    private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final NotificationService notificationService;
 
     public WorkspaceRolePermissionService(
             WorkspaceService workspaceService,
             WorkspaceRoleRepository roleRepository,
             RolePermissionRepository permissionRepository,
-            ActivityLogService activityLogService) {
+            ActivityLogService activityLogService,
+            WorkspaceMemberRepository workspaceMemberRepository,
+            NotificationService notificationService) {
         this.workspaceService = workspaceService;
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.activityLogService = activityLogService;
+        this.workspaceMemberRepository = workspaceMemberRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -55,6 +62,7 @@ public class WorkspaceRolePermissionService {
     @Transactional
     public RolePermissionsResponse replacePermissions(
             UUID userId, UUID workspaceId, UUID roleId, RolePermissionsRequest request) {
+        workspaceService.lockWorkspace(workspaceId);
         requireOwner(userId, workspaceId);
         WorkspaceRole role = findRoleForUpdate(roleId, workspaceId);
         if (role.isProtected()) {
@@ -75,6 +83,7 @@ public class WorkspaceRolePermissionService {
         List<WorkspacePermission> previous = previousEntities.stream()
                 .map(permission -> new WorkspacePermission(permission.getResource(), permission.getAction()))
                 .toList();
+        boolean permissionsChanged = !new HashSet<>(previous).equals(new HashSet<>(requested));
         permissionRepository.deleteAllByRoleId(roleId);
         List<RolePermission> replacements = requested.stream().map(permission -> {
             RolePermission rolePermission = new RolePermission();
@@ -84,6 +93,10 @@ public class WorkspaceRolePermissionService {
             return rolePermission;
         }).toList();
         permissionRepository.saveAllAndFlush(replacements);
+        if (permissionsChanged) {
+            notificationService.accessChanged(workspaceMemberRepository.findAllByWorkspaceIdAndRoleId(workspaceId, roleId)
+                    .stream().map(member -> member.getUser().getId()).toList());
+        }
 
         activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
                 ActivityAction.ROLE_PERMISSIONS_CHANGED, ActivityResourceType.ROLE, roleId,

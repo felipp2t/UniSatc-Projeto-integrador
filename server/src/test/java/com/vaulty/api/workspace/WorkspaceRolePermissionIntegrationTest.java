@@ -12,6 +12,7 @@ import com.vaulty.api.entity.RolePermission;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.RefreshTokenRepository;
+import com.vaulty.api.repository.NotificationRepository;
 import com.vaulty.api.service.JwtService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +40,35 @@ class WorkspaceRolePermissionIntegrationTest extends WorkspaceIntegrationSupport
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired private NotificationRepository notificationRepository;
+
+    @Test
+    void changedRolePermissionsNotifyItsMembersOnceAndNoopDoesNotDuplicate() throws Exception {
+        User owner = createUser("Owner");
+        User member = createUser("Role member");
+        var workspace = configureWorkspace(owner);
+        WorkspaceRole role = createRole(workspace.id(), "Auditor");
+        addMemberToRole(member, workspace.id(), role);
+        notificationRepository.deleteAll();
+        String body = "{\"permissions\":[{\"resource\":\"collection\",\"action\":\"create\"},"
+                + "{\"resource\":\"activity\",\"action\":\"read\"}]}";
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/roles/{roleId}/permissions", workspace.id(), role.getId())
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/workspaces/{workspaceId}/roles/{roleId}/permissions", workspace.id(), role.getId())
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+
+        assertThat(notificationRepository.findAll()).filteredOn(n -> n.getRecipient().getId().equals(member.getId()))
+                .extracting(n -> n.getMetadata().get("event")).containsExactly("ACCESS_CHANGED");
+    }
+
+    private void addMemberToRole(User user, UUID workspaceId, WorkspaceRole role) {
+        var workspaceEntity = workspaceRepository.findById(workspaceId).orElseThrow();
+        var membership = workspaceMapper.toMember(user, workspaceEntity, role);
+        workspaceMemberRepository.saveAndFlush(membership);
+    }
 
     @Test
     void ownerCanReadCatalogAndRolePermissionsAndReplaceThemWithEmptyOrCatalogEntries() throws Exception {
@@ -199,7 +229,8 @@ class WorkspaceRolePermissionIntegrationTest extends WorkspaceIntegrationSupport
             awaitBlockedRequests(1);
             Future<Integer> second = requests.submit(() -> replaceConcurrently(
                     workspace.id(), role.getId(), ownerCookie, secondRequest));
-            awaitBlockedRequests(2);
+            // The second request waits for the canonical workspace lock before it can lock the role.
+            awaitBlockedRequests(1);
 
             releaseLock.countDown();
             blocker.get(5, TimeUnit.SECONDS);

@@ -36,6 +36,7 @@ public class AccessGroupService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceContentAuthorization authorization;
     private final ActivityLogService activityLogService;
+    private final WorkspaceAccessNotifications accessNotifications;
 
     @Transactional
     public AccessGroupResponse create(UUID userId, UUID workspaceId, AccessGroupRequest request) {
@@ -124,6 +125,7 @@ public class AccessGroupService {
 
     @Transactional
     public void addMember(UUID userId, UUID workspaceId, UUID groupId, UUID workspaceMemberId) {
+        accessNotifications.lockWorkspace(workspaceId);
         requireManager(userId, workspaceId);
         var group = findGroupForUpdate(groupId, workspaceId);
         var workspaceMember = workspaceMemberRepository.findByIdAndWorkspaceId(workspaceMemberId, workspaceId)
@@ -132,11 +134,13 @@ public class AccessGroupService {
                 groupId, workspaceId, workspaceMemberId).isPresent()) {
             return;
         }
+        var before = accessNotifications.snapshot(workspaceId);
         var groupMember = new AccessGroupMember();
         groupMember.setGroup(group);
         groupMember.setWorkspaceMember(workspaceMember);
         groupMember.setWorkspaceId(workspaceId);
         groupMemberRepository.saveAndFlush(groupMember);
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspaceId));
         activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
                 ActivityAction.GROUP_MEMBER_ADDED, ActivityResourceType.GROUP, groupId,
                 Map.of("groupId", groupId, "workspaceMemberId", workspaceMemberId));
@@ -144,6 +148,7 @@ public class AccessGroupService {
 
     @Transactional
     public void removeMember(UUID userId, UUID workspaceId, UUID groupId, UUID workspaceMemberId) {
+        accessNotifications.lockWorkspace(workspaceId);
         requireManager(userId, workspaceId);
         findGroupForUpdate(groupId, workspaceId);
         var groupMember = groupMemberRepository.findByGroupIdAndWorkspaceIdAndWorkspaceMemberId(
@@ -151,7 +156,9 @@ public class AccessGroupService {
         if (groupMember.isEmpty()) {
             return;
         }
+        var before = accessNotifications.snapshot(workspaceId);
         groupMemberRepository.delete(groupMember.get());
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspaceId));
         activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
                 ActivityAction.GROUP_MEMBER_REMOVED, ActivityResourceType.GROUP, groupId,
                 Map.of("groupId", groupId, "workspaceMemberId", workspaceMemberId));

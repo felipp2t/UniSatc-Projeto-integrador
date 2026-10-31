@@ -27,6 +27,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
 @AutoConfigureMockMvc
@@ -47,7 +48,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void loginAsOwnerEmbedsTheOwnerRoleInTheAccessToken() throws Exception {
-        MvcResult result = mockMvc.perform(post("/auth/login")
+        MvcResult result = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 { "email": "%s", "password": "%s" }
@@ -68,7 +69,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
     void registeringThroughAnInviteEmbedsTheMemberRoleInTheAccessToken() throws Exception {
         UserInvite invite = createInvite("colaborador@example.com");
 
-        MvcResult result = mockMvc.perform(post("/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register").with(uniqueRemoteAddress())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -94,7 +95,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
     @Test
     @Transactional
     void refreshRecalculatesTheRoleFromTheCurrentMembership() throws Exception {
-        MvcResult login = mockMvc.perform(post("/auth/login")
+        MvcResult login = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 { "email": "%s", "password": "%s" }
@@ -197,12 +198,19 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
     }
 
     private MvcResult loginAsAdmin() throws Exception {
-        return mockMvc.perform(post("/auth/login")
+        return mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 { "email": "%s", "password": "%s" }
                                 """.formatted(ADMIN_EMAIL, ADMIN_PASSWORD)))
                 .andExpect(status().isOk()).andReturn();
+    }
+
+    private RequestPostProcessor uniqueRemoteAddress() {
+        return request -> {
+            request.setRemoteAddr(UUID.randomUUID().toString());
+            return request;
+        };
     }
 
     private UserInvite createInvite(String email) {

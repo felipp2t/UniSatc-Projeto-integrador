@@ -3,6 +3,7 @@ package com.vaulty.api.service;
 import com.vaulty.api.dto.workspace.ChangeMemberRoleRequest;
 import com.vaulty.api.dto.workspace.WorkspaceMemberResponse;
 import com.vaulty.api.entity.WorkspaceRole;
+import com.vaulty.api.entity.User;
 import com.vaulty.api.enums.ActivityAction;
 import com.vaulty.api.enums.ActivityActorContext;
 import com.vaulty.api.enums.ActivityResourceType;
@@ -29,8 +30,8 @@ public class WorkspaceMemberService {
     private final WorkspaceMapper workspaceMapper;
     private final WorkspaceContentAuthorization authorization;
     private final ActivityLogService activityLogService;
-    private final NotificationService notificationService;
     private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceAccessNotifications accessNotifications;
 
     @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> list(UUID userId, UUID workspaceId) {
@@ -65,13 +66,14 @@ public class WorkspaceMemberService {
             throw new ConflictException("O workspace precisa manter ao menos um dono");
         }
 
+        var before = accessNotifications.snapshot(workspaceId);
         member.setRole(role);
         workspaceMemberRepository.saveAndFlush(member);
         activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
                 ActivityAction.MEMBER_ROLE_CHANGED, ActivityResourceType.MEMBER, memberId,
                 Map.of("workspaceMemberId", memberId, "previousRoleId", previousRole.getId(),
                         "roleId", role.getId()));
-        notificationService.accessChanged(List.of(member.getUser().getId()));
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspaceId));
         return workspaceMapper.toResponse(member, true);
     }
 
@@ -85,6 +87,8 @@ public class WorkspaceMemberService {
         }
         var member = workspaceMemberRepository.findByIdAndWorkspaceId(membershipId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Membro não encontrado"));
+        var removedUser = member.getUser();
+        User successor = null;
         if (member.getRole().isOwnerRole()) {
             var owners = workspaceMemberRepository.findOwners(workspaceId, WorkspaceRole.OWNER_ROLE_NAME);
             var otherOwners = owners.stream()
@@ -94,15 +98,19 @@ public class WorkspaceMemberService {
                 throw new ConflictException("O workspace precisa manter ao menos um dono");
             }
             if (workspace.getOwner().getId().equals(member.getUser().getId())) {
-                workspace.setOwner(otherOwners.get(0).getUser());
-                workspaceRepository.save(workspace);
+                successor = otherOwners.get(0).getUser();
             }
         }
-        var removedUser = member.getUser();
+        var before = accessNotifications.snapshot(workspaceId);
+        if (successor != null) {
+            workspace.setOwner(successor);
+            workspaceRepository.save(workspace);
+        }
         activityLogService.record(workspaceId, userId, ActivityActorContext.USER, ActivityAction.MEMBER_REMOVED,
                 ActivityResourceType.MEMBER, membershipId,
                 Map.of("userId", removedUser.getId(), "name", removedUser.getName(),
                         "email", removedUser.getEmail(), "role", member.getRole().getName()));
         workspaceMemberRepository.delete(member);
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspaceId));
     }
 }

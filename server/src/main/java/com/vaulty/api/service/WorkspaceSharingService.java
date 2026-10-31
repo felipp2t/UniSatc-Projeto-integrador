@@ -2,8 +2,8 @@ package com.vaulty.api.service;
 
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.ConflictException;
-import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
+import com.vaulty.api.exception.ForbiddenException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +18,8 @@ public class WorkspaceSharingService {
     private final WorkspaceContentAuthorization authorization;
     private final EffectiveContentAccess access;
     private final WorkspaceRoleRepository roleRepository;
+    private final WorkspaceAccessNotifications accessNotifications;
+    private final NotificationService notifications;
 
     @Transactional
     public void grantGroup(UUID user, UUID workspace, UUID collection, UUID group) {
@@ -26,28 +28,36 @@ public class WorkspaceSharingService {
         access.requireCollection(user, authorization.requireWorkspace(user, workspace), collection);
         if (!exists("SELECT EXISTS(SELECT 1 FROM access_group WHERE id=? AND workspace_id=?)", group, workspace))
             throw new ResourceNotFoundException("Grupo não encontrado");
-        jdbc.update("INSERT INTO collection_access_grant(collection_id,group_id,workspace_id) VALUES (?,?,?) ON CONFLICT DO NOTHING", collection, group, workspace);
+        var before = accessNotifications.snapshot(workspace);
+        if (jdbc.update("INSERT INTO collection_access_grant(collection_id,group_id,workspace_id) VALUES (?,?,?) ON CONFLICT DO NOTHING", collection, group, workspace) > 0)
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
     }
 
     @Transactional
     public void revokeGroup(UUID user, UUID workspace, UUID collection, UUID group) {
         requireManager(user, workspace); requireCollection(workspace, collection);
         access.requireCollection(user, authorization.requireWorkspace(user, workspace), collection);
-        jdbc.update("DELETE FROM collection_access_grant WHERE collection_id=? AND group_id=?", collection, group);
+        var before = accessNotifications.snapshot(workspace);
+        if (jdbc.update("DELETE FROM collection_access_grant WHERE collection_id=? AND group_id=?", collection, group) > 0)
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
     }
 
     @Transactional
     public void grantEveryone(UUID user, UUID workspace, UUID collection) {
         requireManager(user, workspace); requireCollection(workspace, collection);
         access.requireCollection(user, authorization.requireWorkspace(user, workspace), collection);
-        jdbc.update("INSERT INTO collection_public_grant(collection_id,workspace_id) VALUES (?,?) ON CONFLICT DO NOTHING", collection, workspace);
+        var before = accessNotifications.snapshot(workspace);
+        if (jdbc.update("INSERT INTO collection_public_grant(collection_id,workspace_id) VALUES (?,?) ON CONFLICT DO NOTHING", collection, workspace) > 0)
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
     }
 
     @Transactional
     public void revokeEveryone(UUID user, UUID workspace, UUID collection) {
         requireManager(user, workspace); requireCollection(workspace, collection);
         access.requireCollection(user, authorization.requireWorkspace(user, workspace), collection);
-        jdbc.update("DELETE FROM collection_public_grant WHERE collection_id=?", collection);
+        var before = accessNotifications.snapshot(workspace);
+        if (jdbc.update("DELETE FROM collection_public_grant WHERE collection_id=?", collection) > 0)
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
     }
 
     @Transactional
@@ -56,6 +66,7 @@ public class WorkspaceSharingService {
         access.requireCollection(user, authorization.requireWorkspace(user, workspace), collection);
         boolean current = jdbc.queryForObject("SELECT inherit_access FROM collection WHERE id=?", Boolean.class, collection);
         if (current == enabled) return;
+        var before = accessNotifications.snapshot(workspace);
         if (!enabled) {
             List<UUID> parentGroups = jdbc.queryForList("""
                     WITH RECURSIVE chain AS (
@@ -79,6 +90,7 @@ public class WorkspaceSharingService {
             if (parentPublic) jdbc.update("INSERT INTO collection_public_grant(collection_id,workspace_id) VALUES (?,?) ON CONFLICT DO NOTHING", collection, workspace);
         }
         jdbc.update("UPDATE collection SET inherit_access=? WHERE id=?", enabled, collection);
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
     }
 
     @Transactional
@@ -87,14 +99,18 @@ public class WorkspaceSharingService {
         access.requireItem(user, authorization.requireWorkspace(user, workspace), item);
         if (!exists("SELECT EXISTS(SELECT 1 FROM workspace_member WHERE id=? AND workspace_id=?)", member, workspace))
             throw new ResourceNotFoundException("Integrante não encontrado");
-        jdbc.update("INSERT INTO item_member_grant(item_id,workspace_member_id,workspace_id) VALUES (?,?,?) ON CONFLICT DO NOTHING", item, member, workspace);
+        var before = accessNotifications.snapshot(workspace);
+        if (jdbc.update("INSERT INTO item_member_grant(item_id,workspace_member_id,workspace_id) VALUES (?,?,?) ON CONFLICT DO NOTHING", item, member, workspace) > 0)
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
     }
 
     @Transactional
     public void revokeMember(UUID user, UUID workspace, UUID item, UUID member) {
         requireManager(user, workspace); requireItem(workspace, item);
         access.requireItem(user, authorization.requireWorkspace(user, workspace), item);
-        jdbc.update("DELETE FROM item_member_grant WHERE item_id=? AND workspace_member_id=?", item, member);
+        var before = accessNotifications.snapshot(workspace);
+        if (jdbc.update("DELETE FROM item_member_grant WHERE item_id=? AND workspace_member_id=?", item, member) > 0)
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +131,7 @@ public class WorkspaceSharingService {
 
     @Transactional
     public void setRoleSharingPermission(UUID user, UUID workspaceId, UUID roleId, boolean enabled) {
+        accessNotifications.lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(user, workspaceId);
         if (!workspace.getOwner().getId().equals(user))
             throw new ForbiddenException("Somente o dono pode alterar permissões de papéis");
@@ -122,14 +139,19 @@ public class WorkspaceSharingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Papel não encontrado"));
         if ("Owner".equals(role.getName()) || "Member".equals(role.getName()))
             throw new ConflictException("Papéis iniciais não podem ser alterados");
+        List<UUID> affected = jdbc.queryForList(
+                "SELECT user_id FROM workspace_member WHERE workspace_id=? AND role_id=?", UUID.class, workspaceId, roleId);
+        int changed;
         if (enabled) {
-            jdbc.update("INSERT INTO role_permission(role_id,resource,action) VALUES (?,'sharing','manage') ON CONFLICT DO NOTHING", roleId);
+            changed = jdbc.update("INSERT INTO role_permission(role_id,resource,action) VALUES (?,'sharing','manage') ON CONFLICT DO NOTHING", roleId);
         } else {
-            jdbc.update("DELETE FROM role_permission WHERE role_id=? AND resource='sharing' AND action='manage'", roleId);
+            changed = jdbc.update("DELETE FROM role_permission WHERE role_id=? AND resource='sharing' AND action='manage'", roleId);
         }
+        if (changed > 0) notifications.accessChanged(affected);
     }
 
     private void requireManager(UUID user, UUID workspaceId) {
+        accessNotifications.lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(user, workspaceId);
         authorization.require(user, workspace, "sharing", "manage");
     }
