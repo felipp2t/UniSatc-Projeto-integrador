@@ -13,12 +13,15 @@ class CorsConfigTest {
     @Test
     void normalizesConfiguredFrontendUrlToAnOrigin() {
         assertThat(CorsConfig.allowedOrigin(" HTTP://LocalHost:5173/ ")).isEqualTo("http://localhost:5173");
+        assertThat(CorsConfig.allowedOrigin("http://localhost:80")).isEqualTo("http://localhost");
+        assertThat(CorsConfig.allowedOrigin("https://app.vaulty.example:443")).isEqualTo("https://app.vaulty.example");
         assertThat(CorsConfig.allowedOrigin("https://app.vaulty.example")).isEqualTo("https://app.vaulty.example");
     }
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = {"*", "   ", "localhost:5173", "ftp://files.example", "not a url"})
+    @ValueSource(strings = {"*", "   ", "localhost:5173", "ftp://files.example", "not a url",
+            "https://files.example:65536"})
     void rejectsWildcardOrInvalidFrontendUrl(String frontendUrl) {
         assertThatThrownBy(() -> CorsConfig.allowedOrigin(frontendUrl))
                 .isInstanceOf(IllegalStateException.class);

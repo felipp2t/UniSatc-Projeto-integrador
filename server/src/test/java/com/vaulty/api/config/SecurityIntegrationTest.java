@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "jwt.access-token-expiration-ms=-1000")
@@ -55,6 +56,13 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     void returnsDocumentedJsonForExpiredToken() throws Exception {
         String expiredToken = jwtService.generateAccessToken(UUID.randomUUID(), UUID.randomUUID(), null);
         assertUnauthorized(mockMvc.perform(get("/me").cookie(new Cookie("accessToken", expiredToken))));
+    }
+
+    @Test
+    @WithMockUser(authorities = "ACCOUNT_ONLY")
+    void accountOnlyAuthorityCannotAccessWorkspaceRoutes() throws Exception {
+        mockMvc.perform(get("/workspaces"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

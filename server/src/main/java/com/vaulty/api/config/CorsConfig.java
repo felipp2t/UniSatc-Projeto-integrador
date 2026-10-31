@@ -40,10 +40,16 @@ public class CorsConfig {
             throw new IllegalStateException("app.frontend-url deve ser uma URL http(s) válida", exception);
         }
         String scheme = uri.getScheme();
-        if (uri.getHost() == null || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
+        if (uri.getHost() == null || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+                || uri.getPort() > 65535) {
             throw new IllegalStateException("app.frontend-url deve ser uma URL http(s) válida");
         }
-        String port = uri.getPort() == -1 ? "" : ":" + uri.getPort();
+        int portNumber = uri.getPort();
+        if (("http".equalsIgnoreCase(scheme) && portNumber == 80)
+                || ("https".equalsIgnoreCase(scheme) && portNumber == 443)) {
+            portNumber = -1;
+        }
+        String port = portNumber == -1 ? "" : ":" + portNumber;
         return scheme.toLowerCase(Locale.ROOT) + "://" + uri.getHost().toLowerCase(Locale.ROOT) + port;
     }
 }
