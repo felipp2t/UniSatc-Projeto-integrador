@@ -1,57 +1,46 @@
 import { describe, expect, it } from 'vitest'
-import { getMemberPermissions } from './member-permissions'
+import { getMemberPermissions, isWorkspaceOwner } from './member-permissions'
 
 describe('workspace member permissions', () => {
-  it('protects the workspace owner ID even when management is available', () => {
-    expect(
-      getMemberPermissions({
-        currentUserId: 'owner',
-        memberUserId: 'owner',
-        workspaceOwnerId: 'owner',
-      })
-    ).toMatchObject({
-      isLastOwner: true,
-      isSelf: true,
-      removeReason: 'O último dono do workspace não pode ser removido.',
-    })
+  it('recognizes only the exact Owner role returned by the server', () => {
+    expect(isWorkspaceOwner('Owner')).toBe(true)
+    expect(isWorkspaceOwner('owner')).toBe(false)
+    expect(isWorkspaceOwner(undefined)).toBe(false)
   })
 
-  it('preserves the owner request while disabling confirmation without API support', () => {
+  it('allows co-owners to remove other members when supported by the API', () => {
     expect(
       getMemberPermissions({
-        currentUserId: 'owner',
-        memberUserId: 'member',
-        workspaceOwnerId: 'owner',
+        currentUserRole: 'Owner',
+        memberRoleName: 'member',
+        ownerCount: 2,
       })
-    ).toMatchObject({
-      changeRoleReason:
-        'A alteração de cargo ainda não está disponível na API.',
+    ).toEqual({
       removeReason: 'A remoção ainda não está disponível na API do servidor.',
     })
   })
 
-  it('prioritizes self and last-owner explanations over API availability', () => {
-    const self = getMemberPermissions({
-      currentUserId: 'owner',
-      memberUserId: 'owner',
-      workspaceOwnerId: 'owner',
-    })
-    expect(self.changeRoleReason).toBe('Você não pode alterar o próprio cargo.')
-    expect(self.removeReason).toBe(
-      'O último dono do workspace não pode ser removido.'
-    )
-  })
-
-  it('denies management to a non-owner', () => {
+  it('denies removal when the current member is not an Owner', () => {
     expect(
       getMemberPermissions({
-        currentUserId: 'member',
-        memberUserId: 'other',
-        workspaceOwnerId: 'owner',
+        currentUserRole: 'member',
+        memberRoleName: 'Owner',
+        ownerCount: 1,
       })
-    ).toMatchObject({
-      changeRoleReason: 'Somente um dono pode alterar cargos.',
+    ).toEqual({
       removeReason: 'Somente um dono pode remover membros.',
+    })
+  })
+
+  it('protects the last Owner from removal', () => {
+    expect(
+      getMemberPermissions({
+        currentUserRole: 'Owner',
+        memberRoleName: 'Owner',
+        ownerCount: 1,
+      })
+    ).toEqual({
+      removeReason: 'O último dono do workspace não pode ser removido.',
     })
   })
 })

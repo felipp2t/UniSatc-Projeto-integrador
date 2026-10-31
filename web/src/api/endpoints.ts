@@ -51,6 +51,21 @@ export const userApi = {
 }
 
 export const workspaceApi = {
+  changeMemberRole: async (
+    workspaceId: string,
+    memberId: string,
+    roleId: string
+  ) => {
+    const response = await apiClient.put<unknown>(
+      `/workspaces/${workspaceId}/members/${memberId}/role`,
+      { roleId }
+    )
+    const parsed = workspaceMemberSchema.safeParse(response.data)
+    if (!parsed.success) {
+      throw new Error('A resposta da API contém um membro inválido.')
+    }
+    return { ...response, data: parsed.data }
+  },
   get: (workspaceId: string) =>
     apiClient.get<WorkspaceResponse>(`/workspaces/${workspaceId}`),
   list: () => apiClient.get<WorkspaceResponse[]>('/workspaces'),
@@ -71,21 +86,6 @@ export const workspaceApi = {
     const parsed = workspaceRolesSchema.safeParse(response.data)
     if (!parsed.success) {
       throw new Error('A resposta da API contém cargos inválidos.')
-    }
-    return { ...response, data: parsed.data }
-  },
-  changeMemberRole: async (
-    workspaceId: string,
-    memberId: string,
-    roleId: string
-  ) => {
-    const response = await apiClient.put<unknown>(
-      `/workspaces/${workspaceId}/members/${memberId}/role`,
-      { roleId }
-    )
-    const parsed = workspaceMemberSchema.safeParse(response.data)
-    if (!parsed.success) {
-      throw new Error('A resposta da API contém um membro inválido.')
     }
     return { ...response, data: parsed.data }
   },

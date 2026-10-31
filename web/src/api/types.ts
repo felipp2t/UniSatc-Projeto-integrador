@@ -83,6 +83,8 @@ export type UpdateWorkspaceRequest =
 export type UserResponse = components['schemas']['UserResponse']
 export type WorkspaceMemberDto =
   components['schemas']['WorkspaceMemberResponse']
-export type { WorkspaceMemberResponse } from './workspace-members'
-export type { WorkspaceRoleResponse } from './workspace-members'
+export type {
+  WorkspaceMemberResponse,
+  WorkspaceRoleResponse,
+} from './workspace-members'
 export type WorkspaceResponse = components['schemas']['WorkspaceResponse']

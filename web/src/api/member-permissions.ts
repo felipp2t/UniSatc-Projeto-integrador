@@ -1,36 +1,21 @@
 export type MemberPermissions = ReturnType<typeof getMemberPermissions>
 
-export function isWorkspaceOwner(
-  currentUserId: string | undefined,
-  workspaceOwnerId: string | undefined
-) {
-  return Boolean(currentUserId && currentUserId === workspaceOwnerId)
+export function isWorkspaceOwner(roleName: string | undefined) {
+  return roleName === 'Owner'
 }
 
 export function getMemberPermissions({
-  currentUserId,
-  workspaceOwnerId,
-  memberUserId,
+  currentUserRole,
+  memberRoleName,
+  ownerCount,
 }: {
-  currentUserId: string | undefined
-  workspaceOwnerId: string | undefined
-  memberUserId: string
+  currentUserRole: string | undefined
+  memberRoleName: string
+  ownerCount: number
 }) {
-  const isOwner = isWorkspaceOwner(currentUserId, workspaceOwnerId)
-  const isSelf = currentUserId === memberUserId
-  const isLastOwner = Boolean(
-    workspaceOwnerId && memberUserId === workspaceOwnerId
-  )
+  const isLastOwner = isWorkspaceOwner(memberRoleName) && ownerCount === 1
   return {
-    changeRoleReason: isOwner
-      ? isSelf
-        ? 'Você não pode alterar o próprio cargo.'
-        : 'A alteração de cargo ainda não está disponível na API.'
-      : 'Somente um dono pode alterar cargos.',
-    isLastOwner,
-    isOwner,
-    isSelf,
-    removeReason: isOwner
+    removeReason: isWorkspaceOwner(currentUserRole)
       ? isLastOwner
         ? 'O último dono do workspace não pode ser removido.'
         : 'A remoção ainda não está disponível na API do servidor.'

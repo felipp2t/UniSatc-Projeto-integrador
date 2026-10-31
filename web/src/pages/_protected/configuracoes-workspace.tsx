@@ -13,9 +13,11 @@ import {
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
+import { getApiErrorMessage } from '@/api/get-api-error-message'
 import { isForbiddenOrNotFound } from '@/api/http-status'
 import {
   getMemberPermissions,
+  isWorkspaceOwner,
   type MemberPermissions,
 } from '@/api/member-permissions'
 import type {
@@ -30,6 +32,14 @@ import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
@@ -42,8 +52,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { appToast } from '@/components/ui/toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { appToast } from '@/components/ui/toast'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
@@ -55,6 +65,11 @@ function WorkspaceSettingsPage() {
   const { session } = Route.useRouteContext()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
+  const [pendingRoleChange, setPendingRoleChange] = useState<{
+    member: WorkspaceMemberResponse
+    roleId: string
+    roleName: string
+  } | null>(null)
   const queryClient = useQueryClient()
   const workspaces = useCurrentWorkspace()
   const currentWorkspace = workspaces.data
@@ -67,10 +82,12 @@ function WorkspaceSettingsPage() {
     },
     queryKey: workspaceMembersQueryKey(workspaceId),
   })
+  const currentUserRole = members.data?.find(
+    (member) => member.userId === session.user?.id
+  )?.roleName
+  const isOwner = isWorkspaceOwner(currentUserRole)
   const roles = useQuery({
-    enabled: Boolean(workspaceId && members.data?.some(
-      (member) => member.userId === session.user?.id && member.roleName.toLocaleLowerCase() === 'owner'
-    )),
+    enabled: Boolean(workspaceId && isOwner),
     queryFn: async () => {
       if (!workspaceId) throw new Error('Workspace indisponível.')
       return (await workspaceApi.listRoles(workspaceId)).data
@@ -87,28 +104,58 @@ function WorkspaceSettingsPage() {
     await roles.refetch()
   }, [roles.refetch])
   const changeRole = useMutation({
-    mutationFn: ({ memberId, roleId }: { memberId: string; roleId: string }) => {
+    mutationFn: ({
+      memberId,
+      roleId,
+    }: {
+      memberId: string
+      roleId: string
+    }) => {
       if (!workspaceId) throw new Error('Workspace indisponível.')
       return workspaceApi.changeMemberRole(workspaceId, memberId, roleId)
     },
-    onError: () => appToast.error('Não foi possível alterar o cargo.'),
+    onError: (error) =>
+      appToast.error(
+        getApiErrorMessage(error, {
+          fallback: 'Não foi possível alterar o cargo.',
+          statusMessages: {
+            409: 'O servidor recusou a alteração para proteger o último dono do workspace.',
+          },
+        })
+      ),
     onSuccess: async () => {
       appToast.success('Cargo alterado com sucesso.')
-      await queryClient.invalidateQueries({
-        queryKey: workspaceMembersQueryKey(workspaceId),
-      })
-      await queryClient.invalidateQueries({
-        queryKey: workspaceRolesQueryKey(workspaceId),
-      })
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: workspaceMembersQueryKey(workspaceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: workspaceRolesQueryKey(workspaceId),
+        }),
+      ])
     },
   })
-  const isOwner = Boolean(
-    members.data?.some(
-      (member) =>
-        member.userId === session.user?.id &&
-        member.roleName.toLocaleLowerCase() === 'owner'
-    )
+  const handleRoleSelection = useCallback(
+    (member: WorkspaceMemberResponse, roleId: string) => {
+      const roleName = roles.data?.find((role) => role.id === roleId)?.name
+      if (roleName) setPendingRoleChange({ member, roleId, roleName })
+    },
+    [roles.data]
   )
+  const handleRoleDialogOpenChange = useCallback((open: boolean) => {
+    if (!open) setPendingRoleChange(null)
+  }, [])
+  const handleCancelRoleChange = useCallback(() => {
+    setPendingRoleChange(null)
+  }, [])
+  const handleConfirmRoleChange = useCallback(() => {
+    if (!pendingRoleChange) return
+    changeRole.mutate({
+      memberId: pendingRoleChange.member.id,
+      roleId: pendingRoleChange.roleId,
+    })
+    setPendingRoleChange(null)
+  }, [changeRole.mutate, pendingRoleChange])
   const roleNames = useMemo(
     () =>
       [
@@ -237,43 +284,18 @@ function WorkspaceSettingsPage() {
                 </Select>
               </div>
               <MembersList
-                currentUserId={session.user?.id}
+                currentUserRole={currentUserRole}
                 filteredMembers={filteredMembers}
+                isChangingRole={changeRole.isPending}
                 isOwner={isOwner}
+                isRolesError={roles.isError}
+                isRolesLoading={roles.isPending}
                 memberAccessDenied={memberAccessDenied}
                 members={members}
+                onChangeRole={handleRoleSelection}
                 onRetry={retryMembers}
-                roles={roles.data ?? []}
-                isRolesLoading={roles.isPending}
-                isRolesError={roles.isError}
                 onRetryRoles={retryRoles}
-                isChangingRole={changeRole.isPending}
-                onChangeRole={(member, roleId) => {
-                  const ownerRole = roles.data?.find(
-                    (role) => role.name.toLocaleLowerCase() === 'owner'
-                  )
-                  if (
-                    ownerRole &&
-                    member.roleId === ownerRole.id &&
-                    roleId !== ownerRole.id &&
-                    ownerRole.memberCount <= 1
-                  ) {
-                    appToast.error('O último dono não pode perder esse cargo.')
-                    return
-                  }
-                  const roleName = roles.data?.find(
-                    (role) => role.id === roleId
-                  )?.name
-                  if (
-                    roleName &&
-                    window.confirm(
-                      `Alterar o cargo de ${member.name} para ${roleName}?`
-                    )
-                  ) {
-                    changeRole.mutate({ memberId: member.id, roleId })
-                  }
-                }}
-                workspaceOwnerId={currentWorkspace.ownerId}
+                roles={roles.data ?? []}
               />
             </TabsContent>
             {isOwner ? (
@@ -284,6 +306,36 @@ function WorkspaceSettingsPage() {
           </Tabs>
         </section>
       </div>
+      <Dialog
+        onOpenChange={handleRoleDialogOpenChange}
+        open={pendingRoleChange !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar alteração de cargo</DialogTitle>
+            <DialogDescription>
+              {pendingRoleChange
+                ? `Alterar o cargo de ${pendingRoleChange.member.name} para ${pendingRoleChange.roleName}?`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              disabled={changeRole.isPending}
+              onClick={handleCancelRoleChange}
+              variant='outline'
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!pendingRoleChange || changeRole.isPending}
+              onClick={handleConfirmRoleChange}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }
@@ -293,7 +345,6 @@ function MembersList({
   isOwner,
   memberAccessDenied,
   members,
-  currentUserId,
   onRetry,
   roles,
   isRolesLoading,
@@ -301,9 +352,8 @@ function MembersList({
   onRetryRoles,
   isChangingRole,
   onChangeRole,
-  workspaceOwnerId,
+  currentUserRole,
 }: {
-  currentUserId: string | undefined
   filteredMembers: WorkspaceMemberResponse[]
   isOwner: boolean
   memberAccessDenied: boolean
@@ -315,7 +365,7 @@ function MembersList({
   onRetryRoles: () => Promise<void>
   isChangingRole: boolean
   onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
-  workspaceOwnerId: string | undefined
+  currentUserRole: string | undefined
 }) {
   if (members.isPending) return <LoadingState label='Carregando membros…' />
   if (members.isError) {
@@ -349,12 +399,15 @@ function MembersList({
     )
   }
 
+  const ownerCount = members.data.filter((member) =>
+    isWorkspaceOwner(member.roleName)
+  ).length
   const membersWithPermissions = filteredMembers.map((member) => ({
     member,
     permissions: getMemberPermissions({
-      currentUserId,
-      memberUserId: member.userId,
-      workspaceOwnerId,
+      currentUserRole,
+      memberRoleName: member.roleName,
+      ownerCount,
     }),
   }))
   return (
@@ -383,15 +436,15 @@ function MembersList({
             {membersWithPermissions.map(({ member, permissions }, index) => (
               <MemberRow
                 index={index}
+                isChangingRole={isChangingRole}
                 isOwner={isOwner}
+                isRolesError={isRolesError}
+                isRolesLoading={isRolesLoading}
                 key={member.id}
                 member={member}
+                onChangeRole={onChangeRole}
                 permissions={permissions}
                 roles={roles}
-                isRolesLoading={isRolesLoading}
-                isRolesError={isRolesError}
-                isChangingRole={isChangingRole}
-                onChangeRole={onChangeRole}
               />
             ))}
           </tbody>
@@ -423,6 +476,10 @@ function MemberRow({
   onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
 }) {
   const { name } = member
+  const handleRoleChange = useCallback(
+    (roleId: string) => onChangeRole(member, roleId),
+    [member, onChangeRole]
+  )
 
   return (
     <tr className={index % 2 === 0 ? 'bg-card' : 'bg-muted/10'}>
@@ -447,28 +504,41 @@ function MemberRow({
         </div>
       </td>
       <td className='px-1 py-3 md:px-2'>
-        <Select
-          disabled={
-            !isOwner || isRolesLoading || isRolesError || isChangingRole || roles.length === 0
-          }
-          onValueChange={(roleId) => onChangeRole(member, roleId)}
-          value={member.roleId}
-        >
-          <SelectTrigger
-            aria-label={`Cargo de ${name}`}
-            className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
-            title={!isOwner ? 'Somente donos podem alterar cargos.' : 'Alterar cargo.'}
+        {isOwner ? (
+          <Select
+            disabled={
+              isRolesLoading ||
+              isRolesError ||
+              isChangingRole ||
+              roles.length === 0
+            }
+            onValueChange={handleRoleChange}
+            value={member.roleId}
           >
-            <SelectValue className='truncate' />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map((role) => (
-              <SelectItem className='uppercase' key={role.id} value={role.id}>
-                {role.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              aria-label={`Cargo de ${name}`}
+              className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
+              title='Alterar cargo.'
+            >
+              {roles.some((role) => role.id === member.roleId) ? (
+                <SelectValue className='truncate' />
+              ) : (
+                <span className='truncate'>{member.roleName}</span>
+              )}
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map((role) => (
+                <SelectItem className='uppercase' key={role.id} value={role.id}>
+                  {role.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className='font-mono text-primary text-xs uppercase'>
+            {member.roleName}
+          </span>
+        )}
       </td>
       {isOwner ? (
         <td className='px-2 py-3 text-right md:px-4'>
