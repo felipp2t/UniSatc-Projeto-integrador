@@ -59,8 +59,10 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html")
                         .permitAll()
+                        .requestMatchers("/notifications/**", "/me", "/me/**")
+                        .authenticated()
                         .anyRequest()
-                        .authenticated())
+                        .hasAuthority("WORKSPACE_MEMBER"))
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(maintenanceGateFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

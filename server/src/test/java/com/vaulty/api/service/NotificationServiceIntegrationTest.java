@@ -22,7 +22,13 @@ import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
 import jakarta.servlet.http.Cookie;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,6 +44,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -265,6 +272,30 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void legacyAccessChangedReferencesAreSanitizedBeforeReturningToRecipient() throws Exception {
+        User owner = createUser();
+        notificationService.accessChanged(List.of(owner.getId()));
+        Notification notification = notificationRepository.findAll().get(0);
+        jdbcTemplate.update("""
+                UPDATE notification SET title=?, content=?, metadata=?::jsonb WHERE id=?
+                """, "Restricted title", "Restricted path /secret/link", """
+                {"event":"ACCESS_CHANGED","title":"restricted","path":"/secret","link":"/secret",
+                 "secret":"value","itemId":"00000000-0000-0000-0000-000000000001"}
+                """, notification.getId());
+
+        mockMvc.perform(get("/notifications?page=0&size=20").cookie(accessCookie(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notifications[0].title").value("Acesso atualizado"))
+                .andExpect(jsonPath("$.notifications[0].content")
+                        .value("As permissões de acesso da sua conta foram atualizadas."))
+                .andExpect(jsonPath("$.notifications[0].metadata.event").value("ACCESS_CHANGED"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Restricted"))))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/secret"))));
+    }
+
+    @Test
     void streamLimitAppliesPerRecipient() {
         User owner = createUser();
         User other = createUser();
@@ -297,7 +328,9 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
             });
             assertThat(ownerStream.getResponse().getContentAsString()).isEmpty();
 
+            long startedAt = System.nanoTime();
             notificationService.profileUpdated(owner.getId());
+            Duration deliveryTime = Duration.ofNanos(System.nanoTime() - startedAt);
             Notification persisted = notificationRepository.findAll().stream()
                     .filter(notification -> notification.getRecipient().getId().equals(owner.getId()))
                     .findFirst().orElseThrow();
@@ -305,8 +338,14 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
             String ownerPayload = ownerStream.getResponse().getContentAsString();
             assertThat(ownerPayload).contains("event:notification", "id:" + persisted.getId(),
                     "data:\"" + persisted.getId() + "\"");
+            assertThat(deliveryTime).isLessThan(Duration.ofSeconds(5));
             assertThat(ownerPayload).doesNotContain(persisted.getTitle(), persisted.getContent());
             assertThat(otherStream.getResponse().getContentAsString()).isEmpty();
+            ownerEmitter.complete();
+            mockMvc.perform(get("/notifications?page=0&size=20").cookie(accessCookie(owner)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.notifications[0].id").value(persisted.getId().toString()))
+                    .andExpect(jsonPath("$.notifications[0].metadata.event").value("PROFILE_UPDATED"));
         } finally {
             ownerEmitter.complete();
             otherEmitter.complete();
@@ -349,6 +388,34 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(notificationRepository.findAll()).singleElement()
                 .satisfies(notification -> assertThat(notification.getRecipient().getId()).isEqualTo(owner.getId()));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void failedRealtimeSendDoesNotUndoPersistedNotification() {
+        User owner = createUser();
+        AtomicBoolean failureObserved = new AtomicBoolean();
+        SseEmitter failingEmitter = new SseEmitter() {
+            @Override
+            public void send(SseEventBuilder builder) throws IOException {
+                throw new IOException("simulated disconnected client");
+            }
+
+            @Override
+            public void completeWithError(Throwable failure) {
+                failureObserved.set(true);
+            }
+        };
+        Map<UUID, Set<SseEmitter>> emitters =
+                (Map<UUID, Set<SseEmitter>>) ReflectionTestUtils.getField(notificationService, "emitters");
+        emitters.put(owner.getId(), ConcurrentHashMap.newKeySet());
+        emitters.get(owner.getId()).add(failingEmitter);
+
+        notificationService.accessChanged(List.of(owner.getId()));
+
+        assertThat(failureObserved).isTrue();
+        assertThat(notificationRepository.findAll()).filteredOn(n -> n.getRecipient().getId().equals(owner.getId()))
+                .extracting(n -> n.getMetadata().get("event")).containsExactly("ACCESS_CHANGED");
     }
 
     private MvcResult openStream(User user) throws Exception {

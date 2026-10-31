@@ -59,10 +59,7 @@ public class AuthController implements AuthControllerDocs {
     @PostMapping("/auth/logout")
     @Override
     public ResponseEntity<Void> logout(HttpServletRequest request) {
-        String refreshToken = readCookie(request, "refreshToken")
-                .orElseThrow(() -> new InvalidCredentialsException("Token de atualização inválido"));
-
-        authService.logout(refreshToken);
+        readCookie(request, "refreshToken").ifPresent(authService::logout);
 
         return ResponseEntity.status(HttpStatus.NO_CONTENT)
                 .header(HttpHeaders.SET_COOKIE, clearCookie("accessToken").toString())
@@ -103,12 +100,14 @@ public class AuthController implements AuthControllerDocs {
                 .maxAge(jwtService.getAccessTokenExpirationSeconds())
                 .build();
 
-        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", tokens.refreshToken())
-                .httpOnly(true)
-                .secure(true)
-                .sameSite("Strict")
-                .path("/")
-                .build();
+        ResponseCookie refreshTokenCookie = tokens.refreshToken() == null
+                ? clearCookie("refreshToken")
+                : ResponseCookie.from("refreshToken", tokens.refreshToken())
+                        .httpOnly(true)
+                        .secure(true)
+                        .sameSite("Strict")
+                        .path("/")
+                        .build();
 
         return ResponseEntity.status(HttpStatus.OK)
                 .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())

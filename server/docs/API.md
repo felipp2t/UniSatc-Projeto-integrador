@@ -28,17 +28,22 @@ Convenções gerais:
 - Não existe cadastro público: uma conta só nasce quando o dono do workspace envia um convite
   (RF10) e o convidado conclui o cadastro com o token recebido por e-mail (RF01/RF11), entrando no
   workspace único da empresa com o papel `Member`.
-- Cada sessão está vinculada a um `workspace_member.id`: o JWT de acesso contém `membershipId` e
-  o refresh token persistido referencia o mesmo vínculo. Em cada requisição autenticada,
+- Uma sessão de membro está vinculada a um `workspace_member.id`: o JWT de acesso contém
+  `membershipId` e o refresh token persistido referencia o mesmo vínculo. Em cada requisição,
   `JwtAuthenticationFilter` confirma no banco que o vínculo ainda existe para o usuário do JWT e
-  usa o papel atual do vínculo como authority. O access token legado sem `membershipId` não
-  autentica e recebe `401`; o papel do banco é atualizado efetivamente por requisição, sem esperar
-  o limite de validade de até 15 minutos do JWT.
+  usa o papel atual como authority. O access token legado sem `membershipId` não autentica e
+  recebe `401`; o papel do banco é atualizado efetivamente por requisição.
 - Excluir um vínculo invalida imediatamente os access tokens associados e a FK com `ON DELETE
   CASCADE` remove seus refresh tokens. Uma readmissão cria outro vínculo e não recupera a sessão
   anterior. A migration V20 associa refresh tokens existentes ao vínculo atual do usuário e
   descarta os que não têm vínculo. Portanto, um refresh migrado ainda válido de um membro atual
-  pode emitir novo par de tokens; login sem vínculo não emite sessão.
+  pode emitir novo par de tokens. Login de conta sem vínculo emite somente um access token
+  account-only, válido por 15 minutos, sem refresh token; a resposta limpa eventual cookie
+  `refreshToken` antigo. Esse perfil acessa somente `/me`, `/me/password` e as próprias
+  notificações; qualquer rota de workspace responde `403`. Tokens de workspace antigos e seus
+  refresh tokens revogados respondem `401` após a remoção do vínculo. Readmissão não promove
+  token account-only nem reativa tokens anteriores: é necessário fazer login novamente para
+  receber uma sessão de workspace.
 - A permissão do papel autoriza ações; o acesso efetivo a pastas e itens é verificado separadamente
   a partir do vínculo atual, concessões e herança no banco em cada requisição. Não se afirma que
   todas as superfícies previstas em #133 estejam integradas.
@@ -162,13 +167,14 @@ O que a função faz:
 1. Busca o usuário por `email` (senão `401` — mesma mensagem genérica de credenciais erradas,
    para não revelar se o e-mail existe).
 2. Compara a senha enviada com o `password_hash` armazenado via Argon2 (`401` se não bater).
-3. Gera um novo access token (JWT, `sub` = id do usuário) e um novo refresh token (persistido no
-   banco), devolvidos como cookies.
+3. Se o usuário tiver vínculo atual, gera access token e refresh token (persistido no banco).
+   Sem vínculo, gera access token account-only sem refresh. Os tokens são devolvidos como cookies;
+   no login account-only, eventual cookie `refreshToken` anterior é limpo.
 
 | | |
 |---|---|
 | Request body | `{ "email": string, "password": string }` |
-| Sucesso | `200`, corpo vazio, seta `accessToken` + `refreshToken` |
+| Sucesso | `200`, corpo vazio; membro recebe `accessToken` + `refreshToken`, conta sem vínculo recebe somente `accessToken` |
 | `401` | e-mail não encontrado ou senha incorreta; ambas as falhas retornam `E-mail ou senha inválidos` |
 | `429` | mais de 5 tentativas por IP em 1 minuto (rate limit) |
 
@@ -202,21 +208,19 @@ O que a função faz:
 
 ## RF04 — Logout
 
-**`POST /auth/logout`** — autenticação via cookie `refreshToken`.
+**`POST /auth/logout`** — encerra a sessão e limpa os cookies, mesmo sem refresh token.
 
 Encerra a sessão atual invalidando o refresh token no servidor (o `accessToken` em si não pode
 ser revogado por ser stateless, mas expira em minutos).
 
 O que a função faz:
-1. Lê o cookie `refreshToken` (`401` se ausente).
-2. Busca e deleta esse token do banco (`401` se não existir).
-3. Limpa (`Max-Age=0`) os cookies `accessToken` e `refreshToken` no cliente.
+1. Se houver cookie `refreshToken`, busca e revoga o token persistido.
+2. Limpa (`Max-Age=0`) os cookies `accessToken` e `refreshToken` no cliente.
 
 | | |
 |---|---|
-| Auth | Cookie `refreshToken` |
+| Auth | Sem refresh obrigatório |
 | Sucesso | `204`, corpo vazio, limpa os cookies |
-| `401` | cookie ausente ou token inexistente |
 
 ---
 
@@ -743,11 +747,10 @@ Sucesso (`200`):
 
 ## Notificações
 
-As notificações são avisos fixos de conta e acesso. A migration `V18` cria a tabela `notification`,
-com chave estrangeira para o destinatário (`ON DELETE CASCADE`) e índice por destinatário e data.
-`V19` está reservada para outra issue. O campo `metadata` contém o identificador do evento, por
-exemplo `{ "event": "PROFILE_UPDATED" }`; os títulos e textos são fixos e não incluem referências,
-títulos de recursos, links nem segredos. Notificações não concedem nem verificam acesso a recursos.
+As notificações são persistidas na tabela `notification` criada pela migration `V18`, com chave
+estrangeira para o destinatário (`ON DELETE CASCADE`) e índice por destinatário e data. O campo
+`metadata` identifica o evento. Os textos são fixos e não incluem valores secretos. Notificações
+não concedem nem verificam acesso a recursos.
 
 **`GET /notifications?page=0&size=20&unread=false`** — autenticado (cookie `accessToken`).
 
@@ -816,20 +819,30 @@ notificação como `id` SSE e como dado JSON (string UUID), por exemplo:
 ```text
 event:notification
 id:8e8a9d8f-3c94-4d22-a290-598566ea5b16
-data:"8e8a9d8f-3c94-4d22-a290-598566ea5b16"
 ```
 
-A notificação é persistida antes da emissão, que ocorre somente após o commit da transação. A
-entrega em tempo real é best effort: o cliente deve chamar `GET /notifications` ao conectar e ao
-reconectar para recuperar avisos persistidos. Falha ou desconexão do stream não desfaz a operação
-que originou o aviso.
+A notificação é persistida antes da emissão, que ocorre somente após o commit da transação. Nos
+fixtures de integração, a entrega com conexão ativa foi medida em menos de 5 segundos. A entrega é
+best effort: o cliente deve chamar `GET /notifications` ao conectar e reconectar; não há replay
+baseado em `Last-Event-ID`. Falha ou desconexão do stream não desfaz a operação que originou o
+aviso.
 
-Trocas de perfil (`PATCH /me`) e senha (`PATCH /me/password`) geram os eventos fixos
-`PROFILE_UPDATED` e `PASSWORD_CHANGED`. Produtores futuros de mudanças de acesso podem chamar
-`NotificationService.accessChanged(Collection<UUID> affectedRecipients)`, que deduplica os IDs e
-emite o aviso fixo `ACCESS_CHANGED`. A troca de papel de um membro (RF17) já usa esse aviso. Grupos,
-compartilhamentos, herança e alterações das permissões de um papel ainda não emitem avisos; esse
-fan-out pertence às issues #42 e #132.
+`PATCH /me` e `PATCH /me/password` geram `PROFILE_UPDATED` e `PASSWORD_CHANGED`. Mudanças de
+papel, permissões do papel, grupos, associação de membros a grupos, concessões individuais/grupo/
+todos, herança e remoção de membership notificam os membros cujo acesso efetivo a coleções ou itens
+mudou, inclusive por herança. Alterar o papel de um membro também o notifica, pois a mudança pode
+afetar permissões de ações mesmo sem alterar a leitura de conteúdo. Alterações nas permissões de um
+papel avisam seus membros mesmo quando o acesso a conteúdo não mudou. Adicionar ou remover membro de
+grupo também é considerado. Os destinatários são deduplicados por operação; operações sem mudança não
+geram aviso.
+
+O evento `ACCESS_CHANGED` usa texto fixo e genérico, sem título, caminho, link ou referência ao
+recurso perdido. Referências de notificações legadas desse evento também são substituídas ao
+serializar a resposta. Os avisos descrevem somente que o acesso foi alterado e não revelam nem
+concedem acesso ao conteúdo. A comparação usa snapshots canônicos do acesso efetivo a membros e
+recursos, carregados em uma consulta em lote; o número de pares comparados ainda cresce com o
+produto entre membros e recursos. Um lock de workspace serializa alterações administrativas até o
+commit para manter snapshots consistentes, o que pode limitar throughput sob alta concorrência.
 
 ## Tabela-resumo
 
@@ -841,7 +854,7 @@ fan-out pertence às issues #42 e #132.
 | RF01/RF11 | POST | `/auth/register` | Não |
 | RF02 | POST | `/auth/login` | Não |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` |
-| RF04 | POST | `/auth/logout` | Cookie `refreshToken` |
+| RF04 | POST | `/auth/logout` | Sem refresh obrigatório; revoga-o se presente |
 | RF49 | POST | `/auth/forgot-password` | Não |
 | RF49 | POST | `/auth/reset-password` | Não |
 | RF05 | PATCH | `/me/password` | Cookie `accessToken` |
