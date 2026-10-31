@@ -1,3 +1,4 @@
+import type { ZodType } from 'zod'
 import { apiClient } from './client'
 import type {
   ChangePasswordRequest,
@@ -28,6 +29,12 @@ import {
   workspaceMembersSchema,
   workspaceRolesSchema,
 } from './workspace-members'
+
+function parseOrThrow<T>(schema: ZodType<T>, data: unknown, message: string) {
+  const parsed = schema.safeParse(data)
+  if (!parsed.success) throw new Error(message)
+  return parsed.data
+}
 
 export const authApi = {
   forgotPassword: (request: ForgotPasswordRequest) =>
@@ -60,11 +67,14 @@ export const workspaceApi = {
       `/workspaces/${workspaceId}/members/${memberId}/role`,
       { roleId }
     )
-    const parsed = workspaceMemberSchema.safeParse(response.data)
-    if (!parsed.success) {
-      throw new Error('A resposta da API contém um membro inválido.')
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceMemberSchema,
+        response.data,
+        'A resposta da API contém um membro inválido.'
+      ),
     }
-    return { ...response, data: parsed.data }
   },
   get: (workspaceId: string) =>
     apiClient.get<WorkspaceResponse>(`/workspaces/${workspaceId}`),
@@ -73,21 +83,27 @@ export const workspaceApi = {
     const response = await apiClient.get<WorkspaceMemberDto[]>(
       `/workspaces/${workspaceId}/members`
     )
-    const parsed = workspaceMembersSchema.safeParse(response.data)
-    if (!parsed.success) {
-      throw new Error('A resposta da API contém membros inválidos.')
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceMembersSchema,
+        response.data,
+        'A resposta da API contém membros inválidos.'
+      ),
     }
-    return { ...response, data: parsed.data }
   },
   listRoles: async (workspaceId: string) => {
     const response = await apiClient.get<unknown>(
       `/workspaces/${workspaceId}/roles`
     )
-    const parsed = workspaceRolesSchema.safeParse(response.data)
-    if (!parsed.success) {
-      throw new Error('A resposta da API contém cargos inválidos.')
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceRolesSchema,
+        response.data,
+        'A resposta da API contém cargos inválidos.'
+      ),
     }
-    return { ...response, data: parsed.data }
   },
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),

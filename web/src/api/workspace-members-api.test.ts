@@ -15,7 +15,7 @@ const validMember = {
   id: 'membership-local-1',
   name: 'Ana Silva',
   roleId: 'role-local-owner',
-  roleName: 'owner',
+  roleName: 'Owner',
   userId: 'user-local-1',
 }
 
@@ -40,8 +40,8 @@ describe('workspaceApi member contracts', () => {
 
   it('lists valid workspace roles from the workspace role catalog', async () => {
     const roles = [
-      { builtIn: true, id: 'role-owner', memberCount: 2, name: 'owner' },
-      { builtIn: true, id: 'role-member', memberCount: 1, name: 'member' },
+      { id: 'role-owner', name: 'Owner' },
+      { id: 'role-member', name: 'Member' },
     ]
     apiMocks.get.mockResolvedValue({ data: roles })
 
@@ -53,8 +53,27 @@ describe('workspaceApi member contracts', () => {
     )
   })
 
-  it('rejects invalid role catalog responses', async () => {
-    apiMocks.get.mockResolvedValue({ data: [{ id: '', name: 'owner' }] })
+  it('ignores extra role fields and keeps only id and name', async () => {
+    apiMocks.get.mockResolvedValue({
+      data: [
+        { builtIn: true, id: 'role-owner', memberCount: 2, name: 'Owner' },
+        { id: 'role-member', name: 'Member' },
+      ],
+    })
+
+    const result = await workspaceApi.listRoles('workspace-local')
+    expect(result.data).toEqual([
+      { id: 'role-owner', name: 'Owner' },
+      { id: 'role-member', name: 'Member' },
+    ])
+  })
+
+  it.each([
+    ['an empty ID', { id: '', name: 'Owner' }],
+    ['an empty name', { id: 'role-owner', name: '' }],
+    ['a missing name', { id: 'role-owner' }],
+  ])('rejects a role with %s', async (_reason, invalidRole) => {
+    apiMocks.get.mockResolvedValue({ data: [invalidRole] })
 
     await expect(workspaceApi.listRoles('workspace-local')).rejects.toThrow(
       'A resposta da API contém cargos inválidos.'

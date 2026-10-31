@@ -4,20 +4,14 @@ import {
   TrashIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
-import {
-  type UseQueryResult,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
+import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
-import { getApiErrorMessage } from '@/api/get-api-error-message'
 import { isForbiddenOrNotFound } from '@/api/http-status'
 import {
   getMemberPermissions,
-  isWorkspaceOwner,
+  isOwnerRole,
   type MemberPermissions,
 } from '@/api/member-permissions'
 import type {
@@ -29,17 +23,10 @@ import {
   workspaceRolesQueryKey,
 } from '@/api/workspace-keys'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { ChangeMemberRoleDialog } from '@/components/change-member-role-dialog'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
@@ -53,7 +40,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { appToast } from '@/components/ui/toast'
+import { useChangeMemberRole } from '@/hooks/use-change-member-role'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
@@ -65,12 +52,6 @@ function WorkspaceSettingsPage() {
   const { session } = Route.useRouteContext()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
-  const [pendingRoleChange, setPendingRoleChange] = useState<{
-    member: WorkspaceMemberResponse
-    roleId: string
-    roleName: string
-  } | null>(null)
-  const queryClient = useQueryClient()
   const workspaces = useCurrentWorkspace()
   const currentWorkspace = workspaces.data
   const workspaceId = currentWorkspace?.id
@@ -85,7 +66,7 @@ function WorkspaceSettingsPage() {
   const currentUserRole = members.data?.find(
     (member) => member.userId === session.user?.id
   )?.roleName
-  const isOwner = isWorkspaceOwner(currentUserRole)
+  const isOwner = isOwnerRole(currentUserRole)
   const roles = useQuery({
     enabled: Boolean(workspaceId && isOwner),
     queryFn: async () => {
@@ -103,59 +84,19 @@ function WorkspaceSettingsPage() {
   const retryRoles = useCallback(async () => {
     await roles.refetch()
   }, [roles.refetch])
-  const changeRole = useMutation({
-    mutationFn: ({
-      memberId,
-      roleId,
-    }: {
-      memberId: string
-      roleId: string
-    }) => {
-      if (!workspaceId) throw new Error('Workspace indisponível.')
-      return workspaceApi.changeMemberRole(workspaceId, memberId, roleId)
-    },
-    onError: (error) =>
-      appToast.error(
-        getApiErrorMessage(error, {
-          fallback: 'Não foi possível alterar o cargo.',
-          statusMessages: {
-            409: 'O servidor recusou a alteração para proteger o último dono do workspace.',
-          },
-        })
-      ),
-    onSuccess: async () => {
-      appToast.success('Cargo alterado com sucesso.')
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: workspaceMembersQueryKey(workspaceId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: workspaceRolesQueryKey(workspaceId),
-        }),
-      ])
-    },
+  const roleChange = useChangeMemberRole({
+    currentUserId: session.user?.id,
+    roles: roles.data,
+    workspaceId,
   })
-  const handleRoleSelection = useCallback(
-    (member: WorkspaceMemberResponse, roleId: string) => {
-      const roleName = roles.data?.find((role) => role.id === roleId)?.name
-      if (roleName) setPendingRoleChange({ member, roleId, roleName })
-    },
-    [roles.data]
-  )
-  const handleRoleDialogOpenChange = useCallback((open: boolean) => {
-    if (!open) setPendingRoleChange(null)
-  }, [])
-  const handleCancelRoleChange = useCallback(() => {
-    setPendingRoleChange(null)
-  }, [])
-  const handleConfirmRoleChange = useCallback(() => {
-    if (!pendingRoleChange) return
-    changeRole.mutate({
-      memberId: pendingRoleChange.member.id,
-      roleId: pendingRoleChange.roleId,
-    })
-    setPendingRoleChange(null)
-  }, [changeRole.mutate, pendingRoleChange])
+  const roleSelectionDisabled =
+    isOwner &&
+    (roles.isPending ||
+      roles.isError ||
+      roleChange.isChangingRole ||
+      (roles.data?.length ?? 0) === 0)
+  const rolesLoadError =
+    isOwner && roles.isError ? <RolesLoadError onRetry={retryRoles} /> : null
   const roleNames = useMemo(
     () =>
       [
@@ -286,16 +227,14 @@ function WorkspaceSettingsPage() {
               <MembersList
                 currentUserRole={currentUserRole}
                 filteredMembers={filteredMembers}
-                isChangingRole={changeRole.isPending}
                 isOwner={isOwner}
-                isRolesError={roles.isError}
-                isRolesLoading={roles.isPending}
                 memberAccessDenied={memberAccessDenied}
                 members={members}
-                onChangeRole={handleRoleSelection}
+                onChangeRole={roleChange.requestRoleChange}
                 onRetry={retryMembers}
-                onRetryRoles={retryRoles}
+                roleSelectionDisabled={roleSelectionDisabled}
                 roles={roles.data ?? []}
+                rolesLoadError={rolesLoadError}
               />
             </TabsContent>
             {isOwner ? (
@@ -306,36 +245,7 @@ function WorkspaceSettingsPage() {
           </Tabs>
         </section>
       </div>
-      <Dialog
-        onOpenChange={handleRoleDialogOpenChange}
-        open={pendingRoleChange !== null}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar alteração de cargo</DialogTitle>
-            <DialogDescription>
-              {pendingRoleChange
-                ? `Alterar o cargo de ${pendingRoleChange.member.name} para ${pendingRoleChange.roleName}?`
-                : null}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              disabled={changeRole.isPending}
-              onClick={handleCancelRoleChange}
-              variant='outline'
-            >
-              Cancelar
-            </Button>
-            <Button
-              disabled={!pendingRoleChange || changeRole.isPending}
-              onClick={handleConfirmRoleChange}
-            >
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ChangeMemberRoleDialog roleChange={roleChange} />
     </main>
   )
 }
@@ -347,10 +257,8 @@ function MembersList({
   members,
   onRetry,
   roles,
-  isRolesLoading,
-  isRolesError,
-  onRetryRoles,
-  isChangingRole,
+  roleSelectionDisabled,
+  rolesLoadError,
   onChangeRole,
   currentUserRole,
 }: {
@@ -360,10 +268,8 @@ function MembersList({
   members: UseQueryResult<WorkspaceMemberResponse[]>
   onRetry: () => Promise<void>
   roles: WorkspaceRoleResponse[]
-  isRolesLoading: boolean
-  isRolesError: boolean
-  onRetryRoles: () => Promise<void>
-  isChangingRole: boolean
+  roleSelectionDisabled: boolean
+  rolesLoadError: ReactNode
   onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
   currentUserRole: string | undefined
 }) {
@@ -400,7 +306,7 @@ function MembersList({
   }
 
   const ownerCount = members.data.filter((member) =>
-    isWorkspaceOwner(member.roleName)
+    isOwnerRole(member.roleName)
   ).length
   const membersWithPermissions = filteredMembers.map((member) => ({
     member,
@@ -412,16 +318,7 @@ function MembersList({
   }))
   return (
     <>
-      {isOwner && isRolesError ? (
-        <div className='flex items-center justify-between border border-destructive/40 p-3'>
-          <p className='text-destructive text-xs' role='alert'>
-            Não foi possível carregar os cargos.
-          </p>
-          <Button onClick={onRetryRoles} size='sm' variant='outline'>
-            Recarregar cargos
-          </Button>
-        </div>
-      ) : null}
+      {rolesLoadError}
       <div className='max-h-120 overflow-auto border border-border'>
         <table
           aria-label='Membros e cargos'
@@ -436,14 +333,14 @@ function MembersList({
             {membersWithPermissions.map(({ member, permissions }, index) => (
               <MemberRow
                 index={index}
-                isChangingRole={isChangingRole}
                 isOwner={isOwner}
-                isRolesError={isRolesError}
-                isRolesLoading={isRolesLoading}
                 key={member.id}
                 member={member}
                 onChangeRole={onChangeRole}
                 permissions={permissions}
+                roleSelectDisabled={
+                  roleSelectionDisabled || permissions.isLastOwner
+                }
                 roles={roles}
               />
             ))}
@@ -454,15 +351,26 @@ function MembersList({
   )
 }
 
+function RolesLoadError({ onRetry }: { onRetry: () => Promise<void> }) {
+  return (
+    <div className='flex items-center justify-between border border-destructive/40 p-3'>
+      <p className='text-destructive text-xs' role='alert'>
+        Não foi possível carregar os cargos.
+      </p>
+      <Button onClick={onRetry} size='sm' variant='outline'>
+        Recarregar cargos
+      </Button>
+    </div>
+  )
+}
+
 function MemberRow({
   index,
   isOwner,
   member,
   permissions,
   roles,
-  isRolesLoading,
-  isRolesError,
-  isChangingRole,
+  roleSelectDisabled,
   onChangeRole,
 }: {
   index: number
@@ -470,9 +378,7 @@ function MemberRow({
   member: WorkspaceMemberResponse
   permissions: MemberPermissions
   roles: WorkspaceRoleResponse[]
-  isRolesLoading: boolean
-  isRolesError: boolean
-  isChangingRole: boolean
+  roleSelectDisabled: boolean
   onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
 }) {
   const { name } = member
@@ -506,25 +412,15 @@ function MemberRow({
       <td className='px-1 py-3 md:px-2'>
         {isOwner ? (
           <Select
-            disabled={
-              isRolesLoading ||
-              isRolesError ||
-              isChangingRole ||
-              roles.length === 0
-            }
+            disabled={roleSelectDisabled}
             onValueChange={handleRoleChange}
             value={member.roleId}
           >
             <SelectTrigger
               aria-label={`Cargo de ${name}`}
               className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
-              title='Alterar cargo.'
             >
-              {roles.some((role) => role.id === member.roleId) ? (
-                <SelectValue className='truncate' />
-              ) : (
-                <span className='truncate'>{member.roleName}</span>
-              )}
+              <SelectValue className='truncate'>{member.roleName}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {roles.map((role) => (

@@ -1,7 +1,9 @@
 export type MemberPermissions = ReturnType<typeof getMemberPermissions>
 
-export function isWorkspaceOwner(roleName: string | undefined) {
-  return roleName === 'Owner'
+export const OWNER_ROLE = 'Owner'
+
+export function isOwnerRole(roleName: string | undefined) {
+  return roleName === OWNER_ROLE
 }
 
 export function getMemberPermissions({
@@ -13,9 +15,10 @@ export function getMemberPermissions({
   memberRoleName: string
   ownerCount: number
 }) {
-  const isLastOwner = isWorkspaceOwner(memberRoleName) && ownerCount === 1
+  const isLastOwner = isOwnerRole(memberRoleName) && ownerCount === 1
   return {
-    removeReason: isWorkspaceOwner(currentUserRole)
+    isLastOwner,
+    removeReason: isOwnerRole(currentUserRole)
       ? isLastOwner
         ? 'O último dono do workspace não pode ser removido.'
         : 'A remoção ainda não está disponível na API do servidor.'
