@@ -11,7 +11,13 @@ public record CreateItemRequest(
         UUID collectionId,
         @Size(max = 100000, message = "Texto deve ter no máximo 100.000 caracteres") String textContent,
         @Size(max = 2048, message = "URL deve ter no máximo 2.048 caracteres") String linkUrl,
-        @Size(max = 8192, message = "Segredo deve ter no máximo 8.192 caracteres") String value) {
+        @Size(max = 8192, message = "Segredo deve ter no máximo 8.192 caracteres") String value,
+        @Size(max = 2000, message = "Descrição deve ter no máximo 2.000 caracteres") String description) {
+    public CreateItemRequest(String type, String title, UUID collectionId, String textContent,
+                             String linkUrl, String value) {
+        this(type, title, collectionId, textContent, linkUrl, value, null);
+    }
+
     public CreateItemRequest {
         title = title == null ? null : title.trim();
     }

@@ -360,6 +360,65 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void createsInlineItemsWithOptionalDescriptionAndEnforcesDescriptionLimit() throws Exception {
+        User owner = createUser();
+        UUID workspaceId = configureWorkspace(owner).id();
+        String description = "  Orientação de uso  ";
+        UUID textId = createItem(owner, workspaceId, "text", "Texto descrito", null,
+                "  **Markdown preservado**  ", null, null);
+        var link = new CreateItemRequest("link", "Link descrito", null, null,
+                "https://intranet.local/manual", null, description);
+        String linkResponse = mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(link)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.description").value("Orientação de uso"))
+                .andReturn().getResponse().getContentAsString();
+        UUID linkId = UUID.fromString(objectMapper.readTree(linkResponse).get("id").asText());
+        var secret = new CreateItemRequest("secret", "Segredo descrito", null, null, null,
+                "  valor secreto  ", description);
+        String secretResponse = mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(secret)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.description").value("Orientação de uso"))
+                .andReturn().getResponse().getContentAsString();
+        UUID secretId = UUID.fromString(objectMapper.readTree(secretResponse).get("id").asText());
+
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, textId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").doesNotExist());
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, linkId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").value("Orientação de uso"));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspaceId, secretId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").value("Orientação de uso"));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.value").value("  valor secreto  "));
+        assertThat(jdbcTemplate.queryForObject("SELECT description FROM item WHERE id = ?", String.class, linkId))
+                .isEqualTo("Orientação de uso");
+        assertThat(jdbcTemplate.queryForObject("SELECT description FROM item WHERE id = ?", String.class, secretId))
+                .isEqualTo("Orientação de uso");
+        String secretHistory = jdbcTemplate.queryForObject(
+                "SELECT snapshot::text FROM activity_log WHERE resource_id = ? AND action = 'item_created'",
+                String.class, secretId);
+        assertThat(secretHistory).contains("secret", "Segredo descrito").doesNotContain("valor secreto");
+
+        var maxDescription = new CreateItemRequest("text", "Descrição limite", null, "Texto", null, null,
+                "x".repeat(2000));
+        mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(maxDescription)))
+                .andExpect(status().isCreated());
+        var tooLongDescription = new CreateItemRequest("text", "Descrição longa", null, "Texto", null, null,
+                "x".repeat(2001));
+        mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(tooLongDescription)))
+                .andExpect(status().isBadRequest());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"http://intranet", "https://localhost:8443/path", "https://192.168.1.1/a%20b",
             "http://[::1]:8080/", "HTTPS://example.com/path?q=one%20two#fragment"})

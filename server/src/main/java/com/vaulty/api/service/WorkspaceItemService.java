@@ -65,6 +65,7 @@ public class WorkspaceItemService {
         item.setCollection(collection);
         item.setType(request.type());
         item.setTitle(request.title());
+        item.setDescription(normalizeDescription(request.description()));
         item.setTextContent(request.textContent());
         item.setLinkUrl(request.linkUrl());
         try {
@@ -281,6 +282,14 @@ public class WorkspaceItemService {
             throw new ValidationException("Tipo de item inválido para esta entrega");
         }
         validateContent(request.type(), request.textContent(), request.linkUrl(), request.value());
+    }
+
+    private String normalizeDescription(String description) {
+        if (description == null) {
+            return null;
+        }
+        String normalized = description.trim();
+        return normalized.isBlank() ? null : normalized;
     }
 
     private boolean isHttpUrl(String value) {
