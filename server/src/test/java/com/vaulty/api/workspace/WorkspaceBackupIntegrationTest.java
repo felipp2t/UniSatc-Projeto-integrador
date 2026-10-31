@@ -1,12 +1,13 @@
 package com.vaulty.api.workspace;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.vaulty.api.entity.User;
@@ -32,11 +33,14 @@ class WorkspaceBackupIntegrationTest extends WorkspaceIntegrationSupport {
         when(backupService.create(owner.getId())).thenReturn(backup);
 
         try {
-            mockMvc.perform(post("/workspaces/backup").cookie(authCookie(owner)))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType("application/zip"))
-                    .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("vaulty-backup.zip")))
-                    .andExpect(content().bytes(new byte[] { 'P', 'K', 3, 4 }));
+            var response = mockMvc.perform(post("/workspaces/backup").cookie(authCookie(owner)))
+                    .andExpect(request().asyncStarted())
+                    .andReturn();
+            response.getAsyncResult(5000);
+            assertThat(response.getResponse().getStatus()).isEqualTo(200);
+            assertThat(response.getResponse().getContentType()).isEqualTo("application/zip");
+            assertThat(response.getResponse().getHeader("Content-Disposition")).contains("vaulty-backup.zip");
+            assertThat(response.getResponse().getContentAsByteArray()).containsExactly((byte) 'P', (byte) 'K', 3, 4);
             verify(backupService).create(owner.getId());
         } finally {
             Files.deleteIfExists(archive);

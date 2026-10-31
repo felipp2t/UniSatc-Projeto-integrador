@@ -24,6 +24,7 @@ public abstract class PostgresIntegrationTest {
     void resetDatabaseFixture() {
         fixtureTransaction.executeWithoutResult(status -> {
             jdbcTemplate.update("DELETE FROM activity_log");
+            jdbcTemplate.update("DELETE FROM item");
             jdbcTemplate.update("DELETE FROM email_outbox");
             jdbcTemplate.update("DELETE FROM password_reset_token");
             jdbcTemplate.update("DELETE FROM refresh_token");
