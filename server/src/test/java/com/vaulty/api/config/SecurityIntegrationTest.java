@@ -1,5 +1,7 @@
 package com.vaulty.api.config;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -75,6 +77,67 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
                 .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
+    @Test
+    void apiResponsesCarrySecurityHeadersEvenWhenUnauthorized() throws Exception {
+        mockMvc.perform(get("/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Content-Security-Policy", SecurityConfig.API_CONTENT_SECURITY_POLICY))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("X-Frame-Options", "DENY"))
+                .andExpect(header().string("Referrer-Policy", "no-referrer"))
+                .andExpect(header().string("Permissions-Policy", SecurityConfig.PERMISSIONS_POLICY))
+                .andExpect(header().string("Cross-Origin-Opener-Policy", "same-origin"))
+                .andExpect(header().string("Cross-Origin-Resource-Policy", "same-site"))
+                .andExpect(header().string("Cache-Control", containsString("no-store")))
+                .andExpect(header().doesNotExist("Strict-Transport-Security"));
+    }
+
+    @Test
+    void sendsHstsOnlyOverHttps() throws Exception {
+        mockMvc.perform(get("/me").secure(true))
+                .andExpect(header().string("Strict-Transport-Security",
+                        allOf(containsString("max-age=31536000"), containsString("includeSubDomains"))));
+    }
+
+    @Test
+    void swaggerUiReceivesItsOwnContentSecurityPolicy() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy",
+                        SecurityConfig.SWAGGER_CONTENT_SECURITY_POLICY));
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(header().string("Content-Security-Policy", SecurityConfig.API_CONTENT_SECURITY_POLICY));
+    }
+
+    @Test
+    void rejectsPreflightFromUnknownOrigin() throws Exception {
+        mockMvc.perform(options("/me")
+                        .header("Origin", "https://evil.example")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    void rejectsPreflightWithHeaderOrMethodOutsideThePolicy() throws Exception {
+        mockMvc.perform(options("/me")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "X-Custom-Header"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(options("/me")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "TRACE"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void exposesAttachmentFileNameHeaderToTheFrontend() throws Exception {
+        mockMvc.perform(get("/me").header("Origin", "http://localhost:5173"))
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
+                .andExpect(header().string("Access-Control-Expose-Headers", "Content-Disposition"));
     }
 
     private void assertUnauthorized(org.springframework.test.web.servlet.ResultActions result) throws Exception {

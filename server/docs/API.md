@@ -844,6 +844,43 @@ recursos, carregados em uma consulta em lote; o número de pares comparados aind
 produto entre membros e recursos. Um lock de workspace serializa alterações administrativas até o
 commit para manter snapshots consistentes, o que pode limitar throughput sob alta concorrência.
 
+## RNF12 — Cabeçalhos de segurança e CORS
+
+O levantamento cita o Helmet, que é uma biblioteca de Node. Neste backend, o mesmo resultado vem
+dos cabeçalhos do Spring Security (`SecurityConfig`) e da política de CORS (`CorsConfig`). Os
+cabeçalhos são enviados em todas as respostas, inclusive de erro (`401`, `403`, `404`).
+
+| Cabeçalho | Valor | Para quê |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'` | A API só devolve JSON e arquivos; nada é carregado nem executado a partir dela |
+| `Content-Security-Policy` (Swagger UI) | `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Só em `/swagger-ui/**` e `/swagger-ui.html`, que carregam scripts e estilos da própria origem |
+| `X-Content-Type-Options` | `nosniff` | O navegador respeita o `Content-Type`, sem adivinhar o tipo de um anexo |
+| `X-Frame-Options` | `DENY` | Impede embutir a API em frames de outros sites |
+| `Referrer-Policy` | `no-referrer` | Tokens de links de convite e de redefinição de senha não vazam pelo `Referer` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=()` | Desliga recursos do navegador que a aplicação não usa |
+| `Cross-Origin-Opener-Policy` | `same-origin` | Isola a janela de outras origens |
+| `Cross-Origin-Resource-Policy` | `same-site` | Respostas só podem ser embutidas pelo mesmo site; `localhost:5173` e `localhost:8080` contam como o mesmo site |
+| `Cache-Control` | `no-cache, no-store, max-age=0, must-revalidate` | Padrão do Spring Security; anexos e convites também usam `no-store` |
+| `Strict-Transport-Security` | `max-age=31536000 ; includeSubDomains` | Só em requisições HTTPS, como exige a especificação; no ambiente local em HTTP não aparece |
+
+O HSTS depende de a aplicação enxergar a requisição como HTTPS. Atrás de um proxy que encerra o TLS,
+isso exigiria confiar em `X-Forwarded-Proto`. Essa confiança não foi ligada porque o `RateLimitFilter`
+identifica o cliente pelo IP de origem, e confiar em cabeçalhos encaminhados sem um proxy definido
+permitiria forjar `X-Forwarded-For` para escapar do limite.
+
+**CORS:**
+- Origem permitida: apenas `app.frontend-url` (`FRONTEND_URL`, padrão `http://localhost:5173`),
+  normalizada para `esquema://host:porta`. A aplicação não sobe se o valor estiver vazio, for `*` ou
+  não for uma URL `http(s)`, já que uma origem coringa com cookies liberaria a API para qualquer site.
+- Cookies permitidos (`Access-Control-Allow-Credentials: true`), necessários para os cookies de sessão.
+- Métodos: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`. Headers aceitos: `Accept` e `Content-Type`.
+- `Access-Control-Expose-Headers: Content-Disposition`, para o frontend ler o nome do anexo baixado.
+- Preflight de outra origem, com outro método ou com outro header responde `403`, sem
+  `Access-Control-Allow-Origin`.
+- O CSRF continua desligado: a proteção vem dos cookies `SameSite=Strict` junto com a origem única.
+
+---
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
