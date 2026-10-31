@@ -13,12 +13,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { isUnavailableCollectionError } from '@/api/collection-errors'
-import { itemsApi } from '@/api/endpoints'
+import { itemsApi, workspaceApi } from '@/api/endpoints'
 import type {
   CollectionPathEntry,
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
+import {
+  createPermissionChecker,
+  workspacePermissionQueryKey,
+} from '@/auth/permissions'
 import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
 import { NotFoundPage } from '@/components/not-found-page'
@@ -105,6 +109,12 @@ function WorkspaceBrowser({
   workspaceName: string
 }) {
   const queryClient = useQueryClient()
+  const permissions = useQuery({
+    queryFn: async () =>
+      (await workspaceApi.myPermissions(workspaceId)).data.permissions,
+    queryKey: workspacePermissionQueryKey(workspaceId),
+  })
+  const permissionChecker = createPermissionChecker(permissions.data ?? [])
   const path = useCollectionPath(workspaceId, collectionId)
   const [createCollectionSignal, setCreateCollectionSignal] = useState(false)
   const openCreateCollection = useCallback(
@@ -127,6 +137,14 @@ function WorkspaceBrowser({
       }),
     [queryClient, workspaceId]
   )
+  const retryPermissions = useCallback(async () => {
+    await permissions.refetch()
+  }, [permissions.refetch])
+  if (permissions.isPending)
+    return <LoadingState label='Carregando permissões…' />
+  if (permissions.isError) {
+    return <ErrorState error={permissions.error} onRetry={retryPermissions} />
+  }
   if (collectionId && path.isError && !pathUnavailable) {
     return (
       <div className='flex flex-col items-center gap-3 p-8'>
@@ -151,6 +169,8 @@ function WorkspaceBrowser({
         workspaceName={workspaceName}
       />
       <WorkspaceHeading
+        canCreateCollection={permissionChecker.can('collection', 'create')}
+        canCreateItem={permissionChecker.can('item', 'create')}
         collectionId={collectionId}
         isLoading={path.isPending}
         onCreateCollection={openCreateCollection}
@@ -160,6 +180,7 @@ function WorkspaceBrowser({
         workspaceName={workspaceName}
       />
       <WorkspaceCollections
+        canCreateCollection={permissionChecker.can('collection', 'create')}
         collectionId={collectionId}
         createCollectionSignal={createCollectionSignal}
         onCollectionDialogOpened={clearCreateCollectionSignal}
@@ -229,6 +250,8 @@ function WorkspaceHeading({
   onItemCreated,
   workspaceId,
   workspaceName,
+  canCreateCollection,
+  canCreateItem,
 }: {
   collectionId: string | undefined
   isLoading: boolean
@@ -237,6 +260,8 @@ function WorkspaceHeading({
   workspaceName: string
   workspaceId: string
   onItemCreated: () => void
+  canCreateCollection: boolean
+  canCreateItem: boolean
 }) {
   const title = path.at(-1)?.name ?? workspaceName
 
@@ -291,13 +316,17 @@ function WorkspaceHeading({
         </div>
       </div>
       <div className='flex flex-wrap items-center gap-2'>
-        <CreateCollectionButton onClick={onCreateCollection} />
-        <CreateItemDialog
-          collectionId={collectionId}
-          onItemCreated={onItemCreated}
-          workspaceId={workspaceId}
-          workspaceName={workspaceName}
-        />
+        {canCreateCollection ? (
+          <CreateCollectionButton onClick={onCreateCollection} />
+        ) : null}
+        {canCreateItem ? (
+          <CreateItemDialog
+            collectionId={collectionId}
+            onItemCreated={onItemCreated}
+            workspaceId={workspaceId}
+            workspaceName={workspaceName}
+          />
+        ) : null}
       </div>
     </header>
   )

@@ -21,6 +21,7 @@ import type {
   UpdateWorkspaceRequest,
   UserResponse,
   WorkspaceMemberDto,
+  WorkspacePermissionsResponse,
   WorkspaceResponse,
 } from './types'
 import { workspaceMembersSchema } from './workspace-members'
@@ -60,6 +61,10 @@ export const workspaceApi = {
     }
     return { ...response, data: parsed.data }
   },
+  myPermissions: (workspaceId: string) =>
+    apiClient.get<WorkspacePermissionsResponse>(
+      `/workspaces/${workspaceId}/me/permissions`
+    ),
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
 }

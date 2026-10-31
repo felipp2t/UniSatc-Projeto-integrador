@@ -36,6 +36,8 @@ const apiMocks = vi.hoisted(() => ({
   collectionsRename: vi.fn(),
   itemsList: vi.fn(),
   workspaceList: vi.fn(),
+  workspaceMyPermissions: vi.fn(),
+  workspacePermissions: vi.fn(),
 }))
 
 vi.mock('@/api/endpoints', async (importOriginal) => {
@@ -51,7 +53,11 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       rename: apiMocks.collectionsRename,
     },
     itemsApi: { ...actual.itemsApi, list: apiMocks.itemsList },
-    workspaceApi: { ...actual.workspaceApi, list: apiMocks.workspaceList },
+    workspaceApi: {
+      ...actual.workspaceApi,
+      list: apiMocks.workspaceList,
+      myPermissions: apiMocks.workspacePermissions,
+    },
   }
 })
 
@@ -151,6 +157,17 @@ beforeEach(() => {
   apiMocks.collectionsRemove.mockResolvedValue({ data: undefined })
   apiMocks.workspaceList.mockResolvedValue({
     data: [{ id: workspaceId, name: 'Workspace' }],
+  })
+  apiMocks.workspacePermissions.mockResolvedValue({
+    data: {
+      isOwner: false,
+      permissions: [
+        { action: 'all', resource: 'collection' },
+        { action: 'all', resource: 'item' },
+      ],
+      roleId: 'role-1',
+      roleName: 'Owner',
+    },
   })
   apiMocks.collectionsList.mockResolvedValue(collectionPage([]))
   apiMocks.collectionsPath.mockImplementation(async (_id, collectionId) => ({

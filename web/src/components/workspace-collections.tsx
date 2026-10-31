@@ -25,12 +25,14 @@ export function WorkspaceCollections({
   workspaceId,
   createCollectionSignal,
   onCollectionDialogOpened,
+  canCreateCollection,
 }: {
   collectionId: string | undefined
   pathUnavailable: boolean
   workspaceId: string
   createCollectionSignal: boolean
   onCollectionDialogOpened: () => void
+  canCreateCollection: boolean
 }) {
   const navigate = useNavigate()
   const collectionMutations = useCollectionMutations()
@@ -63,10 +65,10 @@ export function WorkspaceCollections({
 
   const { data } = collections
   useEffect(() => {
-    if (!createCollectionSignal) return
+    if (!(createCollectionSignal && canCreateCollection)) return
     setDialog({ type: 'create' })
     onCollectionDialogOpened()
-  }, [createCollectionSignal, onCollectionDialogOpened])
+  }, [canCreateCollection, createCollectionSignal, onCollectionDialogOpened])
 
   useEffect(() => {
     if (
