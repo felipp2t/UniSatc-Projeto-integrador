@@ -806,7 +806,14 @@ fan-out pertence às issues #42 e #132.
 | RF— | GET | `/workspaces/{workspaceId}/groups/{groupId}/members` | Cookie `accessToken` + `group/manage` |
 | RF— | PUT | `/workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}` | Cookie `accessToken` + `group/manage` |
 | RF— | DELETE | `/workspaces/{workspaceId}/groups/{groupId}/members/{workspaceMemberId}` | Cookie `accessToken` + `group/manage` |
+| RF16 | DELETE | `/workspaces/{workspaceId}/members/{membershipId}?confirmMemberId={membershipId}` | Cookie `accessToken` + dono |
 | RF38 | GET | `/notifications` | Cookie `accessToken` |
 | RF39 | PATCH | `/notifications/{notificationId}/read` | Cookie `accessToken` |
 | RF39 | PATCH | `/notifications/read` | Cookie `accessToken` |
 | — | GET | `/notifications/stream` | Cookie `accessToken` |
+
+**`DELETE /workspaces/{workspaceId}/members/{membershipId}?confirmMemberId={membershipId}`** — somente um
+membro ativo com papel `Owner` pode remover um vínculo. A confirmação deve repetir o ID do vínculo no caminho; ausente ou
+divergente retorna `400`, tentativa do último dono retorna `409`, e sucesso retorna `204`. A remoção apaga
+apenas o vínculo, revogando sessões e participações em grupos vinculadas por cascade, e registra
+`member_removed` com ator e snapshot do membro. Conta, conteúdo e autoria histórica permanecem.
