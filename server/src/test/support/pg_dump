@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euo pipefail
+
+remote="/tmp/vaulty-pgdump-$$.dump"
+output=""
+port=""
+args=()
+while (($#)); do
+    case "$1" in
+        --file) output="$2"; shift 2 ;;
+        --port) port="$2"; shift 2 ;;
+        --host) shift 2 ;;
+        *) args+=("$1"); shift ;;
+    esac
+done
+
+if [[ -z "$output" || -z "$port" ]]; then
+    echo "pg_dump --file and --port arguments are required" >&2
+    exit 2
+fi
+
+if [[ -f "${0}.interrupt" ]]; then
+    printf '%s' "$$" > "${0}.interrupt.pid"
+    exec sleep 60
+fi
+
+container=""
+while read -r candidate; do
+    if docker port "$candidate" 5432/tcp 2>/dev/null | grep -q ":${port}$"; then
+        container="$candidate"
+        break
+    fi
+done < <(docker ps --filter ancestor=postgres:17-alpine --format '{{.ID}}')
+if [[ -z "$container" ]]; then
+    echo "No postgres:17-alpine Testcontainer matches host port $port" >&2
+    exit 127
+fi
+
+docker exec -e "PGPASSWORD=${PGPASSWORD:-}" "$container" pg_dump \
+    --host=127.0.0.1 --port=5432 --file="$remote" "${args[@]}"
+docker cp "$container:$remote" "$output" >/dev/null
+docker exec "$container" rm -f "$remote"

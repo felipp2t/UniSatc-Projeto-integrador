@@ -9,9 +9,17 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import com.vaulty.api.service.WorkspaceBackupService.BackupGenerationException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(BackupGenerationException.class)
+    public ResponseEntity<ApiErrorBody> handleBackupFailure(BackupGenerationException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiErrorBody.of(503, "Service Unavailable", "Backup não concluído; tente novamente",
+                        request.getRequestURI()));
+    }
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiErrorBody> handleApiException(ApiException ex, HttpServletRequest request) {

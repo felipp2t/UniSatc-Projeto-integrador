@@ -46,7 +46,7 @@ public abstract class PostgresIntegrationTest {
         });
     }
 
-    private static final PostgreSQLContainer<?> POSTGRES =
+    protected static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>("postgres:17-alpine");
 
     static {
