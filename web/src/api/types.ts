@@ -54,8 +54,10 @@ export type UpdateItemRequest =
   | { textContent: string; title: string }
   | { linkUrl: string; title: string }
   | { title: string; value: string }
-export type UpdateAttachmentMetadataRequest =
-  components['schemas']['UpdateItemMetadataRequest']
+export interface UpdateAttachmentMetadataRequest {
+  description?: string | null
+  title: string
+}
 // Manual: o OpenAPI gerado marca todos os campos como opcionais e width/height
 // como number; a API devolve null para anexos que não são imagem.
 export interface AttachmentResponse {
