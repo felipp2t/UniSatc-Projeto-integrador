@@ -1,155 +1,70 @@
 // @vitest-environment happy-dom
 
-import { QueryClient } from '@tanstack/react-query'
-import {
-  createMemoryHistory,
-  createRouter,
-  RouterProvider,
-} from '@tanstack/react-router'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
-import type { SessionService } from '@/auth/session'
-import type { RouterContext } from '@/router-context'
-import { routerDefaults } from '@/router-defaults'
-import { renderWithProviders } from '@/test/render'
-import { createSessionStub } from '@/test/session-stub'
-
-const workspaceApiMocks = vi.hoisted(() => ({
-  changeMemberRole: vi.fn(),
-  list: vi.fn(),
-  listMembers: vi.fn(),
-  listRoles: vi.fn(),
-}))
-const inviteApiMocks = vi.hoisted(() => ({
-  create: vi.fn(),
-  list: vi.fn(),
-}))
-const toastError = vi.hoisted(() => vi.fn())
-const toastSuccess = vi.hoisted(() => vi.fn())
+import {
+  members,
+  ownerId,
+  renderWorkspaceSettings,
+  setupWorkspaceSettingsMocks,
+  workspaceId,
+} from '@/test/workspace-settings-fixtures'
+import {
+  inviteApiMocks,
+  toastError,
+  toastSuccess,
+  workspaceApiMocks,
+} from '@/test/workspace-settings-mocks'
 
 vi.mock('@/components/ui/toast', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/components/ui/toast')>()
+  const shared = await import('@/test/workspace-settings-mocks')
   return {
     ...actual,
     appToast: {
       ...actual.appToast,
-      error: toastError,
-      success: toastSuccess,
+      error: shared.toastError,
+      success: shared.toastSuccess,
     },
   }
 })
 
 vi.mock('@/api/endpoints', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/endpoints')>()
+  const shared = await import('@/test/workspace-settings-mocks')
   return {
     ...actual,
     inviteApi: {
       ...actual.inviteApi,
-      create: inviteApiMocks.create,
-      list: inviteApiMocks.list,
+      create: shared.inviteApiMocks.create,
+      list: shared.inviteApiMocks.list,
     },
     workspaceApi: {
       ...actual.workspaceApi,
-      changeMemberRole: workspaceApiMocks.changeMemberRole,
-      list: workspaceApiMocks.list,
-      listMembers: workspaceApiMocks.listMembers,
-      listRoles: workspaceApiMocks.listRoles,
+      changeMemberRole: shared.workspaceApiMocks.changeMemberRole,
+      list: shared.workspaceApiMocks.list,
+      listMembers: shared.workspaceApiMocks.listMembers,
+      listRoles: shared.workspaceApiMocks.listRoles,
+      removeMember: shared.workspaceApiMocks.removeMember,
     },
   }
 })
 
-import { routeTree } from '@/route-tree.gen'
+beforeEach(setupWorkspaceSettingsMocks)
 
-const workspaceId = 'workspace-1'
-const ownerId = 'owner-1'
+afterEach(() => vi.restoreAllMocks())
+
 const retryButtonName = /tentar novamente|recarregar/i
 const roleSelectName = /^Cargo de/
 const removeButtonName = /^Remover/
-const members = [
-  {
-    email: 'ana@example.com',
-    id: 'membership-1',
-    name: 'Ana Owner',
-    roleId: 'role-owner',
-    roleName: 'Owner',
-    userId: ownerId,
-  },
-  {
-    email: 'bia@example.com',
-    id: 'membership-2',
-    name: 'Bia Member',
-    roleId: 'role-member',
-    roleName: 'Member',
-    userId: 'member-2',
-  },
-]
-
 const selfDemotionWarning =
   'Você perderá o acesso de gestão de membros deste workspace.'
 const coOwners = [
   members[0],
   { ...members[1], roleId: 'role-owner', roleName: 'Owner' },
 ]
-
-function createSession(userId: string): SessionService {
-  return createSessionStub({
-    status: 'authenticated',
-    user: { email: 'user@example.com', id: userId, name: 'User' },
-  })
-}
-
-async function renderWorkspaceSettings(userId: string) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
-    },
-  })
-  const router = createRouter({
-    context: {
-      permissionChecker: { can: () => true },
-      queryClient,
-      session: createSession(userId),
-    } satisfies RouterContext,
-    history: createMemoryHistory({
-      initialEntries: ['/configuracoes-workspace'],
-    }),
-    isServer: false,
-    routeTree,
-    ...routerDefaults,
-  })
-  router.startTransition = (transition) => {
-    transition()
-    return Promise.resolve(true)
-  }
-  router.updateLatestLocation()
-  await router.load({ sync: true })
-  return renderWithProviders(<RouterProvider router={router} />, {
-    queryClient,
-  })
-}
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  workspaceApiMocks.list.mockResolvedValue({
-    data: [{ id: workspaceId, name: 'Workspace', ownerId }],
-  })
-  workspaceApiMocks.listMembers.mockResolvedValue({ data: members })
-  workspaceApiMocks.listRoles.mockResolvedValue({
-    data: [
-      { id: 'role-owner', name: 'Owner' },
-      { id: 'role-member', name: 'Member' },
-    ],
-  })
-  workspaceApiMocks.changeMemberRole.mockResolvedValue({ data: members[1] })
-  inviteApiMocks.create.mockResolvedValue(undefined)
-  inviteApiMocks.list.mockResolvedValue({ data: [] })
-  toastError.mockReset()
-  toastSuccess.mockReset()
-})
-
-afterEach(() => vi.restoreAllMocks())
 
 describe('workspace members settings', () => {
   it('shows emails only to the workspace owner and filters by name and role', async () => {
@@ -248,7 +163,7 @@ describe('workspace members settings', () => {
     expect(inviteApiMocks.list).toHaveBeenCalledTimes(2)
   })
 
-  it('shows the role selector to owners and keeps removal unavailable', async () => {
+  it('shows the role selector to owners and enables member removal', async () => {
     await renderWorkspaceSettings(ownerId)
 
     const ownerRole = await screen.findByRole('combobox', {
@@ -265,11 +180,8 @@ describe('workspace members settings', () => {
     const removeButton = await screen.findByRole('button', {
       name: 'Remover Bia Member',
     })
-    expect(removeButton).toBeDisabled()
-    expect(removeButton).toHaveAttribute(
-      'title',
-      'A remoção ainda não está disponível na API do servidor.'
-    )
+    expect(removeButton).toBeEnabled()
+    expect(removeButton).toHaveAttribute('title', 'Remover membro.')
   })
 
   it('shows the member role while the role catalog is loading', async () => {
@@ -476,7 +388,29 @@ describe('workspace members settings', () => {
     expect(toastError).not.toHaveBeenCalledWith('Sensitive server detail')
   })
 
-  it('does not open a removal dialog when the API does not support removal', async () => {
+  it('protects the last owner by role and allows another member to be removed', async () => {
+    workspaceApiMocks.listMembers.mockResolvedValue({
+      data: [
+        { ...members[0], roleId: 'role-member', roleName: 'Member' },
+        { ...members[1], roleId: 'role-owner', roleName: 'Owner' },
+      ],
+    })
+    await renderWorkspaceSettings('member-2')
+
+    const lastOwnerButton = await screen.findByRole('button', {
+      name: 'Remover Bia Member',
+    })
+    expect(lastOwnerButton).toBeDisabled()
+    expect(lastOwnerButton).toHaveAttribute(
+      'title',
+      'O último dono do workspace não pode ser removido.'
+    )
+    expect(
+      screen.getByRole('button', { name: 'Remover Ana Owner' })
+    ).toBeEnabled()
+  })
+
+  it('opens the confirmation with the member name and email and does not remove when cancelled', async () => {
     const user = userEvent.setup()
     await renderWorkspaceSettings(ownerId)
 
@@ -484,8 +418,11 @@ describe('workspace members settings', () => {
       name: 'Remover Bia Member',
     })
     await user.click(removeButton)
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Bia Member (bia@example.com)')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
 
-    expect(removeButton).toBeDisabled()
+    expect(workspaceApiMocks.removeMember).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 

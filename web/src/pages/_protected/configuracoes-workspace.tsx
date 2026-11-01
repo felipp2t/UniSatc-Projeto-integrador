@@ -26,6 +26,7 @@ import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { ChangeMemberRoleDialog } from '@/components/change-member-role-dialog'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
+import { RemoveMemberDialog } from '@/components/remove-member-dialog'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
@@ -42,6 +43,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useChangeMemberRole } from '@/hooks/use-change-member-role'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
+import { useRemoveMember } from '@/hooks/use-remove-member'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
   component: WorkspaceSettingsPage,
@@ -89,6 +91,11 @@ function WorkspaceSettingsPage() {
     roles: roles.data,
     workspaceId,
   })
+  const memberRemoval = useRemoveMember({
+    currentUserId: session.user?.id,
+    session,
+    workspaceId,
+  })
   const roleSelectionDisabled =
     isOwner &&
     (roles.isPending ||
@@ -115,6 +122,7 @@ function WorkspaceSettingsPage() {
   const memberAccessError = members.isError ? members.error : undefined
   const memberAccessDenied = isForbiddenOrNotFound(memberAccessError)
 
+  if (memberRemoval.signedOut) return null
   if (workspaces.isPending)
     return <LoadingState label='Carregando workspace…' />
   if (workspaces.isError)
@@ -228,9 +236,11 @@ function WorkspaceSettingsPage() {
                 currentUserRole={currentUserRole}
                 filteredMembers={filteredMembers}
                 isOwner={isOwner}
+                isRemoving={memberRemoval.isPending}
                 memberAccessDenied={memberAccessDenied}
                 members={members}
                 onChangeRole={roleChange.requestRoleChange}
+                onRemove={memberRemoval.request}
                 onRetry={retryMembers}
                 roleSelectionDisabled={roleSelectionDisabled}
                 roles={roles.data ?? []}
@@ -246,6 +256,7 @@ function WorkspaceSettingsPage() {
         </section>
       </div>
       <ChangeMemberRoleDialog roleChange={roleChange} />
+      <RemoveMemberDialog removal={memberRemoval} />
     </main>
   )
 }
@@ -255,17 +266,21 @@ function MembersList({
   isOwner,
   memberAccessDenied,
   members,
+  isRemoving,
   onRetry,
   roles,
   roleSelectionDisabled,
   rolesLoadError,
   onChangeRole,
   currentUserRole,
+  onRemove,
 }: {
   filteredMembers: WorkspaceMemberResponse[]
   isOwner: boolean
   memberAccessDenied: boolean
   members: UseQueryResult<WorkspaceMemberResponse[]>
+  isRemoving: boolean
+  onRemove: (member: WorkspaceMemberResponse) => void
   onRetry: () => Promise<void>
   roles: WorkspaceRoleResponse[]
   roleSelectionDisabled: boolean
@@ -334,9 +349,11 @@ function MembersList({
               <MemberRow
                 index={index}
                 isOwner={isOwner}
+                isRemoving={isRemoving}
                 key={member.id}
                 member={member}
                 onChangeRole={onChangeRole}
+                onRemove={onRemove}
                 permissions={permissions}
                 roleSelectDisabled={
                   roleSelectionDisabled || permissions.isLastOwner
@@ -367,25 +384,30 @@ function RolesLoadError({ onRetry }: { onRetry: () => Promise<void> }) {
 function MemberRow({
   index,
   isOwner,
+  isRemoving,
   member,
   permissions,
   roles,
   roleSelectDisabled,
   onChangeRole,
+  onRemove,
 }: {
   index: number
   isOwner: boolean
+  isRemoving: boolean
   member: WorkspaceMemberResponse
   permissions: MemberPermissions
   roles: WorkspaceRoleResponse[]
   roleSelectDisabled: boolean
   onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
+  onRemove: (member: WorkspaceMemberResponse) => void
 }) {
   const { name } = member
   const handleRoleChange = useCallback(
     (roleId: string) => onChangeRole(member, roleId),
     [member, onChangeRole]
   )
+  const handleRemove = useCallback(() => onRemove(member), [member, onRemove])
 
   return (
     <tr className={index % 2 === 0 ? 'bg-card' : 'bg-muted/10'}>
@@ -441,7 +463,8 @@ function MemberRow({
           <Button
             aria-label={`Remover ${name}`}
             className='size-7 shrink-0 border border-destructive/40 text-destructive hover:bg-destructive/10'
-            disabled
+            disabled={isRemoving || Boolean(permissions.removeReason)}
+            onClick={handleRemove}
             size='icon'
             title={permissions.removeReason ?? 'Remover membro.'}
             variant='outline'
