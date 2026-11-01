@@ -1,6 +1,7 @@
 import type { ZodType } from 'zod'
 import { apiClient } from './client'
 import type {
+  AttachmentResponse,
   ChangePasswordRequest,
   CollectionPageResponse,
   CollectionPathEntry,
@@ -18,6 +19,9 @@ import type {
   RegisterRequest,
   RenameCollectionRequest,
   ResetPasswordRequest,
+  SecretValueResponse,
+  UpdateAttachmentMetadataRequest,
+  UpdateItemRequest,
   UpdateProfileRequest,
   UpdateWorkspaceRequest,
   UserResponse,
@@ -150,10 +154,58 @@ export const collectionsApi = {
 }
 
 export const itemsApi = {
+  archive: (workspaceId: string, itemId: string) =>
+    apiClient.post<void>(`/workspaces/${workspaceId}/items/${itemId}/archive`),
   create: (workspaceId: string, request: CreateItemRequest) =>
     apiClient.post<ItemResponse>(`/workspaces/${workspaceId}/items`, request),
-  list: (workspaceId: string, collectionId?: string, page = 0, size = 100) =>
+  get: (workspaceId: string, itemId: string) =>
+    apiClient.get<ItemResponse>(`/workspaces/${workspaceId}/items/${itemId}`),
+  list: (
+    workspaceId: string,
+    collectionId?: string,
+    page = 0,
+    size = 100,
+    { archived }: { archived?: boolean } = {}
+  ) =>
     apiClient.get<ItemPageResponse>(`/workspaces/${workspaceId}/items`, {
-      params: { collectionId, page, size },
+      params: { archived, collectionId, page, size },
     }),
+  remove: (workspaceId: string, itemId: string) =>
+    apiClient.delete<void>(`/workspaces/${workspaceId}/items/${itemId}`, {
+      params: { confirm: true },
+    }),
+  replaceAttachment: (
+    workspaceId: string,
+    itemId: string,
+    file: File,
+    { signal }: { signal?: AbortSignal } = {}
+  ) => {
+    const body = new FormData()
+    body.append('file', file)
+    return apiClient.put<AttachmentResponse>(
+      `/workspaces/${workspaceId}/items/${itemId}/attachment`,
+      body,
+      { signal }
+    )
+  },
+  restore: (workspaceId: string, itemId: string) =>
+    apiClient.post<void>(`/workspaces/${workspaceId}/items/${itemId}/restore`),
+  revealSecret: (workspaceId: string, itemId: string) =>
+    apiClient.get<SecretValueResponse>(
+      `/workspaces/${workspaceId}/items/${itemId}/secret`
+    ),
+  update: (workspaceId: string, itemId: string, request: UpdateItemRequest) =>
+    apiClient.put<ItemResponse>(
+      `/workspaces/${workspaceId}/items/${itemId}`,
+      request
+    ),
+  updateMetadata: (
+    workspaceId: string,
+    itemId: string,
+    request: UpdateAttachmentMetadataRequest
+  ) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/items/${itemId}/metadata`,
+      request
+    ),
 }

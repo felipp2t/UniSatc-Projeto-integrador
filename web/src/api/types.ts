@@ -23,7 +23,9 @@ export type CreateItemRequest =
       value: string
     }
 export interface ItemResponse {
+  archivedAt: string | null
   collectionId: string | null
+  description: string | null
   id: string
   linkUrl: string | null
   preview: string | null
@@ -47,7 +49,27 @@ export interface CollectionPageResponse {
   totalItems: number
   totalPages: number
 }
-export type ItemType = 'link' | 'secret' | 'text'
+export type ItemType = 'file' | 'image' | 'link' | 'secret' | 'text'
+export type UpdateItemRequest =
+  | { textContent: string; title: string }
+  | { linkUrl: string; title: string }
+  | { title: string; value: string }
+export type UpdateAttachmentMetadataRequest =
+  components['schemas']['UpdateItemMetadataRequest']
+// Manual: o OpenAPI gerado marca todos os campos como opcionais e width/height
+// como number; a API devolve null para anexos que não são imagem.
+export interface AttachmentResponse {
+  fileName: string
+  format: string
+  height: number | null
+  itemId: string
+  mimeType: string
+  size: number
+  width: number | null
+}
+export interface SecretValueResponse {
+  value: string
+}
 export interface ItemPageResponse {
   items: ItemResponse[]
   page: number
