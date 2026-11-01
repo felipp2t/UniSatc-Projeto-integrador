@@ -6,6 +6,7 @@ import {
   LinkIcon,
 } from '@phosphor-icons/react'
 import { useCallback, useState } from 'react'
+import { itemsApi } from '@/api/endpoints'
 import { getArchiveError, getRestoreError } from '@/api/item-errors'
 import type { ItemResponse } from '@/api/types'
 import { DeleteItemDialog } from '@/components/delete-item-dialog'
@@ -54,10 +55,17 @@ export function ItemListCard({
     () => onCopy(item.title, 'title'),
     [item.title, onCopy]
   )
-  const copyableContent = item.type === 'link' ? item.linkUrl : item.textContent
-  const handleCopyContent = useCallback(() => {
-    if (copyableContent) onCopy(copyableContent, 'content')
-  }, [copyableContent, onCopy])
+  const canCopyContent = item.type === 'link' || item.type === 'text'
+  const handleCopyContent = useCallback(async () => {
+    try {
+      const { data } = await itemsApi.get(workspaceId, item.id)
+      const content = data.type === 'link' ? data.linkUrl : data.textContent
+      if (!content) throw new Error('Item sem conteúdo para copiar')
+      onCopy(content, 'content')
+    } catch {
+      appToast.error('Não foi possível copiar o conteúdo.')
+    }
+  }, [item.id, onCopy, workspaceId])
   const isBusy = archive.isPending || restore.isPending
   const runArchive = useCallback(() => {
     if (isBusy) return
@@ -119,7 +127,7 @@ export function ItemListCard({
               <DropdownMenuItem onSelect={handleCopyTitle}>
                 Copiar título
               </DropdownMenuItem>
-              {copyableContent ? (
+              {canCopyContent ? (
                 <DropdownMenuItem onSelect={handleCopyContent}>
                   Copiar conteúdo
                 </DropdownMenuItem>

@@ -39,7 +39,7 @@ function makeItem(overrides: Partial<ItemResponse> = {}): ItemResponse {
     id: 'item-1',
     linkUrl: null,
     preview: 'prévia',
-    textContent: 'x',
+    textContent: null,
     title: 'Meu item',
     type: 'text',
     ...overrides,
@@ -213,26 +213,57 @@ describe('ItemListCard', () => {
     expect(onCopy).toHaveBeenCalledWith('Meu item', 'title')
   })
 
-  it('Copiar conteúdo repassa o texto do item ao callback', async () => {
-    const { onCopy, user } = await openMenu(makeItem({ textContent: 'corpo' }))
-
-    await user.click(screen.getByRole('menuitem', { name: 'Copiar conteúdo' }))
-
-    expect(onCopy).toHaveBeenCalledWith('corpo', 'content')
-  })
-
-  it('Copiar conteúdo de link copia a URL', async () => {
+  it('Copiar conteúdo busca o texto completo, pois a listagem só traz a prévia', async () => {
+    apiMocks.get.mockResolvedValue({
+      data: makeItem({ preview: 'cor…', textContent: 'corpo completo' }),
+    })
     const { onCopy, user } = await openMenu(
-      makeItem({
-        linkUrl: 'https://exemplo.com',
-        textContent: null,
-        type: 'link',
-      })
+      makeItem({ preview: 'cor…', textContent: null })
     )
 
     await user.click(screen.getByRole('menuitem', { name: 'Copiar conteúdo' }))
 
-    expect(onCopy).toHaveBeenCalledWith('https://exemplo.com', 'content')
+    await waitFor(() =>
+      expect(onCopy).toHaveBeenCalledWith('corpo completo', 'content')
+    )
+    expect(apiMocks.get).toHaveBeenCalledWith(workspaceId, 'item-1')
+  })
+
+  it('Copiar conteúdo de link busca a URL completa', async () => {
+    apiMocks.get.mockResolvedValue({
+      data: makeItem({
+        linkUrl: 'https://exemplo.com/caminho-longo',
+        textContent: null,
+        type: 'link',
+      }),
+    })
+    const { onCopy, user } = await openMenu(
+      makeItem({ linkUrl: null, textContent: null, type: 'link' })
+    )
+
+    await user.click(screen.getByRole('menuitem', { name: 'Copiar conteúdo' }))
+
+    await waitFor(() =>
+      expect(onCopy).toHaveBeenCalledWith(
+        'https://exemplo.com/caminho-longo',
+        'content'
+      )
+    )
+  })
+
+  it('Copiar conteúdo avisa o erro quando a busca falha', async () => {
+    const errorSpy = vi.spyOn(toast, 'error')
+    apiMocks.get.mockRejectedValue(new ApiError('falhou', 500))
+    const { onCopy, user } = await openMenu(makeItem({ textContent: null }))
+
+    await user.click(screen.getByRole('menuitem', { name: 'Copiar conteúdo' }))
+
+    await waitFor(() =>
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Não foi possível copiar o conteúdo.'
+      )
+    )
+    expect(onCopy).not.toHaveBeenCalled()
   })
 
   it('não oferece Copiar conteúdo para segredos', async () => {
