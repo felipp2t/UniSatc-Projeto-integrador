@@ -10,6 +10,7 @@ import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
 import type { CreateItemRequest, CreateItemType } from '@/api/types'
+import { ItemContentField } from '@/components/item-content-control'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -21,7 +22,6 @@ import {
 } from '@/components/ui/dialog'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { SecretInput } from '@/components/ui/secret-input'
 import {
   Select,
   SelectContent,
@@ -29,14 +29,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { appToast } from '@/components/ui/toast'
+import {
+  isContentInvalid,
+  isTitleInvalid,
+  TITLE_MAX,
+} from '@/lib/item-validation'
 
 const itemTypes = [
-  { icon: FileTextIcon, label: 'document', value: 'document' },
+  { icon: FileTextIcon, label: 'documento', value: 'document' },
   { icon: LinkSimpleIcon, label: 'link', value: 'link' },
-  { icon: KeyIcon, label: 'secret', value: 'secret' },
-  { icon: ParagraphIcon, label: 'text', value: 'text' },
+  { icon: KeyIcon, label: 'segredo', value: 'secret' },
+  { icon: ParagraphIcon, label: 'texto', value: 'text' },
 ] as const
 
 interface CollectionLocation {
@@ -123,7 +127,7 @@ function ItemTypeButton({
       onClick={handleClick}
       title={
         option.value === 'document'
-          ? 'Document upload is not supported yet'
+          ? 'O envio de documentos ainda não é suportado'
           : undefined
       }
       type='button'
@@ -144,7 +148,7 @@ function ItemTypeSelector({
   return (
     <fieldset className='w-full border-0 p-0'>
       <legend className='mb-1.5 font-mono text-[10px] text-muted-foreground'>
-        TYPE
+        TIPO
       </legend>
       <div className='flex items-center'>
         {itemTypes.map((option) => (
@@ -157,115 +161,6 @@ function ItemTypeSelector({
         ))}
       </div>
     </fieldset>
-  )
-}
-
-function ItemContentControl({
-  describedBy,
-  id,
-  invalid,
-  onChange,
-  type,
-  value,
-}: {
-  describedBy?: string
-  id: string
-  invalid: boolean
-  onChange: (value: string) => void
-  type: CreateItemType
-  value: string
-}) {
-  if (type === 'text') {
-    return (
-      <Textarea
-        aria-describedby={describedBy}
-        aria-invalid={invalid || undefined}
-        className='h-32 resize-none rounded-none border-border bg-outline p-3 focus-visible:border-primary/50 focus-visible:ring-0'
-        id={id}
-        maxLength={100_000}
-        name='content'
-        onValueChange={onChange}
-        placeholder='Write your text content here...'
-        required
-        rows={7}
-        value={value}
-      />
-    )
-  }
-  if (type === 'link') {
-    return (
-      <Input
-        aria-describedby={describedBy}
-        aria-invalid={invalid || undefined}
-        autoComplete='url'
-        className='h-[30px] rounded-none border-border bg-black px-2 focus-visible:border-primary/50 focus-visible:ring-0'
-        id={id}
-        maxLength={2048}
-        name='content'
-        onValueChange={onChange}
-        placeholder='https://'
-        required
-        type='url'
-        value={value}
-      />
-    )
-  }
-  return (
-    <SecretInput
-      aria-describedby={describedBy}
-      aria-invalid={invalid || undefined}
-      autoComplete='off'
-      id={id}
-      maxLength={8192}
-      name='content'
-      onValueChange={onChange}
-      placeholder='Secret value'
-      required
-      value={value}
-    />
-  )
-}
-
-function ItemContentField({
-  id,
-  invalid,
-  onChange,
-  type,
-  value,
-}: {
-  id: string
-  invalid: boolean
-  onChange: (value: string) => void
-  type: CreateItemType
-  value: string
-}) {
-  const errorId = `${id}-error`
-  const label =
-    type === 'text' ? 'CONTENT' : type === 'link' ? 'URL' : 'SECRET VALUE'
-  return (
-    <Field aria-invalid={invalid || undefined}>
-      <FieldLabel
-        className='font-normal text-[10px] text-muted-foreground'
-        htmlFor={id}
-      >
-        {label}
-      </FieldLabel>
-      <ItemContentControl
-        describedBy={invalid ? errorId : undefined}
-        id={id}
-        invalid={invalid}
-        onChange={onChange}
-        type={type}
-        value={value}
-      />
-      {invalid ? (
-        <p className='text-destructive text-xs' id={errorId} role='alert'>
-          {type === 'link'
-            ? 'Informe uma URL completa iniciada por http:// ou https://.'
-            : 'Enter the item content.'}
-        </p>
-      ) : null}
-    </Field>
   )
 }
 
@@ -305,7 +200,7 @@ function ItemDestinationFields({
               className='h-[30px] rounded-none border-border bg-black px-2 text-xs'
               id={`${titleId}-workspace`}
             >
-              <SelectValue placeholder='Select a workspace' />
+              <SelectValue placeholder='Selecione um workspace' />
             </SelectTrigger>
             <SelectContent>
               {workspaces.map((workspace) => (
@@ -324,7 +219,7 @@ function ItemDestinationFields({
             className='font-normal text-[10px] text-muted-foreground'
             htmlFor={`${titleId}-location`}
           >
-            LOCATION
+            LOCAL
           </FieldLabel>
           <Select
             disabled={locationsLoading}
@@ -335,10 +230,10 @@ function ItemDestinationFields({
               className='h-[30px] rounded-none border-border bg-black px-2 text-xs'
               id={`${titleId}-location`}
             >
-              <SelectValue placeholder='Workspace root or folder' />
+              <SelectValue placeholder='Raiz do workspace ou pasta' />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value='root'>Workspace root</SelectItem>
+              <SelectItem value='root'>Raiz do workspace</SelectItem>
               {locations.map((entry) => (
                 <SelectItem key={entry.id} value={entry.id}>
                   {entry.label}
@@ -369,21 +264,14 @@ async function fetchAvailableWorkspaces(): Promise<WorkspaceOption[]> {
 
 function getFormErrors(title: string, type: CreateItemType, content: string) {
   return {
-    content: !content.trim() || (type === 'link' && !isHttpUrl(content.trim())),
-    title: !title.trim(),
+    content: isContentInvalid(type, content),
+    title: isTitleInvalid(title),
   }
 }
 
-function isHttpUrl(value: string) {
-  try {
-    const url = new URL(value)
-    return (
-      (url.protocol === 'http:' || url.protocol === 'https:') &&
-      Boolean(url.hostname)
-    )
-  } catch {
-    return false
-  }
+const secretStatusMessages: Record<number, string> = {
+  403: 'Você não tem permissão para criar segredos neste workspace.',
+  503: 'O armazenamento de segredos não está configurado no servidor. Avise o administrador.',
 }
 
 function getCreateError(error: unknown, type: CreateItemType) {
@@ -398,6 +286,7 @@ function getCreateError(error: unknown, type: CreateItemType) {
         : 'Não foi possível confirmar o cadastro. Confira se o item foi criado antes de tentar novamente.',
     statusMessages: {
       409: 'Já existe um item com esse título nessa localização.',
+      ...(type === 'secret' ? secretStatusMessages : {}),
     },
     useServerMessage: type !== 'secret',
   })
@@ -483,7 +372,7 @@ export function CreateItemDialog({
       .catch(() => {
         if (!ignore) {
           setLocationsError(
-            'Folders could not be loaded. Saving to root is still available.'
+            'Não foi possível carregar as pastas. Ainda é possível salvar na raiz.'
           )
         }
       })
@@ -630,7 +519,7 @@ export function CreateItemDialog({
             <span aria-hidden='true' className='text-primary'>
               {'//'}
             </span>{' '}
-            NEW ITEM
+            NOVO ITEM
           </DialogTitle>
         </DialogHeader>
 
@@ -645,7 +534,7 @@ export function CreateItemDialog({
               className='font-normal text-[10px] text-muted-foreground'
               htmlFor={`${titleId}-title`}
             >
-              TITLE
+              TÍTULO
             </FieldLabel>
             <Input
               aria-describedby={
@@ -655,10 +544,10 @@ export function CreateItemDialog({
               autoComplete='off'
               className='h-[30px] rounded-none border-border bg-black px-2 focus-visible:border-primary/50 focus-visible:ring-0'
               id={`${titleId}-title`}
-              maxLength={255}
+              maxLength={TITLE_MAX}
               name='title'
               onChange={handleTitleChange}
-              placeholder='item title'
+              placeholder='título do item'
               required
               value={title}
             />
@@ -713,7 +602,7 @@ export function CreateItemDialog({
               onClick={handleCancel}
               variant='outline'
             >
-              CANCEL
+              CANCELAR
             </Button>
             <Button
               className='h-[30px] rounded-none px-4 text-[10px]'
@@ -722,7 +611,7 @@ export function CreateItemDialog({
               type='submit'
             >
               <PlusIcon aria-hidden='true' size={13} />
-              CREATE
+              CRIAR
             </Button>
           </DialogFooter>
         </form>

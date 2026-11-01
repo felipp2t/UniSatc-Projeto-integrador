@@ -66,11 +66,12 @@ public interface WorkspaceItemControllerDocs {
     ResponseEntity<ItemResponse> create(@Parameter(hidden = true) UUID userId,
                                         UUID workspaceId, CreateItemRequest request);
 
-    @Operation(summary = "Lista os itens ativos da raiz ou de uma pasta")
+    @Operation(summary = "Lista os itens ativos (ou, com archived=true, os arquivados) da raiz ou de uma pasta")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
         @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
     ResponseEntity<ItemPageResponse> list(@Parameter(hidden = true) UUID userId,
-                                          UUID workspaceId, UUID collectionId, int page, int size);
+                                          UUID workspaceId, UUID collectionId, boolean archived,
+                                          int page, int size);
 
     @Operation(summary = "Busca itens ativos por todas as palavras do título, ignorando caixa e acentos")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
