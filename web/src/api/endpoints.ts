@@ -109,6 +109,11 @@ export const workspaceApi = {
       ),
     }
   },
+  removeMember: (workspaceId: string, membershipId: string) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/members/${membershipId}`,
+      { params: { confirmMemberId: membershipId } }
+    ),
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
 }
@@ -116,6 +121,8 @@ export const workspaceApi = {
 export const inviteApi = {
   create: (request: InviteUserRequest) =>
     apiClient.post<void>('/invites', request),
+  decline: (request: InviteValidationRequest) =>
+    apiClient.post<void>('/invites/decline', request),
   list: () => apiClient.get<InviteResponse[]>('/invites'),
   revoke: (inviteId: string) =>
     apiClient.post<void>(`/invites/${inviteId}/revoke`),

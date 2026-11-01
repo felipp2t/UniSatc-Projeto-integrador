@@ -8,7 +8,7 @@ describe('workspace member permissions', () => {
     expect(isOwnerRole(undefined)).toBe(false)
   })
 
-  it('allows co-owners to remove other members when supported by the API', () => {
+  it('allows co-owners to remove other members', () => {
     expect(
       getMemberPermissions({
         currentUserRole: 'Owner',
@@ -17,7 +17,7 @@ describe('workspace member permissions', () => {
       })
     ).toEqual({
       isLastOwner: false,
-      removeReason: 'A remoção ainda não está disponível na API do servidor.',
+      removeReason: undefined,
     })
   })
 

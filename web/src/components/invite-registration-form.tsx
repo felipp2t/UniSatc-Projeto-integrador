@@ -1,7 +1,8 @@
 import { revalidateLogic, useForm, useSelector } from '@tanstack/react-form'
+import { useMutation } from '@tanstack/react-query'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { z } from 'zod'
-import { authApi } from '@/api/endpoints'
+import { authApi, inviteApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import {
   getApiErrorMessage,
@@ -10,6 +11,16 @@ import {
 } from '@/api/get-api-error-message'
 import { AuthStatus, BrandMark } from '@/components/auth-status'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   Field,
   FieldError,
@@ -55,6 +66,20 @@ export function InviteRegistrationForm({
   const [completionError, setCompletionError] = useState<string>()
   const [inviteUnavailable, setInviteUnavailable] = useState(false)
   const [now, setNow] = useState(() => performance.now())
+  const declineInvite = useMutation({
+    mutationFn: () => inviteApi.decline({ email, token }),
+    onError: (cause) => {
+      if (toApiError(cause).status === 404) setInviteUnavailable(true)
+    },
+  })
+  const declining = declineInvite.isPending
+  const declineError = declineInvite.error
+    ? getApiErrorMessage(declineInvite.error, {
+        fallback: 'Não foi possível recusar o convite. Tente novamente.',
+        serverError: SERVER_UNAVAILABLE_MESSAGE,
+        statusMessages: { 429: RATE_LIMITED_MESSAGE },
+      })
+    : undefined
   const remainingSeconds = Math.max(0, Math.ceil((deadline - now) / 1000))
   const form = useForm({
     defaultValues: { confirmPassword: '', name: '', password: '' },
@@ -103,10 +128,16 @@ export function InviteRegistrationForm({
   const submit = useCallback(
     (event: React.SubmitEvent<HTMLFormElement>) => {
       event.preventDefault()
+      if (declineInvite.isPending) return
+      declineInvite.reset()
       form.handleSubmit().catch(() => undefined)
     },
-    [form]
+    [declineInvite.isPending, declineInvite.reset, form]
   )
+  const confirmDecline = useCallback(() => {
+    setRequestError(undefined)
+    declineInvite.mutate()
+  }, [declineInvite.mutate])
 
   useEffect(() => {
     const update = () => {
@@ -127,13 +158,16 @@ export function InviteRegistrationForm({
     }
   }, [deadline])
 
-  if (remainingSeconds === 0) {
+  if (declineInvite.isSuccess) {
     return (
-      <AuthStatus message={unavailableMessage} title='Convite indisponível' />
+      <AuthStatus
+        message='O convite foi recusado. Nenhuma conta ou sessão foi criada.'
+        title='Convite recusado'
+      />
     )
   }
 
-  if (inviteUnavailable) {
+  if (remainingSeconds === 0 || inviteUnavailable) {
     return (
       <AuthStatus message={unavailableMessage} title='Convite indisponível' />
     )
@@ -262,13 +296,50 @@ export function InviteRegistrationForm({
             </p>
           ) : null}
           <Button
-            disabled={!canSubmit || submitting}
+            disabled={!canSubmit || submitting || declining}
             loading={submitting}
             type='submit'
           >
             {submitting ? 'Criando conta…' : 'CRIAR CONTA'}
           </Button>
         </form>
+        <div className='mt-6 flex flex-col gap-2'>
+          {declineError ? (
+            <p className='text-destructive text-sm' role='alert'>
+              {declineError}
+            </p>
+          ) : null}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                disabled={submitting || declining}
+                loading={declining}
+                type='button'
+                variant='destructive'
+              >
+                {declining ? 'Recusando convite…' : 'RECUSAR CONVITE'}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Recusar convite</DialogTitle>
+                <DialogDescription>
+                  Tem certeza de que deseja recusar este convite?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant='outline'>Cancelar</Button>
+                </DialogClose>
+                <DialogClose asChild>
+                  <Button onClick={confirmDecline} variant='destructive'>
+                    Recusar convite
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </section>
     </main>
   )

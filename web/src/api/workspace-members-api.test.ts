@@ -108,6 +108,17 @@ describe('workspaceApi member contracts', () => {
     ).rejects.toThrow('A resposta da API contém um membro inválido.')
   })
 
+  it('confirms member removal with the membership ID in the route and query', async () => {
+    apiMocks.delete.mockResolvedValue(undefined)
+
+    await workspaceApi.removeMember('workspace-local', 'membership-local-1')
+
+    expect(apiMocks.delete).toHaveBeenCalledWith(
+      '/workspaces/workspace-local/members/membership-local-1',
+      { params: { confirmMemberId: 'membership-local-1' } }
+    )
+  })
+
   it.each([
     ['a missing role ID', { ...validMember, roleId: undefined }],
     ['an empty user ID', { ...validMember, userId: '' }],

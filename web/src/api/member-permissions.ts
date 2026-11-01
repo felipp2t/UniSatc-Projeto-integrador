@@ -21,7 +21,7 @@ export function getMemberPermissions({
     removeReason: isOwnerRole(currentUserRole)
       ? isLastOwner
         ? 'O último dono do workspace não pode ser removido.'
-        : 'A remoção ainda não está disponível na API do servidor.'
+        : undefined
       : 'Somente um dono pode remover membros.',
   }
 }
