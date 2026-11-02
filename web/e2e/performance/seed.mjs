@@ -26,9 +26,10 @@ try {
     async ({ apiUrl, workspaceId, seedTitles }) => {
       const existingTitles = new Set()
       let totalPages = 1
-      for (let page = 0; page < totalPages; page += 1) {
+      for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
+        // biome-ignore lint/performance/noAwaitInLoops: Each page reveals the total page count needed to fetch the next one.
         const response = await fetch(
-          `${apiUrl}/workspaces/${workspaceId}/items?page=${page}&size=100`,
+          `${apiUrl}/workspaces/${workspaceId}/items?page=${pageIndex}&size=100`,
           { credentials: 'include' }
         )
         if (!response.ok) {
@@ -38,9 +39,9 @@ try {
             skipped: 0,
           }
         }
-        const result = await response.json()
-        totalPages = result.totalPages
-        for (const item of result.items) existingTitles.add(item.title)
+        const { items, totalPages: pageCount } = await response.json()
+        totalPages = pageCount
+        for (const { title } of items) existingTitles.add(title)
       }
 
       let created = 0
