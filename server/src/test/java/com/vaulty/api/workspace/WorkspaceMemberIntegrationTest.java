@@ -466,6 +466,108 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
+    void readmissionIsOwnerOnlyAndRequiresAnExistingRemovedAccount() throws Exception {
+        User owner = createUser("Proprietário");
+        User member = createUser("Membro");
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(member, workspaceId);
+
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"missing@example.com\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"missing@example.com\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + member.getEmail() + "\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"invalid\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void readmissionCreatesFreshMemberAccessWithoutRestoringOldAuthorityOrSessions() throws Exception {
+        User owner = createUser("Proprietário");
+        User target = createUser("Membro readmitido");
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(target, workspaceId);
+        var oldMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, target.getId())
+                .orElseThrow();
+        WorkspaceRole formerRole = new WorkspaceRole();
+        formerRole.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
+        formerRole.setName("Former manager");
+        formerRole = workspaceRoleRepository.saveAndFlush(formerRole);
+        oldMembership.setRole(formerRole);
+        workspaceMemberRepository.saveAndFlush(oldMembership);
+
+        AccessGroup group = new AccessGroup();
+        group.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
+        group.setName("Former team");
+        group = groupRepository.saveAndFlush(group);
+        addGroupMember(group, oldMembership.getId(), workspaceId);
+        UUID itemId = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO item (id, workspace_id, type, title) VALUES (?, ?, 'text', ?)",
+                itemId, workspaceId, "Former direct grant");
+        jdbcTemplate.update("INSERT INTO item_member_grant (item_id, workspace_member_id, workspace_id) VALUES (?, ?, ?)",
+                itemId, oldMembership.getId(), workspaceId);
+
+        var oldLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var oldAccess = oldLogin.getResponse().getCookie("accessToken");
+        var oldRefresh = oldLogin.getResponse().getCookie("refreshToken");
+        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspaceId, oldMembership.getId())
+                        .cookie(authCookie(owner)).param("confirmMemberId", oldMembership.getId().toString()))
+                .andExpect(status().isNoContent());
+
+        var response = mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.roleName").value("Member"))
+                .andReturn();
+        UUID newMembershipId = UUID.fromString(objectMapper.readTree(response.getResponse().getContentAsString())
+                .get("id").asText());
+        assertThat(newMembershipId).isNotEqualTo(oldMembership.getId());
+        var newMembership = workspaceMemberRepository.findById(newMembershipId).orElseThrow();
+        assertThat(newMembership.getRole().getName()).isEqualTo(WorkspaceRole.MEMBER_ROLE_NAME);
+        var readmissionActivity = jdbcTemplate.queryForMap("""
+                SELECT actor_id, actor_name, actor_context, action, resource_type, resource_id, snapshot
+                FROM activity_log WHERE action = 'member_joined' AND resource_id = ?
+                """, newMembershipId);
+        assertThat(readmissionActivity.get("actor_id")).isEqualTo(owner.getId());
+        assertThat(readmissionActivity.get("actor_name")).isEqualTo(owner.getName());
+        assertThat(readmissionActivity.get("actor_context")).isEqualTo("USER");
+        assertThat(readmissionActivity.get("resource_type")).isEqualTo("member");
+        assertThat(readmissionActivity.get("resource_id")).isEqualTo(newMembershipId);
+        assertThat(readmissionActivity.get("snapshot").toString())
+                .contains(target.getId().toString(), target.getName(), target.getEmail(), "Member");
+        assertThat(groupMemberRepository.findByGroupIdAndWorkspaceIdAndWorkspaceMemberId(
+                group.getId(), workspaceId, newMembershipId)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM item_member_grant WHERE item_id = ?",
+                Integer.class, itemId)).isZero();
+        mockMvc.perform(get("/workspaces/{workspaceId}/members", workspaceId).cookie(oldAccess))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/auth/refresh").cookie(oldRefresh)).andExpect(status().isUnauthorized());
+
+        var freshLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspaceId)
+                        .cookie(freshLogin.getResponse().getCookie("accessToken")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleName").value("Member"))
+                .andExpect(jsonPath("$.permissions.length()").value(2));
+    }
+
+    @Test
     void anotherOwnerCanRemoveMemberWhileRegularMemberCannot() throws Exception {
         User owner = createUser("Proprietário canônico");
         User otherOwner = createUser("Outro proprietário");
