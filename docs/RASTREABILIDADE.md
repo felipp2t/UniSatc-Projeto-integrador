@@ -88,6 +88,8 @@ Essa evidência cobre comportamento frontend e sessão local. Validade real de u
 
 ## Matriz não funcional
 
+O épico [#46](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/46) agrupa RNF01–RNF14 (#47–#60). Os refinamentos vinculados ao épico são [#135](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/135) (RF48/RNF16), [#137](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/137) (verificação de RNF16), [#138](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/138) (verificação de RNF15) e [#144](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/144) (conferência de critérios da base historicamente concluída). A conferência #144 não representa evidência de implementação ou verificação dos RNFs. RNF17 está previsto no escopo compartilhado de #45, #55 e #95.
+
 | RNF | Issue original / situação | Verificação prevista |
 |---|---|---|
 | RNF01 | [#47](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/47) / CLOSED | Cookies e ciclo de sessão, sem exposição de tokens |
