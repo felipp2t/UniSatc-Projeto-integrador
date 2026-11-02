@@ -49,7 +49,14 @@ function createSession(userId: string): SessionService {
 export function setupWorkspaceSettingsMocks() {
   vi.clearAllMocks()
   workspaceApiMocks.list.mockResolvedValue({
-    data: [{ id: workspaceId, name: 'Workspace', ownerId }],
+    data: [
+      {
+        description: 'Workspace description',
+        id: workspaceId,
+        name: 'Workspace',
+        ownerId,
+      },
+    ],
   })
   workspaceApiMocks.listMembers.mockResolvedValue({ data: members })
   workspaceApiMocks.listRoles.mockResolvedValue({
@@ -60,13 +67,24 @@ export function setupWorkspaceSettingsMocks() {
   })
   workspaceApiMocks.changeMemberRole.mockResolvedValue({ data: members[1] })
   workspaceApiMocks.removeMember.mockResolvedValue(undefined)
+  workspaceApiMocks.update.mockResolvedValue({
+    data: {
+      description: 'Workspace description',
+      id: workspaceId,
+      name: 'Workspace',
+      ownerId,
+    },
+  })
   inviteApiMocks.create.mockResolvedValue(undefined)
   inviteApiMocks.list.mockResolvedValue({ data: [] })
   toastError.mockReset()
   toastSuccess.mockReset()
 }
 
-export async function renderWorkspaceSettings(userId: string) {
+export async function renderWorkspaceSettings(
+  userId: string,
+  initialPath = '/configuracoes-workspace'
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
@@ -80,7 +98,7 @@ export async function renderWorkspaceSettings(userId: string) {
       session,
     } satisfies RouterContext,
     history: createMemoryHistory({
-      initialEntries: ['/configuracoes-workspace'],
+      initialEntries: [initialPath],
     }),
     isServer: false,
     routeTree,

@@ -6,6 +6,7 @@ export const workspaceApiMocks = {
   listMembers: vi.fn(),
   listRoles: vi.fn(),
   removeMember: vi.fn(),
+  update: vi.fn(),
 }
 export const inviteApiMocks = {
   create: vi.fn(),
