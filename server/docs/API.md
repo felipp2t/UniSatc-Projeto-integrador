@@ -531,8 +531,9 @@ autenticado; exige `item/read`.
 Lista os itens da raiz (sem `collectionId`) ou de uma pasta. Por padrão (`archived=false`) devolve
 somente itens ativos. Com `archived=true` devolve somente itens arquivados, aplicando a mesma regra
 de papel e compartilhamento: o proprietário vê todos; itens de pastas inacessíveis e segredos sem
-`secret/read` não aparecem. A busca (`/items/search`) continua restrita a itens ativos. Todo item
-retornado (listagem, consulta, edição e busca) traz `archivedAt` (`null` quando ativo, data/hora
+`secret/read` não aparecem. A busca (`/items/search`) retorna somente ativos por padrão e aceita
+`includeArchived=true` para incluir também os arquivados. Todo item retornado (listagem, consulta,
+edição e busca) traz `archivedAt` (`null` quando ativo, data/hora
 ISO-8601 quando arquivado).
 
 **`PUT /workspaces/{workspaceId}/items/{itemId}`** — autenticado; exige `item/update`.
