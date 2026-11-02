@@ -175,6 +175,7 @@ export function WorkspaceCollections({
         onRename={openRename}
         onRetry={retry}
         page={page}
+        workspaceId={workspaceId}
       />
     </>
   )
@@ -193,6 +194,7 @@ function CollectionsSection({
   onRename,
   onRetry,
   page,
+  workspaceId,
 }: {
   collectionId: string | undefined
   collections: CollectionPageResponse | undefined
@@ -206,6 +208,7 @@ function CollectionsSection({
   onRename: (collection: CollectionResponse) => void
   onRetry: () => void | Promise<void>
   page: number
+  workspaceId: string
 }) {
   if (isError) return <ErrorState error={error} onRetry={onRetry} />
   if (!collections) return <LoadingState label='Carregando pastas…' />
@@ -252,6 +255,7 @@ function CollectionsSection({
             key={folder.id}
             onDelete={onDelete}
             onRename={onRename}
+            workspaceId={workspaceId}
           />
         ))}
       </div>
