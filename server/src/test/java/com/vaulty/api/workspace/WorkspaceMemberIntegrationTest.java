@@ -70,14 +70,18 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     @AfterEach
     void cleanNonTransactionalFixtures() {
         if (cleanupWorkspace == null) return;
-        jdbcTemplate.update("DELETE FROM notification WHERE recipient_id IN (?, ?, ?)", cleanupOwner,
-                cleanupMember, cleanupThirdMember == null ? cleanupMember : cleanupThirdMember);
+        if (cleanupOwner != null || cleanupMember != null || cleanupThirdMember != null) {
+            jdbcTemplate.update("DELETE FROM notification WHERE recipient_id IN (?, ?, ?)", cleanupOwner,
+                    cleanupMember, cleanupThirdMember);
+        }
         if (cleanupCollection != null) jdbcTemplate.update("DELETE FROM collection WHERE id=?", cleanupCollection);
         if (cleanupGroup != null) jdbcTemplate.update("DELETE FROM access_group WHERE id=?", cleanupGroup);
         if (cleanupItem != null) jdbcTemplate.update("DELETE FROM item WHERE id=?", cleanupItem);
         jdbcTemplate.update("UPDATE workspace SET owner_id='afd23ecc-4abb-4e2b-b985-3aaa8637a839' WHERE id=?", cleanupWorkspace);
-        jdbcTemplate.update("DELETE FROM workspace_member WHERE user_id IN (?, ?, ?)", cleanupOwner,
-                cleanupMember, cleanupThirdMember == null ? cleanupMember : cleanupThirdMember);
+        if (cleanupOwner != null || cleanupMember != null || cleanupThirdMember != null) {
+            jdbcTemplate.update("DELETE FROM workspace_member WHERE user_id IN (?, ?, ?)", cleanupOwner,
+                    cleanupMember, cleanupThirdMember);
+        }
         if (cleanupRole != null) jdbcTemplate.update("DELETE FROM workspace_role WHERE id=?", cleanupRole);
         jdbcTemplate.update("""
                 INSERT INTO workspace_member (id,user_id,workspace_id,role_id)
