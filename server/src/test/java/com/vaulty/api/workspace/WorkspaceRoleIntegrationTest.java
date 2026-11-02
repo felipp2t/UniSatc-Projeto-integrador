@@ -185,32 +185,24 @@ class WorkspaceRoleIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void renameRejectsInvalidNamesAndUnknownRoles() throws Exception {
+    void renameRejectsInvalidAndNormalizedDuplicateNamesAndUnknownRoles() throws Exception {
         User owner = createUser();
         WorkspaceResponse workspace = configureWorkspace(owner);
         UUID roleId = createRole(owner, workspace.id(), "Financeiro");
+        createRole(owner, workspace.id(), "Café");
         for (String invalid : new String[] {"   ", "a".repeat(51)}) {
             mockMvc.perform(put(role(workspace.id(), roleId)).cookie(authCookie(owner))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(Map.of("name", invalid))))
                     .andExpect(status().isBadRequest());
         }
+        mockMvc.perform(put(role(workspace.id(), roleId)).cookie(authCookie(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\" CAFE \"}"))
+                .andExpect(status().isConflict());
         mockMvc.perform(put(role(workspace.id(), UUID.randomUUID())).cookie(authCookie(owner))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Outro\"}"))
                 .andExpect(status().isNotFound());
         assertThat(activityCount("role_renamed", owner)).isZero();
-    }
-
-    @Test
-    void renameRejectsNormalizedDuplicateName() throws Exception {
-        User owner = createUser();
-        WorkspaceResponse workspace = configureWorkspace(owner);
-        UUID roleId = createRole(owner, workspace.id(), "Financeiro");
-        createRole(owner, workspace.id(), "Café");
-
-        mockMvc.perform(put(role(workspace.id(), roleId)).cookie(authCookie(owner))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\" CAFE \"}"))
-                .andExpect(status().isConflict());
     }
 
     @Test
