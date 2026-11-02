@@ -89,7 +89,8 @@ public class WorkspaceItemService {
     }
 
     @Transactional(readOnly = true)
-    public ItemPageResponse list(UUID userId, UUID workspaceId, UUID collectionId, int page, int size) {
+    public ItemPageResponse list(UUID userId, UUID workspaceId, UUID collectionId, boolean archived,
+                                 int page, int size) {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         validatePage(page, size);
@@ -99,12 +100,13 @@ public class WorkspaceItemService {
         if (collectionId != null) contentAccess.requireCollection(userId, workspace, collectionId);
         var pageable = PageRequest.of(page, size);
         boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
-        return ItemPageResponse.from(itemRepository.listAccessible(workspaceId, userId, collectionId, includeSecrets, pageable)
+        return ItemPageResponse.from(itemRepository.listAccessible(workspaceId, userId, collectionId, includeSecrets, archived, pageable)
                 .map(item -> toResponse(item, false)));
     }
 
     @Transactional(readOnly = true)
-    public ItemPageResponse search(UUID userId, UUID workspaceId, String query, int page, int size) {
+    public ItemPageResponse search(UUID userId, UUID workspaceId, String query, boolean includeArchived,
+                                   int page, int size) {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         validatePage(page, size);
@@ -114,7 +116,7 @@ public class WorkspaceItemService {
         var pageable = PageRequest.of(page, size);
         boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
         return ItemPageResponse.from(itemRepository.searchAccessible(
-                        workspaceId, userId, query.trim(), includeSecrets, pageable)
+                        workspaceId, userId, query.trim(), includeSecrets, includeArchived, pageable)
                 .map(item -> toAccessibleResponse(userId, workspace, item, false)));
     }
 
@@ -318,7 +320,8 @@ public class WorkspaceItemService {
         return new ItemResponse(item.getId(), item.getType(), item.getTitle(),
                 item.getCollection() == null ? null : item.getCollection().getId(),
                 includeContent ? item.getTextContent() : null,
-                includeContent ? item.getLinkUrl() : null, preview, item.getDescription());
+                includeContent ? item.getLinkUrl() : null, preview, item.getDescription(),
+                item.getArchivedAt());
     }
 
     private ItemResponse toAccessibleResponse(UUID userId, Workspace workspace, WorkspaceItem item,
@@ -327,7 +330,8 @@ public class WorkspaceItemService {
         return item.getCollection() != null
                 && !contentAccess.canReadCollection(userId, workspace, item.getCollection().getId())
                 ? new ItemResponse(response.id(), response.type(), response.title(), null,
-                        response.textContent(), response.linkUrl(), response.preview(), response.description())
+                        response.textContent(), response.linkUrl(), response.preview(), response.description(),
+                        response.archivedAt())
                 : response;
     }
 

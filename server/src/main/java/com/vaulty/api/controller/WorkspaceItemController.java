@@ -113,9 +113,10 @@ public class WorkspaceItemController implements WorkspaceItemControllerDocs {
     public ResponseEntity<ItemPageResponse> list(@AuthenticationPrincipal UUID userId,
                                                  @PathVariable UUID workspaceId,
                                                  @RequestParam(required = false) UUID collectionId,
+                                                 @RequestParam(defaultValue = "false") boolean archived,
                                                  @RequestParam(defaultValue = "0") int page,
                                                  @RequestParam(defaultValue = "20") int size) {
-        var items = itemService.list(userId, workspaceId, collectionId, page, size);
+        var items = itemService.list(userId, workspaceId, collectionId, archived, page, size);
         return ResponseEntity.ok(items);
     }
 
@@ -123,9 +124,10 @@ public class WorkspaceItemController implements WorkspaceItemControllerDocs {
     public ResponseEntity<ItemPageResponse> search(@AuthenticationPrincipal UUID userId,
                                                    @PathVariable UUID workspaceId,
                                                    @RequestParam String q,
+                                                   @RequestParam(defaultValue = "false") boolean includeArchived,
                                                    @RequestParam(defaultValue = "0") int page,
                                                    @RequestParam(defaultValue = "20") int size) {
-        var items = itemService.search(userId, workspaceId, q, page, size);
+        var items = itemService.search(userId, workspaceId, q, includeArchived, page, size);
         return ResponseEntity.ok(items);
     }
 

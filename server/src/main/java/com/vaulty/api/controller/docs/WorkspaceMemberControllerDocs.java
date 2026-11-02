@@ -1,6 +1,7 @@
 package com.vaulty.api.controller.docs;
 
 import com.vaulty.api.dto.workspace.ChangeMemberRoleRequest;
+import com.vaulty.api.dto.workspace.ReadmitMemberRequest;
 import com.vaulty.api.dto.workspace.WorkspaceMemberResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,6 +18,16 @@ public interface WorkspaceMemberControllerDocs {
     @Operation(summary = "Lista os membros de um workspace")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "404")})
     List<WorkspaceMemberResponse> list(@Parameter(hidden = true) UUID userId, UUID workspaceId);
+
+    @Operation(summary = "Readmite uma conta existente como membro do workspace",
+            description = "Somente Owner pode readmitir. A conta recebe o papel Member e não recupera acessos anteriores.")
+    @ApiResponses({@ApiResponse(responseCode = "201", description = "Membro readmitido"),
+            @ApiResponse(responseCode = "400", description = "E-mail inválido"),
+            @ApiResponse(responseCode = "403", description = "Somente o dono pode readmitir membros"),
+            @ApiResponse(responseCode = "404", description = "Workspace ou conta não encontrada"),
+            @ApiResponse(responseCode = "409", description = "Conta já é membro do workspace")})
+    ResponseEntity<WorkspaceMemberResponse> readmit(@Parameter(hidden = true) UUID userId, UUID workspaceId,
+                                                     ReadmitMemberRequest request);
 
     @Operation(summary = "Atribui um papel a um membro, preservando ao menos um dono")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),

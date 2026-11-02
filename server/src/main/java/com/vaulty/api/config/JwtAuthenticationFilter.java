@@ -49,7 +49,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         extractAccessTokenCookie(request)
                 .flatMap(jwtService::validateAccessToken)
                 .ifPresent(claims -> {
-                    if (workspaceMemberRepository != null) {
+                    if (claims.accountOnly()) {
+                        authenticateAccount(claims);
+                    } else if (workspaceMemberRepository != null) {
                         workspaceMemberRepository.findByIdAndUserId(claims.membershipId(), claims.userId())
                                 .ifPresent(member -> authenticate(claims, member));
                     }
@@ -70,8 +72,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(JwtService.AccessTokenClaims claims, WorkspaceMember member) {
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(member.getRole().getName()));
+        List<GrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority("WORKSPACE_MEMBER"),
+                new SimpleGrantedAuthority(member.getRole().getName()));
         var authentication = new UsernamePasswordAuthenticationToken(claims.userId(), null, authorities);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    private void authenticateAccount(JwtService.AccessTokenClaims claims) {
+        var authentication = new UsernamePasswordAuthenticationToken(
+                claims.userId(), null, List.of(new SimpleGrantedAuthority("ACCOUNT_ONLY")));
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

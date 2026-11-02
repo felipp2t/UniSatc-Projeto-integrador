@@ -12,10 +12,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaulty.api.entity.RolePermission;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.WorkspaceRole;
+import com.vaulty.api.entity.Notification;
+import com.vaulty.api.repository.NotificationRepository;
+import com.vaulty.api.service.WorkspaceSharingService;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 import com.vaulty.api.storage.ObjectStorage;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -29,6 +42,194 @@ class WorkspaceSharingIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Autowired private ObjectMapper mapper;
     @MockBean private ObjectStorage storage;
+    @Autowired private NotificationRepository notificationRepository;
+    @Autowired private WorkspaceSharingService sharingService;
+    @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    private UUID cleanupWorkspace;
+    private UUID cleanupOwner;
+    private UUID cleanupMember;
+    private UUID cleanupParent;
+    private UUID cleanupChild;
+    private UUID cleanupGroupA;
+    private UUID cleanupGroupB;
+
+    @AfterEach
+    void cleanConcurrentFixture() {
+        if (cleanupWorkspace == null) return;
+        jdbcTemplate.update("DELETE FROM notification WHERE recipient_id IN (?, ?)", cleanupOwner, cleanupMember);
+        jdbcTemplate.update("DELETE FROM collection_access_grant WHERE collection_id IN (?, ?)", cleanupParent, cleanupChild);
+        jdbcTemplate.update("DELETE FROM access_group_member WHERE group_id IN (?, ?)", cleanupGroupA, cleanupGroupB);
+        jdbcTemplate.update("DELETE FROM access_group WHERE id IN (?, ?)", cleanupGroupA, cleanupGroupB);
+        jdbcTemplate.update("DELETE FROM collection WHERE id IN (?, ?)", cleanupChild, cleanupParent);
+        jdbcTemplate.update("UPDATE workspace SET owner_id='afd23ecc-4abb-4e2b-b985-3aaa8637a839' WHERE id=?", cleanupWorkspace);
+        jdbcTemplate.update("DELETE FROM workspace_member WHERE user_id IN (?, ?)", cleanupOwner, cleanupMember);
+        jdbcTemplate.update("""
+                INSERT INTO workspace_member (id,user_id,workspace_id,role_id)
+                SELECT gen_random_uuid(), 'afd23ecc-4abb-4e2b-b985-3aaa8637a839', ?, id
+                FROM workspace_role WHERE workspace_id=? AND name='Owner'
+                ON CONFLICT (workspace_id,user_id) DO NOTHING
+                """, cleanupWorkspace, cleanupWorkspace);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentRevocationOfTwoGroupOriginsNotifiesOnlyAfterLastOriginIsRemoved() throws Exception {
+        User owner = createUser("Owner");
+        User member = createUser("Member");
+        UUID workspace = configureWorkspace(owner).id();
+        cleanupWorkspace = workspace;
+        cleanupOwner = owner.getId();
+        cleanupMember = member.getId();
+        addMember(member, workspace);
+        UUID parent = createFolder(owner, workspace, "Private", null);
+        cleanupParent = parent;
+        disableInheritance(owner, workspace, parent);
+        revokeEveryone(owner, workspace, parent);
+        UUID child = createFolder(owner, workspace, "Inherited private", parent);
+        cleanupChild = child;
+        UUID groupA = createGroup(owner, workspace, "A");
+        UUID groupB = createGroup(owner, workspace, "B");
+        cleanupGroupA = groupA;
+        cleanupGroupB = groupB;
+        UUID memberId = memberId(workspace, member);
+        grantCollectionGroup(owner, workspace, child, groupA);
+        grantCollectionGroup(owner, workspace, child, groupB);
+        addToGroup(owner, workspace, groupA, memberId);
+        addToGroup(owner, workspace, groupB, memberId);
+        notificationRepository.deleteAll();
+        mockMvc.perform(get(path(workspace, child)).cookie(authCookie(member))).andExpect(status().isOk());
+
+        CountDownLatch firstApplied = new CountDownLatch(1);
+        CountDownLatch allowFirstCommit = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        try {
+            var revokeA = executor.submit(() -> transaction.execute(status -> {
+                sharingService.revokeGroup(owner.getId(), workspace, child, groupA);
+                firstApplied.countDown();
+                await(allowFirstCommit);
+                return null;
+            }));
+            assertTrue(firstApplied.await(5, TimeUnit.SECONDS));
+            var revokeB = executor.submit(() -> transaction.execute(status -> {
+                secondStarted.countDown();
+                sharingService.revokeGroup(owner.getId(), workspace, child, groupB);
+                return null;
+            }));
+            assertTrue(secondStarted.await(5, TimeUnit.SECONDS));
+            awaitWorkspaceLockWait();
+            allowFirstCommit.countDown();
+            revokeA.get(10, TimeUnit.SECONDS);
+            revokeB.get(10, TimeUnit.SECONDS);
+        } finally {
+            allowFirstCommit.countDown();
+            executor.shutdownNow();
+        }
+
+        assertThatAccessChanged(member, 1);
+        mockMvc.perform(get(path(workspace, child)).cookie(authCookie(member))).andExpect(status().isNotFound());
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) throw new AssertionError("Timed out waiting for concurrent start");
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(exception);
+        }
+    }
+
+    private void awaitWorkspaceLockWait() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            Integer waiting = jdbcTemplate.queryForObject("""
+                    SELECT count(*) FROM pg_stat_activity
+                    WHERE datname = current_database() AND pid <> pg_backend_pid()
+                      AND state = 'active' AND wait_event_type = 'Lock'
+                    """, Integer.class);
+            if (waiting != null && waiting > 0) return;
+            Thread.sleep(10);
+        }
+        throw new AssertionError("Second ACL mutation did not block on the held workspace lock");
+    }
+
+    @Test
+    void groupGrantAndRevocationNotifyOnlyMembersWhoseInheritedReadAccessChanges() throws Exception {
+        User owner = createUser("Owner");
+        User member = createUser("Granted member");
+        User unrelated = createUser("Unrelated member");
+        UUID workspace = configureWorkspace(owner).id();
+        addMember(member, workspace);
+        addMember(unrelated, workspace);
+        UUID parent = createFolder(owner, workspace, "Private parent", null);
+        disableInheritance(owner, workspace, parent);
+        revokeEveryone(owner, workspace, parent);
+        UUID child = createFolder(owner, workspace, "Inherited child", parent);
+        UUID group = createGroup(owner, workspace, "Readers");
+        UUID memberId = memberId(workspace, member);
+        notificationRepository.deleteAll();
+
+        grantCollectionGroup(owner, workspace, child, group);
+        mockMvc.perform(put("/workspaces/{workspaceId}/groups/{groupId}/members/{memberId}",
+                        workspace, group, memberId).cookie(authCookie(owner)))
+                .andExpect(status().isNoContent());
+
+        assertThatAccessChanged(member, 1);
+        assertThatAccessChanged(unrelated, 0);
+        mockMvc.perform(get(path(workspace, child)).cookie(authCookie(member))).andExpect(status().isOk());
+
+        mockMvc.perform(delete("/workspaces/{workspaceId}/groups/{groupId}/members/{memberId}",
+                        workspace, group, memberId).cookie(authCookie(owner)))
+                .andExpect(status().isNoContent());
+        assertThatAccessChanged(member, 2);
+        mockMvc.perform(get(path(workspace, child)).cookie(authCookie(member))).andExpect(status().isNotFound());
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/groups/{groupId}/members/{memberId}",
+                        workspace, group, memberId).cookie(authCookie(owner)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(delete("/workspaces/{workspaceId}/sharing/collections/{collectionId}/groups/{groupId}",
+                        workspace, child, group).cookie(authCookie(owner)))
+                .andExpect(status().isNoContent());
+
+        assertThatAccessChanged(member, 4);
+        mockMvc.perform(get(path(workspace, child)).cookie(authCookie(member))).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void revokingOneAccessOriginDoesNotNotifyWhenAnotherStillGrantsRead() throws Exception {
+        User owner = createUser("Owner");
+        User member = createUser("Member");
+        UUID workspace = configureWorkspace(owner).id();
+        addMember(member, workspace);
+        UUID item = createRootItem(owner, workspace, "Shared item");
+        UUID group = createGroup(owner, workspace, "Readers");
+        UUID memberId = memberId(workspace, member);
+        mockMvc.perform(put("/workspaces/{workspaceId}/groups/{groupId}/members/{memberId}",
+                        workspace, group, memberId).cookie(authCookie(owner))).andExpect(status().isNoContent());
+        mockMvc.perform(put("/workspaces/{workspaceId}/sharing/items/{itemId}/members/{memberId}",
+                        workspace, item, memberId).cookie(authCookie(owner))).andExpect(status().isNoContent());
+        notificationRepository.deleteAll();
+
+        mockMvc.perform(delete("/workspaces/{workspaceId}/sharing/items/{itemId}/members/{memberId}",
+                        workspace, item, memberId).cookie(authCookie(owner))).andExpect(status().isNoContent());
+
+        assertThatAccessChanged(member, 0);
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}", workspace, item)
+                        .cookie(authCookie(member))).andExpect(status().isOk());
+    }
+
+    private void assertThatAccessChanged(User user, int expectedCount) {
+        assertEquals(expectedCount, notificationRepository.findAll().stream()
+                .filter(notification -> notification.getRecipient().getId().equals(user.getId()))
+                .filter(this::isAccessChanged).count());
+    }
+
+    private boolean isAccessChanged(Notification notification) {
+        return "ACCESS_CHANGED".equals(notification.getMetadata().get("event"));
+    }
 
     @Test
     void groupGrantsAndMembershipChangesApplyImmediatelyAndRequireSharingPermission() throws Exception {

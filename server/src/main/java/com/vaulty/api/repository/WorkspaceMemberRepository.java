@@ -29,6 +29,17 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
     boolean existsByRoleId(UUID roleId);
 
     @Query("""
+            select count(member) from WorkspaceMember member
+            where member.workspace.id = :workspaceId and member.role.id = :roleId
+            """)
+    long countByWorkspaceIdAndRoleId(
+            @Param("workspaceId") UUID workspaceId, @Param("roleId") UUID roleId);
+
+    @Query("select member from WorkspaceMember member join fetch member.user where member.workspace.id = :workspaceId and member.role.id = :roleId")
+    List<WorkspaceMember> findAllByWorkspaceIdAndRoleId(
+            @Param("workspaceId") UUID workspaceId, @Param("roleId") UUID roleId);
+
+    @Query("""
             select member from WorkspaceMember member
             where member.workspace.id = :workspaceId and member.role.name = :ownerRoleName
             order by member.id

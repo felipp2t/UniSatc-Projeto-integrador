@@ -48,19 +48,19 @@ async function submitItem(type: 'secret' | 'text') {
   await user.click(screen.getByRole('button', { name: 'Novo item' }))
   const dialog = await screen.findByRole('dialog')
   await waitFor(() => {
-    expect(within(dialog).getByRole('button', { name: 'CREATE' })).toBeEnabled()
+    expect(within(dialog).getByRole('button', { name: 'CRIAR' })).toBeEnabled()
   })
-  await user.type(within(dialog).getByLabelText('TITLE'), 'Test item')
+  await user.type(within(dialog).getByLabelText('TÍTULO'), 'Test item')
   if (type === 'secret') {
-    await user.click(within(dialog).getByRole('button', { name: 'secret' }))
+    await user.click(within(dialog).getByRole('button', { name: 'segredo' }))
     await user.type(
-      within(dialog).getByLabelText('SECRET VALUE'),
+      within(dialog).getByLabelText('VALOR DO SEGREDO'),
       'secret value'
     )
   } else {
-    await user.type(within(dialog).getByLabelText('CONTENT'), 'text content')
+    await user.type(within(dialog).getByLabelText('CONTEÚDO'), 'text content')
   }
-  await user.click(within(dialog).getByRole('button', { name: 'CREATE' }))
+  await user.click(within(dialog).getByRole('button', { name: 'CRIAR' }))
   return { dialog, user }
 }
 
@@ -115,6 +115,29 @@ describe('create item errors', () => {
       'Já existe um item com esse título nessa localização.'
     )
     expect(within(dialog).queryByText('Sensitive server detail')).toBeNull()
+  })
+
+  it('explains when the server has no secret encryption configured', async () => {
+    apiMocks.itemsCreate.mockRejectedValueOnce(
+      new ApiError('SECRET_ENCRYPTION_KEY não configurada', 503)
+    )
+    const { dialog } = await submitItem('secret')
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'O armazenamento de segredos não está configurado no servidor. Avise o administrador.'
+    )
+    expect(
+      within(dialog).queryByText('SECRET_ENCRYPTION_KEY não configurada')
+    ).toBeNull()
+  })
+
+  it('tells the user when secret creation is forbidden', async () => {
+    apiMocks.itemsCreate.mockRejectedValueOnce(new ApiError('Forbidden', 403))
+    const { dialog } = await submitItem('secret')
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Você não tem permissão para criar segredos neste workspace.'
+    )
   })
 
   it('uses the generic message for other secret failures without exposing server details', async () => {

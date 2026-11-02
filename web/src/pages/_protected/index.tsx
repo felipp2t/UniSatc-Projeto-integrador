@@ -1,11 +1,9 @@
 import {
-  ArchiveIcon,
+  ClockCounterClockwiseIcon,
   DotsThreeVerticalIcon,
   FileIcon,
   FolderIcon,
   GearIcon,
-  KeyIcon,
-  LinkIcon,
 } from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
@@ -14,6 +12,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { isUnavailableCollectionError } from '@/api/collection-errors'
 import { itemsApi } from '@/api/endpoints'
+import { itemKeys } from '@/api/item-keys'
 import type {
   CollectionPathEntry,
   ItemPageResponse,
@@ -21,8 +20,14 @@ import type {
 } from '@/api/types'
 import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
+import {
+  InlineCodeContent,
+  InlineCodeRoot,
+  InlineCodeSeparator,
+  InlineCodeText,
+} from '@/components/inline-code'
+import { type CopyKind, ItemListCard } from '@/components/item-list-card'
 import { NotFoundPage } from '@/components/not-found-page'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,9 +53,17 @@ import { useCollectionPath } from '@/hooks/use-collection-path'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 const searchSchema = z.object({
+  archived: z.boolean().optional().catch(undefined),
   collectionId: z.guid().optional().catch(undefined),
 })
-const itemTypeOptions = ['all', 'text', 'link', 'secret'] as const
+const itemTypeOptions = [
+  'all',
+  'text',
+  'link',
+  'secret',
+  'file',
+  'image',
+] as const
 type ItemTypeFilter = (typeof itemTypeOptions)[number]
 
 export const Route = createFileRoute('/_protected/')({
@@ -61,7 +74,15 @@ export const Route = createFileRoute('/_protected/')({
 })
 
 function HomePage() {
-  const { collectionId } = Route.useSearch()
+  const { archived, collectionId } = Route.useSearch()
+  const navigate = Route.useNavigate()
+  const changeArchived = useCallback(
+    (value: boolean) =>
+      navigate({
+        search: (prev) => ({ ...prev, archived: value || undefined }),
+      }),
+    [navigate]
+  )
   const workspaces = useCurrentWorkspace()
   const workspace = workspaces.data
   const retryWorkspaces = useCallback(async () => {
@@ -86,9 +107,11 @@ function HomePage() {
 
   return (
     <WorkspaceBrowser
+      archived={Boolean(archived)}
       collectionId={collectionId}
       // Remounting per folder prevents folder-scoped state and data from leaking.
       key={`${workspace.id}:${collectionId ?? 'root'}`}
+      onArchivedChange={changeArchived}
       workspaceId={workspace.id}
       workspaceName={workspace.name ?? 'Workspace'}
     />
@@ -96,11 +119,15 @@ function HomePage() {
 }
 
 function WorkspaceBrowser({
+  archived,
   collectionId,
+  onArchivedChange,
   workspaceId,
   workspaceName,
 }: {
+  archived: boolean
   collectionId: string | undefined
+  onArchivedChange: (archived: boolean) => void
   workspaceId: string
   workspaceName: string
 }) {
@@ -123,7 +150,7 @@ function WorkspaceBrowser({
   const refreshItems = useCallback(
     () =>
       queryClient.invalidateQueries({
-        queryKey: ['items', workspaceId],
+        queryKey: itemKeys.all(workspaceId),
       }),
     [queryClient, workspaceId]
   )
@@ -148,7 +175,6 @@ function WorkspaceBrowser({
         collectionId={collectionId}
         isLoading={path.isPending}
         path={path.data ?? []}
-        workspaceName={workspaceName}
       />
       <WorkspaceHeading
         collectionId={collectionId}
@@ -166,7 +192,12 @@ function WorkspaceBrowser({
         pathUnavailable={pathUnavailable}
         workspaceId={workspaceId}
       />
-      <ItemsSection collectionId={collectionId} workspaceId={workspaceId} />
+      <ItemsSection
+        archived={archived}
+        collectionId={collectionId}
+        onArchivedChange={onArchivedChange}
+        workspaceId={workspaceId}
+      />
     </main>
   )
 }
@@ -175,49 +206,66 @@ function WorkspaceBreadcrumbs({
   collectionId,
   isLoading,
   path,
-  workspaceName,
 }: {
   collectionId: string | undefined
   isLoading: boolean
   path: CollectionPathEntry[]
-  workspaceName: string
 }) {
+  if (!collectionId) return null
+  const truncate = path.length > 3
+  const visiblePath = truncate ? [path[0], null, ...path.slice(-2)] : path
+
   return (
-    <nav
-      aria-label='breadcrumb'
-      className='flex flex-wrap items-center gap-2 font-mono text-xs uppercase'
-    >
-      <Link
-        className='border border-border bg-card px-2.5 py-1.5 text-primary transition-colors hover:border-primary/50 hover:text-foreground'
-        search={{ collectionId: undefined }}
-        to='/'
-      >
-        {workspaceName}
-      </Link>
-      {isLoading && collectionId ? (
-        <Skeleton aria-label='Carregando caminho' className='h-4 w-32' />
-      ) : null}
-      {path.map((folder, index) => (
-        <span className='flex items-center gap-2' key={folder.id}>
-          <span aria-hidden='true' className='text-muted-foreground'>
-            /
-          </span>
-          {index === path.length - 1 ? (
-            <span aria-current='page' className='text-foreground'>
-              {folder.name}
+    <InlineCodeRoot>
+      <InlineCodeContent aria-label='Caminho da pasta' role='navigation'>
+        <Link className='group' search={{ collectionId: undefined }} to='/'>
+          <InlineCodeText className='text-primary transition-colors group-hover:text-foreground'>
+            Início
+          </InlineCodeText>
+        </Link>
+        {isLoading ? (
+          <Skeleton aria-label='Carregando caminho' className='h-4 w-32' />
+        ) : null}
+        {visiblePath.map((folder, index) => {
+          if (folder === null) {
+            return (
+              <span className='flex items-center' key='ellipsis'>
+                <InlineCodeSeparator />
+                <InlineCodeText>...</InlineCodeText>
+              </span>
+            )
+          }
+
+          const originalIndex = truncate
+            ? index === 0
+              ? 0
+              : path.length + index - 4
+            : index
+          const isLast = originalIndex === path.length - 1
+
+          return (
+            <span className='flex items-center' key={folder.id}>
+              <InlineCodeSeparator />
+              {isLast ? (
+                <InlineCodeText className='max-w-[16ch] truncate text-primary'>
+                  {folder.name}
+                </InlineCodeText>
+              ) : (
+                <Link
+                  className='group'
+                  search={{ collectionId: folder.id }}
+                  to='/'
+                >
+                  <InlineCodeText className='max-w-[16ch] truncate transition-colors group-hover:text-foreground'>
+                    {folder.name}
+                  </InlineCodeText>
+                </Link>
+              )}
             </span>
-          ) : (
-            <Link
-              className='text-muted-foreground transition-colors hover:text-primary'
-              search={{ collectionId: folder.id }}
-              to='/'
-            >
-              {folder.name}
-            </Link>
-          )}
-        </span>
-      ))}
-    </nav>
+          )
+        })}
+      </InlineCodeContent>
+    </InlineCodeRoot>
   )
 }
 
@@ -277,6 +325,18 @@ function WorkspaceHeading({
                     <DropdownMenuItem asChild>
                       <Link
                         className='flex w-full items-center gap-2'
+                        to='/atividades'
+                      >
+                        <ClockCounterClockwiseIcon
+                          aria-hidden='true'
+                          size={14}
+                        />
+                        Histórico de atividades
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        className='flex w-full items-center gap-2'
                         to='/configuracoes-workspace'
                       >
                         <GearIcon aria-hidden='true' size={14} />
@@ -303,11 +363,26 @@ function WorkspaceHeading({
   )
 }
 
+const copyMessages = {
+  content: {
+    error: 'Não foi possível copiar o conteúdo.',
+    success: 'Conteúdo copiado.',
+  },
+  title: {
+    error: 'Não foi possível copiar o título.',
+    success: 'Título copiado.',
+  },
+} as const
+
 function ItemsSection({
+  archived,
   collectionId,
+  onArchivedChange,
   workspaceId,
 }: {
+  archived: boolean
   collectionId: string | undefined
+  onArchivedChange: (archived: boolean) => void
   workspaceId: string
 }) {
   const [itemType, setItemType] = useState<ItemTypeFilter>('all')
@@ -315,8 +390,9 @@ function ItemsSection({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const items = useQuery({
     queryFn: async () =>
-      (await itemsApi.list(workspaceId, collectionId, page, 100)).data,
-    queryKey: ['items', workspaceId, collectionId, page],
+      (await itemsApi.list(workspaceId, collectionId, page, 100, { archived }))
+        .data,
+    queryKey: itemKeys.list(workspaceId, { archived, collectionId, page }),
   })
   const isInvalidPage =
     items.isSuccess &&
@@ -335,17 +411,25 @@ function ItemsSection({
     setItemType(value)
     setPage(0)
   }, [])
+  const changeArchived = useCallback(
+    (value: boolean) => {
+      setItemType('all')
+      setPage(0)
+      onArchivedChange(value)
+    },
+    [onArchivedChange]
+  )
   const changeSortOrder = useCallback((value: 'asc' | 'desc') => {
     setSortOrder(value)
   }, [])
   const previousPage = useCallback(() => setPage((current) => current - 1), [])
   const nextPage = useCallback(() => setPage((current) => current + 1), [])
-  const copyTitle = useCallback(async (title: string) => {
+  const copyText = useCallback(async (text: string, kind: CopyKind) => {
     try {
-      await navigator.clipboard.writeText(title)
-      toast.success('Título copiado.')
+      await navigator.clipboard.writeText(text)
+      toast.success(copyMessages[kind].success)
     } catch {
-      toast.error('Não foi possível copiar o título.')
+      toast.error(copyMessages[kind].error)
     }
   }, [])
   const visibleItems = (items.data?.items ?? [])
@@ -358,7 +442,7 @@ function ItemsSection({
 
   return (
     <section aria-labelledby='items-heading' className='space-y-3'>
-      <div className='flex flex-wrap items-center justify-between gap-3'>
+      <div className='flex flex-col items-start gap-3'>
         <h2
           className='font-mono font-semibold text-muted-foreground text-xs uppercase tracking-widest'
           id='items-heading'
@@ -366,37 +450,45 @@ function ItemsSection({
           Itens
         </h2>
         <ItemControls
+          archived={archived}
           itemType={itemType}
+          onArchivedChange={changeArchived}
           onItemTypeChange={changeItemType}
           onSortOrderChange={changeSortOrder}
           sortOrder={sortOrder}
         />
       </div>
       <ItemsContent
+        archived={archived}
         error={items.error}
         isError={items.isError}
         isFetching={items.isFetching}
         isInvalidPage={isInvalidPage}
         isPending={items.isPending}
         items={items.data}
-        onCopyTitle={copyTitle}
+        onCopy={copyText}
         onNextPage={nextPage}
         onPreviousPage={previousPage}
         page={page}
         typeFilter={itemType}
         visibleItems={visibleItems}
+        workspaceId={workspaceId}
       />
     </section>
   )
 }
 
 function ItemControls({
+  archived,
   itemType,
+  onArchivedChange,
   onItemTypeChange,
   onSortOrderChange,
   sortOrder,
 }: {
+  archived: boolean
   itemType: ItemTypeFilter
+  onArchivedChange: (archived: boolean) => void
   onItemTypeChange: (value: ItemTypeFilter) => void
   onSortOrderChange: (value: 'asc' | 'desc') => void
   sortOrder: 'asc' | 'desc'
@@ -412,6 +504,7 @@ function ItemControls({
 
   return (
     <div className='flex flex-wrap items-center gap-2'>
+      <ArchiveTabs archived={archived} onChange={onArchivedChange} />
       <Select onValueChange={handleItemTypeChange} value={itemType}>
         <SelectTrigger aria-label='Filtrar itens por tipo' className='w-40'>
           <SelectValue />
@@ -421,6 +514,8 @@ function ItemControls({
           <SelectItem value='text'>Texto</SelectItem>
           <SelectItem value='link'>Link</SelectItem>
           <SelectItem value='secret'>Segredo</SelectItem>
+          <SelectItem value='file'>Arquivo</SelectItem>
+          <SelectItem value='image'>Imagem</SelectItem>
         </SelectContent>
       </Select>
       <Select onValueChange={handleSortOrderChange} value={sortOrder}>
@@ -432,49 +527,77 @@ function ItemControls({
           <SelectItem value='desc'>Título Z–A</SelectItem>
         </SelectContent>
       </Select>
-      <Button
-        aria-describedby='archive-filter-note'
-        disabled
-        size='sm'
-        title='O backend ainda lista apenas itens ativos.'
-        variant='outline'
-      >
-        <ArchiveIcon aria-hidden='true' />
-        Mostrar arquivados
-      </Button>
-      <span className='sr-only' id='archive-filter-note'>
-        O backend ainda não disponibiliza a listagem de itens arquivados.
-      </span>
     </div>
   )
 }
 
+const archiveToggleClass =
+  'inline-flex cursor-pointer items-center justify-center rounded-sm px-3 py-1.5 font-mono text-muted-foreground text-xs uppercase outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm dark:aria-pressed:bg-accent'
+
+function ArchiveTabs({
+  archived,
+  onChange,
+}: {
+  archived: boolean
+  onChange: (archived: boolean) => void
+}) {
+  const showActive = useCallback(() => onChange(false), [onChange])
+  const showArchived = useCallback(() => onChange(true), [onChange])
+  return (
+    <fieldset
+      aria-label='Estado dos itens'
+      className='inline-flex h-9 items-center gap-1 rounded-sm bg-muted p-1'
+    >
+      <button
+        aria-pressed={!archived}
+        className={archiveToggleClass}
+        onClick={showActive}
+        type='button'
+      >
+        Ativos
+      </button>
+      <button
+        aria-pressed={archived}
+        className={archiveToggleClass}
+        onClick={showArchived}
+        type='button'
+      >
+        Arquivados
+      </button>
+    </fieldset>
+  )
+}
+
 function ItemsContent({
+  archived,
   error,
   isError,
   isFetching,
   isInvalidPage,
   isPending,
   items,
-  onCopyTitle,
+  onCopy,
   onNextPage,
   onPreviousPage,
   page,
   typeFilter,
   visibleItems,
+  workspaceId,
 }: {
+  archived: boolean
   error: Error | null
   isError: boolean
   isFetching: boolean
   isInvalidPage: boolean
   isPending: boolean
   items: ItemPageResponse | undefined
-  onCopyTitle: (title: string) => void
+  onCopy: (text: string, kind: CopyKind) => void
   onNextPage: () => void
   onPreviousPage: () => void
   page: number
   typeFilter: ItemTypeFilter
   visibleItems: ItemResponse[]
+  workspaceId: string
 }) {
   if (isError) return <ErrorState error={error} />
   if (isInvalidPage) return <LoadingState label='Carregando itens…' />
@@ -482,6 +605,7 @@ function ItemsContent({
   if (visibleItems.length === 0) {
     return (
       <EmptyItemsContent
+        archived={archived}
         isFetching={isFetching}
         items={items}
         onNextPage={onNextPage}
@@ -496,7 +620,12 @@ function ItemsContent({
     <>
       <div className='grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-4'>
         {visibleItems.map((item) => (
-          <ItemListCard item={item} key={item.id} onCopyTitle={onCopyTitle} />
+          <ItemListCard
+            item={item}
+            key={item.id}
+            onCopy={onCopy}
+            workspaceId={workspaceId}
+          />
         ))}
       </div>
       {items && items.totalPages > 1 ? (
@@ -512,7 +641,40 @@ function ItemsContent({
   )
 }
 
+function getEmptyItemsCopy({
+  archived,
+  hasOtherPages,
+  isEmptyCollection,
+  typeFilter,
+}: {
+  archived: boolean
+  hasOtherPages: boolean
+  isEmptyCollection: boolean
+  typeFilter: ItemTypeFilter
+}) {
+  if (isEmptyCollection) {
+    return archived
+      ? {
+          description: 'Itens arquivados aparecerão aqui.',
+          title: 'Nenhum item arquivado',
+        }
+      : {
+          description: 'Esta pasta ainda não tem itens.',
+          title: 'Nenhum item encontrado',
+        }
+  }
+  let description = 'Nenhum item encontrado nesta página.'
+  if (hasOtherPages) {
+    description =
+      'Nenhum item encontrado nesta página. Use a paginação para consultar outras páginas.'
+  } else if (typeFilter !== 'all') {
+    description = 'Nenhum item deste tipo foi encontrado nesta página.'
+  }
+  return { description, title: 'Nenhum item encontrado' }
+}
+
 function EmptyItemsContent({
+  archived,
   isFetching,
   items,
   onNextPage,
@@ -520,6 +682,7 @@ function EmptyItemsContent({
   page,
   typeFilter,
 }: {
+  archived: boolean
   isFetching: boolean
   items: ItemPageResponse | undefined
   onNextPage: () => void
@@ -529,22 +692,21 @@ function EmptyItemsContent({
 }) {
   const hasOtherPages = Boolean(items && items.totalPages > 1)
   const isEmptyCollection = typeFilter === 'all' && page === 0 && !hasOtherPages
-  const description = isEmptyCollection
-    ? 'Esta pasta ainda não tem itens.'
-    : hasOtherPages
-      ? 'Nenhum item encontrado nesta página. Use a paginação para consultar outras páginas.'
-      : typeFilter === 'all'
-        ? 'Nenhum item encontrado nesta página.'
-        : 'Nenhum item deste tipo foi encontrado nesta página.'
+  const copy = getEmptyItemsCopy({
+    archived,
+    hasOtherPages,
+    isEmptyCollection,
+    typeFilter,
+  })
   const shouldShowPagination =
     Boolean(items && items.totalPages > 1) || page > 0
 
   return (
     <>
       <EmptyState
-        description={description}
+        description={copy.description}
         icon={<FileIcon aria-hidden='true' className='size-6' />}
-        title='Nenhum item encontrado'
+        title={copy.title}
         variant='compact'
       />
       {items && shouldShowPagination ? (
@@ -557,78 +719,5 @@ function EmptyItemsContent({
         />
       ) : null}
     </>
-  )
-}
-
-function ItemListCard({
-  item,
-  onCopyTitle,
-}: {
-  item: ItemResponse
-  onCopyTitle: (title: string) => void
-}) {
-  const handleCopyTitle = useCallback(
-    () => onCopyTitle(item.title),
-    [item.title, onCopyTitle]
-  )
-  const Icon =
-    item.type === 'secret'
-      ? KeyIcon
-      : item.type === 'link'
-        ? LinkIcon
-        : FileIcon
-  const preview = item.type === 'secret' ? '••••••••••••' : item.preview
-
-  return (
-    <article className='flex min-h-21 cursor-default flex-col justify-between gap-3 border-2 border-border bg-card p-4 transition-all hover:border-primary/50'>
-      <div className='flex w-full items-start justify-between gap-2'>
-        <div className='flex min-w-0 items-center gap-2'>
-          {item.type === 'text' ? (
-            <span
-              aria-hidden='true'
-              className='shrink-0 font-mono text-lg text-muted-foreground leading-none'
-            >
-              ¶
-            </span>
-          ) : (
-            <Icon
-              aria-hidden='true'
-              className={`size-4 shrink-0 ${item.type === 'secret' ? 'text-amber-500' : 'text-muted-foreground'}`}
-            />
-          )}
-          <h3 className='truncate font-bold font-mono text-sm tracking-wide'>
-            {item.title}
-          </h3>
-        </div>
-        <div className='flex shrink-0 items-center gap-1.5'>
-          <span
-            className={`px-1.5 py-0.5 font-mono font-semibold text-[10px] uppercase ${item.type === 'secret' ? 'bg-amber-500/10 text-amber-500' : 'bg-muted text-muted-foreground'}`}
-          >
-            {item.type}
-          </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                aria-label={`Ações de ${item.title}`}
-                className='text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
-                type='button'
-              >
-                <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end'>
-              <DropdownMenuItem onSelect={handleCopyTitle}>
-                Copiar título
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      {preview ? (
-        <p className='truncate font-mono text-muted-foreground text-xs'>
-          {preview}
-        </p>
-      ) : null}
-    </article>
   )
 }

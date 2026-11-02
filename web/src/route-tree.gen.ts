@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './pages/login'
 import { Route as RedefinirSenhaRouteImport } from './pages/redefinir-senha'
 import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
 import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
+import { Route as ProtectedAtividadesRouteImport } from './pages/_protected/atividades'
 import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
 import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
 import { Route as ProtectedConfiguracoesWorkspaceRouteImport } from './pages/_protected/configuracoes-workspace'
@@ -54,6 +55,11 @@ const ProtectedSplatRoute = ProtectedSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
+const ProtectedAtividadesRoute = ProtectedAtividadesRouteImport.update({
+  id: '/atividades',
+  path: '/atividades',
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
 const ProtectedComponentsRoute = ProtectedComponentsRouteImport.update({
   id: '/components',
   path: '/components',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
+  '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
   '/configuracoes': typeof ProtectedConfiguracoesRoute
   '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
+  '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
   '/configuracoes': typeof ProtectedConfiguracoesRoute
   '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/_protected/$': typeof ProtectedSplatRoute
+  '/_protected/atividades': typeof ProtectedAtividadesRoute
   '/_protected/components': typeof ProtectedComponentsRoute
   '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
   '/_protected/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/$'
+    | '/atividades'
     | '/components'
     | '/configuracoes'
     | '/configuracoes-workspace'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/$'
+    | '/atividades'
     | '/components'
     | '/configuracoes'
     | '/configuracoes-workspace'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/_protected/$'
+    | '/_protected/atividades'
     | '/_protected/components'
     | '/_protected/configuracoes'
     | '/_protected/configuracoes-workspace'
@@ -202,6 +214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedSplatRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
+    '/_protected/atividades': {
+      id: '/_protected/atividades'
+      path: '/atividades'
+      fullPath: '/atividades'
+      preLoaderRoute: typeof ProtectedAtividadesRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
     '/_protected/components': {
       id: '/_protected/components'
       path: '/components'
@@ -228,6 +247,7 @@ declare module '@tanstack/react-router' {
 
 interface ProtectedLayoutRouteChildren {
   ProtectedSplatRoute: typeof ProtectedSplatRoute
+  ProtectedAtividadesRoute: typeof ProtectedAtividadesRoute
   ProtectedComponentsRoute: typeof ProtectedComponentsRoute
   ProtectedConfiguracoesRoute: typeof ProtectedConfiguracoesRoute
   ProtectedConfiguracoesWorkspaceRoute: typeof ProtectedConfiguracoesWorkspaceRoute
@@ -236,6 +256,7 @@ interface ProtectedLayoutRouteChildren {
 
 const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
   ProtectedSplatRoute: ProtectedSplatRoute,
+  ProtectedAtividadesRoute: ProtectedAtividadesRoute,
   ProtectedComponentsRoute: ProtectedComponentsRoute,
   ProtectedConfiguracoesRoute: ProtectedConfiguracoesRoute,
   ProtectedConfiguracoesWorkspaceRoute: ProtectedConfiguracoesWorkspaceRoute,

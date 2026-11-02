@@ -28,17 +28,22 @@ Convenções gerais:
 - Não existe cadastro público: uma conta só nasce quando o dono do workspace envia um convite
   (RF10) e o convidado conclui o cadastro com o token recebido por e-mail (RF01/RF11), entrando no
   workspace único da empresa com o papel `Member`.
-- Cada sessão está vinculada a um `workspace_member.id`: o JWT de acesso contém `membershipId` e
-  o refresh token persistido referencia o mesmo vínculo. Em cada requisição autenticada,
+- Uma sessão de membro está vinculada a um `workspace_member.id`: o JWT de acesso contém
+  `membershipId` e o refresh token persistido referencia o mesmo vínculo. Em cada requisição,
   `JwtAuthenticationFilter` confirma no banco que o vínculo ainda existe para o usuário do JWT e
-  usa o papel atual do vínculo como authority. O access token legado sem `membershipId` não
-  autentica e recebe `401`; o papel do banco é atualizado efetivamente por requisição, sem esperar
-  o limite de validade de até 15 minutos do JWT.
+  usa o papel atual como authority. O access token legado sem `membershipId` não autentica e
+  recebe `401`; o papel do banco é atualizado efetivamente por requisição.
 - Excluir um vínculo invalida imediatamente os access tokens associados e a FK com `ON DELETE
   CASCADE` remove seus refresh tokens. Uma readmissão cria outro vínculo e não recupera a sessão
   anterior. A migration V20 associa refresh tokens existentes ao vínculo atual do usuário e
   descarta os que não têm vínculo. Portanto, um refresh migrado ainda válido de um membro atual
-  pode emitir novo par de tokens; login sem vínculo não emite sessão.
+  pode emitir novo par de tokens. Login de conta sem vínculo emite somente um access token
+  account-only, válido por 15 minutos, sem refresh token; a resposta limpa eventual cookie
+  `refreshToken` antigo. Esse perfil acessa somente `/me`, `/me/password` e as próprias
+  notificações; qualquer rota de workspace responde `403`. Tokens de workspace antigos e seus
+  refresh tokens revogados respondem `401` após a remoção do vínculo. Readmissão não promove
+  token account-only nem reativa tokens anteriores: é necessário fazer login novamente para
+  receber uma sessão de workspace.
 - A permissão do papel autoriza ações; o acesso efetivo a pastas e itens é verificado separadamente
   a partir do vínculo atual, concessões e herança no banco em cada requisição. Não se afirma que
   todas as superfícies previstas em #133 estejam integradas.
@@ -162,13 +167,14 @@ O que a função faz:
 1. Busca o usuário por `email` (senão `401` — mesma mensagem genérica de credenciais erradas,
    para não revelar se o e-mail existe).
 2. Compara a senha enviada com o `password_hash` armazenado via Argon2 (`401` se não bater).
-3. Gera um novo access token (JWT, `sub` = id do usuário) e um novo refresh token (persistido no
-   banco), devolvidos como cookies.
+3. Se o usuário tiver vínculo atual, gera access token e refresh token (persistido no banco).
+   Sem vínculo, gera access token account-only sem refresh. Os tokens são devolvidos como cookies;
+   no login account-only, eventual cookie `refreshToken` anterior é limpo.
 
 | | |
 |---|---|
 | Request body | `{ "email": string, "password": string }` |
-| Sucesso | `200`, corpo vazio, seta `accessToken` + `refreshToken` |
+| Sucesso | `200`, corpo vazio; membro recebe `accessToken` + `refreshToken`, conta sem vínculo recebe somente `accessToken` |
 | `401` | e-mail não encontrado ou senha incorreta; ambas as falhas retornam `E-mail ou senha inválidos` |
 | `429` | mais de 5 tentativas por IP em 1 minuto (rate limit) |
 
@@ -202,21 +208,19 @@ O que a função faz:
 
 ## RF04 — Logout
 
-**`POST /auth/logout`** — autenticação via cookie `refreshToken`.
+**`POST /auth/logout`** — encerra a sessão e limpa os cookies, mesmo sem refresh token.
 
 Encerra a sessão atual invalidando o refresh token no servidor (o `accessToken` em si não pode
 ser revogado por ser stateless, mas expira em minutos).
 
 O que a função faz:
-1. Lê o cookie `refreshToken` (`401` se ausente).
-2. Busca e deleta esse token do banco (`401` se não existir).
-3. Limpa (`Max-Age=0`) os cookies `accessToken` e `refreshToken` no cliente.
+1. Se houver cookie `refreshToken`, busca e revoga o token persistido.
+2. Limpa (`Max-Age=0`) os cookies `accessToken` e `refreshToken` no cliente.
 
 | | |
 |---|---|
-| Auth | Cookie `refreshToken` |
+| Auth | Sem refresh obrigatório |
 | Sucesso | `204`, corpo vazio, limpa os cookies |
-| `401` | cookie ausente ou token inexistente |
 
 ---
 
@@ -225,7 +229,10 @@ O que a função faz:
 **`POST /auth/forgot-password`** — sem autenticação.
 
 Dispara um e-mail (JavaMail) com um link de redefinição de senha, se o e-mail informado tiver
-conta.
+conta. A API não confirma a existência da conta: para ambos os casos retorna `204` sem corpo.
+O texto apresentado à pessoa é responsabilidade da interface (RF49-CA01): “Se houver uma conta com
+esse e-mail, você receberá orientações para redefinir a senha.” A resposta não afirma que o e-mail
+foi entregue.
 
 O que a função faz:
 1. Busca o usuário por `email`. Se não existir, não faz nada — mas a resposta é idêntica à do
@@ -240,6 +247,10 @@ O que a função faz:
 | Sucesso | `204` sempre, exista ou não o e-mail |
 | `429` | mais de 5 tentativas por IP em 1 minuto (rate limit) |
 
+O link é válido por uma hora (RF49-CA02). Cada nova solicitação para uma conta remove seus tokens
+anteriores antes de criar outro (RF49-CA04). A API não define a mensagem visual após a solicitação;
+a interface deve exibir o mesmo texto para e-mails cadastrados e inexistentes.
+
 ---
 
 ## RF49 — Redefinição de senha
@@ -248,6 +259,13 @@ O que a função faz:
 
 Define uma nova senha a partir do token recebido por e-mail (RF49).
 
+O token só pode ser usado enquanto válido e ainda não utilizado (RF49-CA02, RF49-CA03 e
+RF49-CA04). Token inexistente, expirado ou já consumido resulta em `401` sem alterar a senha
+(RF49-CA07). A redefinição concluída retorna `204` sem corpo e sem emitir cookies, portanto não
+inicia sessão automaticamente (RF49-CA06).
+Cabe à interface informar a conclusão e encaminhar a pessoa ao login; para `401`, deve informar
+que o link está indisponível e oferecer uma nova solicitação (RF49-CA07).
+
 O que a função faz:
 1. Valida que `newPassword == confirmPassword` (senão `400`).
 2. Busca o `PasswordResetToken` (senão `401`).
@@ -255,14 +273,15 @@ O que a função faz:
    tokens expirados.
 4. Grava o novo `password_hash` (Argon2) no usuário associado ao token.
 5. **Deleta todos os refresh tokens e todos os tokens de redefinição do usuário** — o link se
-   torna de uso único e qualquer outra sessão/dispositivo precisa autenticar de novo.
+   torna de uso único e sessões anteriores não podem ser renovadas. Access tokens já emitidos são
+   stateless e podem permanecer válidos até expirarem, por no máximo 15 minutos (RF49-CA05).
 
 | | |
 |---|---|
 | Request body | `{ "token": string, "newPassword": string (min 8), "confirmPassword": string (min 8) }` |
 | Sucesso | `204` |
 | `400` | senhas não conferem, ou corpo inválido |
-| `401` | token inexistente ou expirado |
+| `401` | token inexistente, expirado ou já utilizado |
 | `429` | mais de 5 tentativas por IP em 1 minuto (rate limit) |
 
 ---
@@ -506,6 +525,17 @@ Atualiza `{ "title": string, "description": string | null }` sem alterar o conte
 a pasta. `title` é obrigatório (1–255 caracteres); `description` é opcional (até 2.000 caracteres).
 Conflito de título retorna `409`.
 
+**`GET /workspaces/{workspaceId}/items?collectionId={uuid}&archived=false&page=0&size=20`** —
+autenticado; exige `item/read`.
+
+Lista os itens da raiz (sem `collectionId`) ou de uma pasta. Por padrão (`archived=false`) devolve
+somente itens ativos. Com `archived=true` devolve somente itens arquivados, aplicando a mesma regra
+de papel e compartilhamento: o proprietário vê todos; itens de pastas inacessíveis e segredos sem
+`secret/read` não aparecem. A busca (`/items/search`) retorna somente ativos por padrão e aceita
+`includeArchived=true` para incluir também os arquivados. Todo item retornado (listagem, consulta,
+edição e busca) traz `archivedAt` (`null` quando ativo, data/hora
+ISO-8601 quando arquivado).
+
 **`PUT /workspaces/{workspaceId}/items/{itemId}`** — autenticado; exige `item/update`.
 
 Atualiza título e conteúdo de itens `text`, `link` ou `secret`, preservando tipo e pasta. O corpo
@@ -728,11 +758,10 @@ Sucesso (`200`):
 
 ## Notificações
 
-As notificações são avisos fixos de conta e acesso. A migration `V18` cria a tabela `notification`,
-com chave estrangeira para o destinatário (`ON DELETE CASCADE`) e índice por destinatário e data.
-`V19` está reservada para outra issue. O campo `metadata` contém o identificador do evento, por
-exemplo `{ "event": "PROFILE_UPDATED" }`; os títulos e textos são fixos e não incluem referências,
-títulos de recursos, links nem segredos. Notificações não concedem nem verificam acesso a recursos.
+As notificações são persistidas na tabela `notification` criada pela migration `V18`, com chave
+estrangeira para o destinatário (`ON DELETE CASCADE`) e índice por destinatário e data. O campo
+`metadata` identifica o evento. Os textos são fixos e não incluem valores secretos. Notificações
+não concedem nem verificam acesso a recursos.
 
 **`GET /notifications?page=0&size=20&unread=false`** — autenticado (cookie `accessToken`).
 
@@ -801,20 +830,67 @@ notificação como `id` SSE e como dado JSON (string UUID), por exemplo:
 ```text
 event:notification
 id:8e8a9d8f-3c94-4d22-a290-598566ea5b16
-data:"8e8a9d8f-3c94-4d22-a290-598566ea5b16"
 ```
 
-A notificação é persistida antes da emissão, que ocorre somente após o commit da transação. A
-entrega em tempo real é best effort: o cliente deve chamar `GET /notifications` ao conectar e ao
-reconectar para recuperar avisos persistidos. Falha ou desconexão do stream não desfaz a operação
-que originou o aviso.
+A notificação é persistida antes da emissão, que ocorre somente após o commit da transação. Nos
+fixtures de integração, a entrega com conexão ativa foi medida em menos de 5 segundos. A entrega é
+best effort: o cliente deve chamar `GET /notifications` ao conectar e reconectar; não há replay
+baseado em `Last-Event-ID`. Falha ou desconexão do stream não desfaz a operação que originou o
+aviso.
 
-Trocas de perfil (`PATCH /me`) e senha (`PATCH /me/password`) geram os eventos fixos
-`PROFILE_UPDATED` e `PASSWORD_CHANGED`. Produtores futuros de mudanças de acesso podem chamar
-`NotificationService.accessChanged(Collection<UUID> affectedRecipients)`, que deduplica os IDs e
-emite o aviso fixo `ACCESS_CHANGED`. A troca de papel de um membro (RF17) já usa esse aviso. Grupos,
-compartilhamentos, herança e alterações das permissões de um papel ainda não emitem avisos; esse
-fan-out pertence às issues #42 e #132.
+`PATCH /me` e `PATCH /me/password` geram `PROFILE_UPDATED` e `PASSWORD_CHANGED`. Mudanças de
+papel, permissões do papel, grupos, associação de membros a grupos, concessões individuais/grupo/
+todos, herança e remoção de membership notificam os membros cujo acesso efetivo a coleções ou itens
+mudou, inclusive por herança. Alterar o papel de um membro também o notifica, pois a mudança pode
+afetar permissões de ações mesmo sem alterar a leitura de conteúdo. Alterações nas permissões de um
+papel avisam seus membros mesmo quando o acesso a conteúdo não mudou. Adicionar ou remover membro de
+grupo também é considerado. Os destinatários são deduplicados por operação; operações sem mudança não
+geram aviso.
+
+O evento `ACCESS_CHANGED` usa texto fixo e genérico, sem título, caminho, link ou referência ao
+recurso perdido. Referências de notificações legadas desse evento também são substituídas ao
+serializar a resposta. Os avisos descrevem somente que o acesso foi alterado e não revelam nem
+concedem acesso ao conteúdo. A comparação usa snapshots canônicos do acesso efetivo a membros e
+recursos, carregados em uma consulta em lote; o número de pares comparados ainda cresce com o
+produto entre membros e recursos. Um lock de workspace serializa alterações administrativas até o
+commit para manter snapshots consistentes, o que pode limitar throughput sob alta concorrência.
+
+## RNF12 — Cabeçalhos de segurança e CORS
+
+O levantamento cita o Helmet, que é uma biblioteca de Node. Neste backend, o mesmo resultado vem
+dos cabeçalhos do Spring Security (`SecurityConfig`) e da política de CORS (`CorsConfig`). Os
+cabeçalhos são enviados em todas as respostas, inclusive de erro (`401`, `403`, `404`).
+
+| Cabeçalho | Valor | Para quê |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'` | A API só devolve JSON e arquivos; nada é carregado nem executado a partir dela |
+| `Content-Security-Policy` (Swagger UI) | `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Só em `/swagger-ui/**` e `/swagger-ui.html`, que carregam scripts e estilos da própria origem |
+| `X-Content-Type-Options` | `nosniff` | O navegador respeita o `Content-Type`, sem adivinhar o tipo de um anexo |
+| `X-Frame-Options` | `DENY` | Impede embutir a API em frames de outros sites |
+| `Referrer-Policy` | `no-referrer` | Tokens de links de convite e de redefinição de senha não vazam pelo `Referer` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=()` | Desliga recursos do navegador que a aplicação não usa |
+| `Cross-Origin-Opener-Policy` | `same-origin` | Isola a janela de outras origens |
+| `Cross-Origin-Resource-Policy` | `same-site` | Respostas só podem ser embutidas pelo mesmo site; `localhost:5173` e `localhost:8080` contam como o mesmo site |
+| `Cache-Control` | `no-cache, no-store, max-age=0, must-revalidate` | Padrão do Spring Security; anexos e convites também usam `no-store` |
+| `Strict-Transport-Security` | `max-age=31536000 ; includeSubDomains` | Só em requisições HTTPS, como exige a especificação; no ambiente local em HTTP não aparece |
+
+O HSTS depende de a aplicação enxergar a requisição como HTTPS. Atrás de um proxy que encerra o TLS,
+isso exigiria confiar em `X-Forwarded-Proto`. Essa confiança não foi ligada porque o `RateLimitFilter`
+identifica o cliente pelo IP de origem, e confiar em cabeçalhos encaminhados sem um proxy definido
+permitiria forjar `X-Forwarded-For` para escapar do limite.
+
+**CORS:**
+- Origem permitida: apenas `app.frontend-url` (`FRONTEND_URL`, padrão `http://localhost:5173`),
+  normalizada para `esquema://host:porta`. A aplicação não sobe se o valor estiver vazio, for `*` ou
+  não for uma URL `http(s)`, já que uma origem coringa com cookies liberaria a API para qualquer site.
+- Cookies permitidos (`Access-Control-Allow-Credentials: true`), necessários para os cookies de sessão.
+- Métodos: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`. Headers aceitos: `Accept` e `Content-Type`.
+- `Access-Control-Expose-Headers: Content-Disposition`, para o frontend ler o nome do anexo baixado.
+- Preflight de outra origem, com outro método ou com outro header responde `403`, sem
+  `Access-Control-Allow-Origin`.
+- O CSRF continua desligado: a proteção vem dos cookies `SameSite=Strict` junto com a origem única.
+
+---
 
 ## Tabela-resumo
 
@@ -826,7 +902,7 @@ fan-out pertence às issues #42 e #132.
 | RF01/RF11 | POST | `/auth/register` | Não |
 | RF02 | POST | `/auth/login` | Não |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` |
-| RF04 | POST | `/auth/logout` | Cookie `refreshToken` |
+| RF04 | POST | `/auth/logout` | Sem refresh obrigatório; revoga-o se presente |
 | RF49 | POST | `/auth/forgot-password` | Não |
 | RF49 | POST | `/auth/reset-password` | Não |
 | RF05 | PATCH | `/me/password` | Cookie `accessToken` |

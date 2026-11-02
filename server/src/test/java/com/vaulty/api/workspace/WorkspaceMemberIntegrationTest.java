@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,6 +21,7 @@ import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.AccessGroupRepository;
 import com.vaulty.api.repository.AccessGroupMemberRepository;
 import com.vaulty.api.repository.RefreshTokenRepository;
+import com.vaulty.api.repository.NotificationRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -33,12 +35,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.http.HttpHeaders;
 import com.vaulty.api.service.WorkspaceMemberService;
 import com.vaulty.api.service.WorkspaceService;
+import com.vaulty.api.service.NotificationService;
 
 class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
 
@@ -51,6 +56,228 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private WorkspaceMemberService workspaceMemberService;
     @Autowired private WorkspaceService workspaceService;
+    @Autowired private NotificationRepository notificationRepository;
+    @Autowired private NotificationService notificationService;
+    private UUID cleanupWorkspace;
+    private UUID cleanupOwner;
+    private UUID cleanupMember;
+    private UUID cleanupThirdMember;
+    private UUID cleanupCollection;
+    private UUID cleanupGroup;
+    private UUID cleanupRole;
+    private UUID cleanupItem;
+
+    @AfterEach
+    void cleanNonTransactionalFixtures() {
+        if (cleanupWorkspace == null) return;
+        if (cleanupOwner != null || cleanupMember != null || cleanupThirdMember != null) {
+            jdbcTemplate.update("DELETE FROM notification WHERE recipient_id IN (?, ?, ?)", cleanupOwner,
+                    cleanupMember, cleanupThirdMember);
+        }
+        if (cleanupCollection != null) jdbcTemplate.update("DELETE FROM collection WHERE id=?", cleanupCollection);
+        if (cleanupGroup != null) jdbcTemplate.update("DELETE FROM access_group WHERE id=?", cleanupGroup);
+        if (cleanupItem != null) jdbcTemplate.update("DELETE FROM item WHERE id=?", cleanupItem);
+        jdbcTemplate.update("UPDATE workspace SET owner_id='afd23ecc-4abb-4e2b-b985-3aaa8637a839' WHERE id=?", cleanupWorkspace);
+        if (cleanupOwner != null || cleanupMember != null || cleanupThirdMember != null) {
+            jdbcTemplate.update("DELETE FROM workspace_member WHERE user_id IN (?, ?, ?)", cleanupOwner,
+                    cleanupMember, cleanupThirdMember);
+        }
+        if (cleanupRole != null) jdbcTemplate.update("DELETE FROM workspace_role WHERE id=?", cleanupRole);
+        jdbcTemplate.update("""
+                INSERT INTO workspace_member (id,user_id,workspace_id,role_id)
+                SELECT gen_random_uuid(), 'afd23ecc-4abb-4e2b-b985-3aaa8637a839', ?, id
+                FROM workspace_role WHERE workspace_id=? AND name='Owner'
+                ON CONFLICT (workspace_id,user_id) DO NOTHING
+                """, cleanupWorkspace, cleanupWorkspace);
+        cleanupWorkspace = null;
+        cleanupOwner = null;
+        cleanupMember = null;
+        cleanupThirdMember = null;
+        cleanupCollection = null;
+        cleanupGroup = null;
+        cleanupRole = null;
+        cleanupItem = null;
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void accountOnlyLoginCanReadOwnNotificationsButCannotRestoreWorkspaceAuthority() throws Exception {
+        User owner = createUser("Proprietário");
+        User target = createUser("Membro removido");
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(target, workspaceId);
+        var targetMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, target.getId())
+                .orElseThrow();
+        var priorLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var priorAccess = priorLogin.getResponse().getCookie("accessToken");
+        var priorRefresh = priorLogin.getResponse().getCookie("refreshToken");
+
+        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspaceId,
+                        targetMembership.getId()).cookie(authCookie(owner))
+                        .param("confirmMemberId", targetMembership.getId().toString()))
+                .andExpect(status().isNoContent());
+
+        var notification = notificationRepository.findAll().stream()
+                .filter(candidate -> candidate.getRecipient().getId().equals(target.getId()))
+                .filter(candidate -> "ACCESS_CHANGED".equals(candidate.getMetadata().get("event")))
+                .findFirst().orElseThrow();
+        mockMvc.perform(get("/notifications?page=0&size=20").cookie(priorAccess))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/auth/refresh").cookie(priorRefresh)).andExpect(status().isUnauthorized());
+        var accountLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var accountAccess = accountLogin.getResponse().getCookie("accessToken");
+        var clearedRefresh = accountLogin.getResponse().getCookie("refreshToken");
+        assertThat(clearedRefresh).isNotNull();
+        assertThat(clearedRefresh.getValue()).isEmpty();
+        assertThat(clearedRefresh.getMaxAge()).isZero();
+        assertThat(refreshTokenRepository.findAll()).noneMatch(token -> token.getUser().getId().equals(target.getId()));
+        assertThat(jwtService.validateAccessToken(accountAccess.getValue()).orElseThrow().accountOnly()).isTrue();
+
+        mockMvc.perform(get("/notifications?page=0&size=20").cookie(accountAccess))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.notifications[0].id").value(notification.getId().toString()))
+                .andExpect(jsonPath("$.notifications[0].metadata.event").value("ACCESS_CHANGED"));
+        mockMvc.perform(patch("/notifications/{id}/read", notification.getId()).cookie(accountAccess))
+                .andExpect(status().isNoContent());
+        notificationService.profileUpdated(owner.getId());
+        var ownerNotification = notificationRepository.findAll().stream()
+                .filter(candidate -> candidate.getRecipient().getId().equals(owner.getId()))
+                .findFirst().orElseThrow();
+        mockMvc.perform(patch("/notifications/{id}/read", ownerNotification.getId()).cookie(accountAccess))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/me").cookie(accountAccess)).andExpect(status().isOk());
+        mockMvc.perform(patch("/me/password").cookie(accountAccess).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"password123\",\"newPassword\":\"changed-password\","
+                                + "\"confirmPassword\":\"changed-password\"}"))
+                .andExpect(status().isNoContent());
+
+        UUID itemId = UUID.randomUUID();
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId).cookie(accountAccess))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/search", workspaceId).param("q", "secret")
+                        .cookie(accountAccess)).andExpect(status().isForbidden());
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, itemId)
+                        .cookie(accountAccess)).andExpect(status().isForbidden());
+        mockMvc.perform(get("/workspaces/{workspaceId}/groups", workspaceId).cookie(accountAccess))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/workspaces/{workspaceId}/sharing/items/{itemId}/origins", workspaceId, itemId)
+                        .cookie(accountAccess)).andExpect(status().isForbidden());
+
+        addMember(target, workspaceId);
+        workspaceMemberRepository.flush();
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId).cookie(priorAccess))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId).cookie(accountAccess))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/auth/refresh").cookie(priorRefresh)).andExpect(status().isUnauthorized());
+
+        var workspaceLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"changed-password\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var workspaceAccess = workspaceLogin.getResponse().getCookie("accessToken");
+        var workspaceRefresh = workspaceLogin.getResponse().getCookie("refreshToken");
+        assertThat(workspaceRefresh).isNotNull();
+        assertThat(workspaceRefresh.getValue()).isNotEmpty();
+        assertThat(jwtService.validateAccessToken(workspaceAccess.getValue()).orElseThrow().accountOnly()).isFalse();
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId).cookie(workspaceAccess))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void accountOnlySessionCanLogoutWithoutRefreshCookieAndExpiresBothCookies() throws Exception {
+        User owner = createUser("Proprietário");
+        User removed = createUser("Removido");
+        UUID workspaceId = configureWorkspace(owner).id();
+        cleanupWorkspace = workspaceId;
+        cleanupOwner = owner.getId();
+        cleanupMember = removed.getId();
+        addMember(removed, workspaceId);
+        var membership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, removed.getId())
+                .orElseThrow();
+        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspaceId, membership.getId())
+                        .cookie(authCookie(owner)).param("confirmMemberId", membership.getId().toString()))
+                .andExpect(status().isNoContent());
+
+        var login = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + removed.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var access = login.getResponse().getCookie("accessToken");
+        var refresh = login.getResponse().getCookie("refreshToken");
+        assertThat(access).isNotNull();
+        assertThat(refresh).isNotNull();
+        assertThat(refresh.getValue()).isEmpty();
+
+        var logout = mockMvc.perform(post("/auth/logout").cookie(access))
+                .andExpect(status().isNoContent()).andReturn().getResponse();
+        assertThat(logout.getHeaders(HttpHeaders.SET_COOKIE)).hasSize(2)
+                .allSatisfy(cookie -> assertThat(cookie).contains("Max-Age=0"));
+        assertThat(logout.getHeaders(HttpHeaders.SET_COOKIE)).anySatisfy(cookie ->
+                assertThat(cookie).contains("accessToken=").contains("Max-Age=0"));
+        assertThat(logout.getHeaders(HttpHeaders.SET_COOKIE)).anySatisfy(cookie ->
+                assertThat(cookie).contains("refreshToken=").contains("Max-Age=0"));
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void removingCanonicalOwnerNotifiesSuccessorWhoGainsPrivateFolderAccess() throws Exception {
+        User owner = createUser("Dono removido");
+        User successor = createUser("Novo dono");
+        User unchanged = createUser("Membro sem mudança");
+        UUID workspaceId = configureWorkspace(owner).id();
+        cleanupWorkspace = workspaceId;
+        cleanupOwner = owner.getId();
+        cleanupMember = successor.getId();
+        cleanupThirdMember = unchanged.getId();
+        addMember(successor, workspaceId);
+        addMember(unchanged, workspaceId);
+        var restricted = mockMvc.perform(post("/workspaces/{workspaceId}/collections", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Privada\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        UUID collectionId = UUID.fromString(objectMapper.readTree(restricted.getResponse().getContentAsString())
+                .get("id").asText());
+        cleanupCollection = collectionId;
+        jdbcTemplate.update("UPDATE collection SET inherit_access=FALSE WHERE id=?", collectionId);
+        jdbcTemplate.update("DELETE FROM collection_public_grant WHERE collection_id=?", collectionId);
+        var successorMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, successor.getId())
+                .orElseThrow();
+        successorMembership.setRole(workspaceRoleRepository
+                .findByWorkspaceIdAndName(workspaceId, WorkspaceRole.OWNER_ROLE_NAME).orElseThrow());
+        workspaceMemberRepository.saveAndFlush(successorMembership);
+        entityManager.clear();
+        mockMvc.perform(get("/workspaces/{workspaceId}/collections/{collectionId}/path", workspaceId, collectionId)
+                        .cookie(authCookie(successor)))
+                .andExpect(status().isNotFound());
+        notificationRepository.deleteAll();
+
+        var ownerMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, owner.getId())
+                .orElseThrow();
+        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspaceId, ownerMembership.getId())
+                        .cookie(authCookie(owner)).param("confirmMemberId", ownerMembership.getId().toString()))
+                .andExpect(status().isNoContent());
+
+        assertThat(notificationRepository.findAll()).filteredOn(n -> n.getRecipient().getId().equals(successor.getId()))
+                .hasSize(1);
+        assertThat(notificationRepository.findAll()).filteredOn(n -> n.getRecipient().getId().equals(owner.getId()))
+                .hasSize(1);
+        assertThat(notificationRepository.findAll()).noneMatch(n -> n.getRecipient().getId().equals(unchanged.getId()));
+        mockMvc.perform(get("/workspaces/{workspaceId}/collections/{collectionId}/path", workspaceId, collectionId)
+                        .cookie(authCookie(successor)))
+                .andExpect(status().isOk());
+    }
+
+    private org.springframework.test.web.servlet.request.RequestPostProcessor uniqueRemoteAddress() {
+        return request -> {
+            request.setRemoteAddr(UUID.randomUUID().toString());
+            return request;
+        };
+    }
     @Autowired private PlatformTransactionManager transactionManager;
 
     @Test
@@ -254,6 +481,117 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(delete(path).cookie(authCookie(owner)).param("confirmMemberId", UUID.randomUUID().toString()))
                 .andExpect(status().isBadRequest());
         assertThat(workspaceMemberRepository.findById(membership.getId())).isPresent();
+    }
+
+    @Test
+    void readmissionIsOwnerOnlyAndRequiresAnExistingRemovedAccount() throws Exception {
+        User owner = createUser("Proprietário");
+        User member = createUser("Membro");
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(member, workspaceId);
+
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"missing@example.com\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"missing@example.com\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + member.getEmail() + "\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"invalid\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void readmissionCreatesFreshMemberAccessWithoutRestoringOldAuthorityOrSessions() throws Exception {
+        User owner = createUser("Proprietário");
+        User target = createUser("Membro readmitido");
+        UUID workspaceId = configureWorkspace(owner).id();
+        cleanupWorkspace = workspaceId;
+        cleanupOwner = owner.getId();
+        cleanupMember = target.getId();
+        addMember(target, workspaceId);
+        var oldMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, target.getId())
+                .orElseThrow();
+        WorkspaceRole formerRole = new WorkspaceRole();
+        formerRole.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
+        formerRole.setName("Former manager");
+        formerRole = workspaceRoleRepository.saveAndFlush(formerRole);
+        cleanupRole = formerRole.getId();
+        oldMembership.setRole(formerRole);
+        workspaceMemberRepository.saveAndFlush(oldMembership);
+
+        AccessGroup group = new AccessGroup();
+        group.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
+        group.setName("Former team");
+        group = groupRepository.saveAndFlush(group);
+        cleanupGroup = group.getId();
+        addGroupMember(group, oldMembership.getId(), workspaceId);
+        UUID itemId = UUID.randomUUID();
+        cleanupItem = itemId;
+        jdbcTemplate.update("INSERT INTO item (id, workspace_id, type, title) VALUES (?, ?, 'text', ?)",
+                itemId, workspaceId, "Former direct grant");
+        jdbcTemplate.update("INSERT INTO item_member_grant (item_id, workspace_member_id, workspace_id) VALUES (?, ?, ?)",
+                itemId, oldMembership.getId(), workspaceId);
+
+        var oldLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var oldAccess = oldLogin.getResponse().getCookie("accessToken");
+        var oldRefresh = oldLogin.getResponse().getCookie("refreshToken");
+        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspaceId, oldMembership.getId())
+                        .cookie(authCookie(owner)).param("confirmMemberId", oldMembership.getId().toString()))
+                .andExpect(status().isNoContent());
+
+        var response = mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.roleName").value("Member"))
+                .andReturn();
+        UUID newMembershipId = UUID.fromString(objectMapper.readTree(response.getResponse().getContentAsString())
+                .get("id").asText());
+        assertThat(newMembershipId).isNotEqualTo(oldMembership.getId());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT role.name FROM workspace_member member
+                JOIN workspace_role role ON role.id = member.role_id WHERE member.id = ?
+                """, String.class, newMembershipId)).isEqualTo(WorkspaceRole.MEMBER_ROLE_NAME);
+        var readmissionActivity = jdbcTemplate.queryForMap("""
+                SELECT actor_id, actor_name, actor_context, action, resource_type, resource_id, snapshot
+                FROM activity_log WHERE action = 'member_joined' AND resource_id = ?
+                """, newMembershipId);
+        assertThat(readmissionActivity.get("actor_id")).isEqualTo(owner.getId());
+        assertThat(readmissionActivity.get("actor_name")).isEqualTo(owner.getName());
+        assertThat(readmissionActivity.get("actor_context")).isEqualTo("USER");
+        assertThat(readmissionActivity.get("resource_type")).isEqualTo("member");
+        assertThat(readmissionActivity.get("resource_id")).isEqualTo(newMembershipId);
+        assertThat(readmissionActivity.get("snapshot").toString())
+                .contains(target.getId().toString(), target.getName(), target.getEmail(), "Member");
+        assertThat(groupMemberRepository.findByGroupIdAndWorkspaceIdAndWorkspaceMemberId(
+                group.getId(), workspaceId, newMembershipId)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM item_member_grant WHERE item_id = ?",
+                Integer.class, itemId)).isZero();
+        mockMvc.perform(get("/workspaces/{workspaceId}/members", workspaceId).cookie(oldAccess))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/auth/refresh").cookie(oldRefresh)).andExpect(status().isUnauthorized());
+
+        var freshLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspaceId)
+                        .cookie(freshLogin.getResponse().getCookie("accessToken")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleName").value("Member"))
+                .andExpect(jsonPath("$.permissions.length()").value(2));
     }
 
     @Test

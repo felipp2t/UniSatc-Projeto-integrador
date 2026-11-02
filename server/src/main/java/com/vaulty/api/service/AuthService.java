@@ -219,8 +219,11 @@ public class AuthService {
     }
 
     private TokenPair issueTokenPair(UUID userId) {
-        var membership = workspaceMemberRepository.findByUserId(userId)
-                .orElseThrow(() -> new InvalidCredentialsException("Vínculo com workspace não encontrado"));
+        var membership = workspaceMemberRepository.findByUserId(userId).orElse(null);
+
+        if (membership == null) {
+            return new TokenPair(jwtService.generateAccountAccessToken(userId), null);
+        }
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(UUID.randomUUID().toString());

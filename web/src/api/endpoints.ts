@@ -1,5 +1,10 @@
+import type { ZodType } from 'zod'
 import { apiClient } from './client'
 import type {
+  AccessGroupResponse,
+  ActivityFilters,
+  ActivityPageResponse,
+  AttachmentResponse,
   ChangePasswordRequest,
   CollectionPageResponse,
   CollectionPathEntry,
@@ -14,16 +19,32 @@ import type {
   ItemPageResponse,
   ItemResponse,
   LoginRequest,
+  NotificationPageResponse,
   RegisterRequest,
   RenameCollectionRequest,
   ResetPasswordRequest,
+  SecretValueResponse,
+  UpdateAttachmentMetadataRequest,
+  UpdateItemRequest,
   UpdateProfileRequest,
   UpdateWorkspaceRequest,
   UserResponse,
   WorkspaceMemberDto,
+  WorkspacePermissionsResponse,
   WorkspaceResponse,
 } from './types'
-import { workspaceMembersSchema } from './workspace-members'
+import {
+  workspaceMemberSchema,
+  workspaceMembersSchema,
+  workspaceRolePermissionsSchema,
+  workspaceRolesSchema,
+} from './workspace-members'
+
+function parseOrThrow<T>(schema: ZodType<T>, data: unknown, message: string) {
+  const parsed = schema.safeParse(data)
+  if (!parsed.success) throw new Error(message)
+  return parsed.data
+}
 
 export const authApi = {
   forgotPassword: (request: ForgotPasswordRequest) =>
@@ -47,6 +68,32 @@ export const userApi = {
 }
 
 export const workspaceApi = {
+  activity: (workspaceId: string, filters: ActivityFilters) =>
+    apiClient.get<ActivityPageResponse>(`/workspaces/${workspaceId}/activity`, {
+      params: filters,
+    }),
+  changeMemberRole: async (
+    workspaceId: string,
+    memberId: string,
+    roleId: string
+  ) => {
+    const response = await apiClient.put<unknown>(
+      `/workspaces/${workspaceId}/members/${memberId}/role`,
+      { roleId }
+    )
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceMemberSchema,
+        response.data,
+        'A resposta da API contém um membro inválido.'
+      ),
+    }
+  },
+  createRole: (workspaceId: string, name: string) =>
+    apiClient.post<void>(`/workspaces/${workspaceId}/roles`, { name }),
+  deleteRole: (workspaceId: string, roleId: string) =>
+    apiClient.delete<void>(`/workspaces/${workspaceId}/roles/${roleId}`),
   get: (workspaceId: string) =>
     apiClient.get<WorkspaceResponse>(`/workspaces/${workspaceId}`),
   list: () => apiClient.get<WorkspaceResponse[]>('/workspaces'),
@@ -54,12 +101,50 @@ export const workspaceApi = {
     const response = await apiClient.get<WorkspaceMemberDto[]>(
       `/workspaces/${workspaceId}/members`
     )
-    const parsed = workspaceMembersSchema.safeParse(response.data)
-    if (!parsed.success) {
-      throw new Error('A resposta da API contém membros inválidos.')
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceMembersSchema,
+        response.data,
+        'A resposta da API contém membros inválidos.'
+      ),
     }
-    return { ...response, data: parsed.data }
   },
+  listRolePermissions: async (workspaceId: string, roleId: string) => {
+    const response = await apiClient.get<unknown>(
+      `/workspaces/${workspaceId}/roles/${roleId}/permissions`
+    )
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceRolePermissionsSchema,
+        response.data,
+        'A resposta da API contém permissões inválidas.'
+      ),
+    }
+  },
+  listRoles: async (workspaceId: string) => {
+    const response = await apiClient.get<unknown>(
+      `/workspaces/${workspaceId}/roles`
+    )
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceRolesSchema,
+        response.data,
+        'A resposta da API contém cargos inválidos.'
+      ),
+    }
+  },
+  permissions: (workspaceId: string) =>
+    apiClient.get<WorkspacePermissionsResponse>(
+      `/workspaces/${workspaceId}/me/permissions`
+    ),
+  removeMember: (workspaceId: string, membershipId: string) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/members/${membershipId}`,
+      { params: { confirmMemberId: membershipId } }
+    ),
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
 }
@@ -67,11 +152,61 @@ export const workspaceApi = {
 export const inviteApi = {
   create: (request: InviteUserRequest) =>
     apiClient.post<void>('/invites', request),
+  decline: (request: InviteValidationRequest) =>
+    apiClient.post<void>('/invites/decline', request),
   list: () => apiClient.get<InviteResponse[]>('/invites'),
   revoke: (inviteId: string) =>
     apiClient.post<void>(`/invites/${inviteId}/revoke`),
   validate: (request: InviteValidationRequest) =>
     apiClient.post<InviteValidationResponse>('/invites/validate', request),
+}
+
+export const notificationsApi = {
+  list: (page = 0, size = 10) =>
+    apiClient.get<NotificationPageResponse>('/notifications', {
+      params: { page, size },
+    }),
+  markAllRead: () => apiClient.patch<void>('/notifications/read'),
+  markRead: (notificationId: string) =>
+    apiClient.patch<void>(`/notifications/${notificationId}/read`),
+}
+
+export const accessGroupApi = {
+  list: (workspaceId: string) =>
+    apiClient.get<AccessGroupResponse[]>(`/workspaces/${workspaceId}/groups`),
+}
+
+export const sharingApi = {
+  grantEveryone: (workspaceId: string, collectionId: string) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/everyone`
+    ),
+  grantGroup: (workspaceId: string, collectionId: string, groupId: string) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/groups/${groupId}`
+    ),
+  grantMember: (workspaceId: string, itemId: string, memberId: string) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/sharing/items/${itemId}/members/${memberId}`
+    ),
+  origins: (workspaceId: string, type: 'collection' | 'item', id: string) =>
+    apiClient.get<string[]>(
+      `/workspaces/${workspaceId}/sharing/${type === 'collection' ? 'collections' : 'items'}/${id}/origins`
+    ),
+  revokeEveryone: (workspaceId: string, collectionId: string) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/everyone`
+    ),
+  setInheritance: (
+    workspaceId: string,
+    collectionId: string,
+    enabled: boolean
+  ) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/inheritance`,
+      undefined,
+      { params: { enabled } }
+    ),
 }
 
 export const collectionsApi = {
@@ -105,10 +240,58 @@ export const collectionsApi = {
 }
 
 export const itemsApi = {
+  archive: (workspaceId: string, itemId: string) =>
+    apiClient.post<void>(`/workspaces/${workspaceId}/items/${itemId}/archive`),
   create: (workspaceId: string, request: CreateItemRequest) =>
     apiClient.post<ItemResponse>(`/workspaces/${workspaceId}/items`, request),
-  list: (workspaceId: string, collectionId?: string, page = 0, size = 100) =>
+  get: (workspaceId: string, itemId: string) =>
+    apiClient.get<ItemResponse>(`/workspaces/${workspaceId}/items/${itemId}`),
+  list: (
+    workspaceId: string,
+    collectionId?: string,
+    page = 0,
+    size = 100,
+    { archived }: { archived?: boolean } = {}
+  ) =>
     apiClient.get<ItemPageResponse>(`/workspaces/${workspaceId}/items`, {
-      params: { collectionId, page, size },
+      params: { archived, collectionId, page, size },
     }),
+  remove: (workspaceId: string, itemId: string) =>
+    apiClient.delete<void>(`/workspaces/${workspaceId}/items/${itemId}`, {
+      params: { confirm: true },
+    }),
+  replaceAttachment: (
+    workspaceId: string,
+    itemId: string,
+    file: File,
+    { signal }: { signal?: AbortSignal } = {}
+  ) => {
+    const body = new FormData()
+    body.append('file', file)
+    return apiClient.put<AttachmentResponse>(
+      `/workspaces/${workspaceId}/items/${itemId}/attachment`,
+      body,
+      { signal }
+    )
+  },
+  restore: (workspaceId: string, itemId: string) =>
+    apiClient.post<void>(`/workspaces/${workspaceId}/items/${itemId}/restore`),
+  revealSecret: (workspaceId: string, itemId: string) =>
+    apiClient.get<SecretValueResponse>(
+      `/workspaces/${workspaceId}/items/${itemId}/secret`
+    ),
+  update: (workspaceId: string, itemId: string, request: UpdateItemRequest) =>
+    apiClient.put<ItemResponse>(
+      `/workspaces/${workspaceId}/items/${itemId}`,
+      request
+    ),
+  updateMetadata: (
+    workspaceId: string,
+    itemId: string,
+    request: UpdateAttachmentMetadataRequest
+  ) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/items/${itemId}/metadata`,
+      request
+    ),
 }

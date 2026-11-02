@@ -23,20 +23,21 @@ de redefinição de uso único.
 
 ## Como rodar
 
-1. Inicie o PostgreSQL:
+1. Copie `.env.example` para `.env` e configure `DB_USERNAME=vaulty` e `DB_PASSWORD=vaulty`.
+   Gere `JWT_SECRET` com pelo menos 32 bytes aleatórios e `SECRET_ENCRYPTION_KEY` com
+   `openssl rand -base64 32`. Mantenha a chave de criptografia entre reinicializações.
+   Para o storage Garage, gere `GARAGE_RPC_SECRET` e `GARAGE_DEFAULT_SECRET_KEY` com
+   `openssl rand -hex 32`, e `GARAGE_DEFAULT_ACCESS_KEY` com `printf 'GK'; openssl rand -hex 16`.
+   Mantenha esses valores no `.env`; o Spring Boot o carrega automaticamente.
+2. Inicie o PostgreSQL e o Garage:
 
    ```bash
    docker compose up -d
    ```
 
-   O Compose cria o banco `vaulty`, exposto em `localhost:5432`, com usuário e senha `vaulty`.
-2. Copie `.env.example` para `.env` e ajuste as variáveis. Para o banco iniciado pelo Compose,
-   use `DB_USERNAME=vaulty` e `DB_PASSWORD=vaulty`. Gere um valor aleatório de pelo menos 32 bytes
-   para `JWT_SECRET`; a aplicação não inicia se essa variável estiver ausente. O `.env` é carregado
-   automaticamente pelo Spring Boot, sem precisar exportar as variáveis no terminal.
-   Para criar e consultar segredos, configure `SECRET_ENCRYPTION_KEY` com 32 bytes aleatórios
-   codificados em Base64. Gere-a, por exemplo, com `openssl rand -base64 32` e mantenha a mesma
-   chave entre reinicializações para poder descriptografar os valores já salvos.
+   O Garage cria o bucket `vaulty` e guarda dados e metadados em volumes Docker. A API S3
+   fica em `localhost:3900`. Esta instalação usa um único nó, sem redundância; preserve os
+   volumes e faça backups. Para outro serviço S3, ajuste as propriedades `app.storage.s3.*`.
 3. Para testar convites e recuperação de senha, configure `MAIL_HOST`, `MAIL_PORT`,
    `MAIL_USERNAME`, `MAIL_PASSWORD` e `MAIL_FROM`. Com Mailtrap Email Sandbox, use o host
    `sandbox.smtp.mailtrap.io`, porta `2525` e as credenciais exibidas na aba SMTP do seu Sandbox.
@@ -101,15 +102,17 @@ completa de conteúdo granular.
 | RF02 | POST | `/auth/login` | Não | `{ email, password }` | 200, seta cookies | 401 credenciais inválidas |
 | RF03 | POST | `/auth/refresh` | Cookie `refreshToken` | — | 200, roda os cookies | 401 refresh token inválido/expirado |
 | RF04 | POST | `/auth/logout` | Cookie `refreshToken` | — | 204, limpa os cookies | 401 refresh token inválido |
-| RF49 | POST | `/auth/forgot-password` | Não | `{ email }` | 204 (sempre, mesmo se o e-mail não existir) | — |
-| RF49 | POST | `/auth/reset-password` | Não | `{ token, newPassword, confirmPassword }` | 204 | 400 senhas não conferem, 401 token inválido/expirado |
+| RF49 | POST | `/auth/forgot-password` | Não | `{ email }` | 204 sem corpo (sempre, exista ou não a conta) | 429 limite por IP |
+| RF49 | POST | `/auth/reset-password` | Não | `{ token, newPassword, confirmPassword }` | 204 sem corpo, sem iniciar sessão | 400 senhas não conferem, 401 token inválido/expirado/utilizado, 429 limite por IP |
 | RF05 | PATCH | `/me/password` | Sim | `{ currentPassword, newPassword, confirmPassword }` | 204 | 400 senha atual incorreta ou senhas não conferem, 401 não autenticado |
 | RF06 | PATCH | `/me` | Sim | `{ name }` | 204 | 400 nome inválido (< 3 caracteres) |
 | RF07 | GET | `/me` | Sim | — | 200 `{ id, name, email }` | 401 não autenticado |
 
 Trocar a senha (RF05) e redefini-la via e-mail (RF49) invalidam todos os refresh tokens e todos os
-tokens de redefinição pendentes do usuário, forçando novo login em outras sessões e impedindo o
-reuso de links antigos.
+tokens de redefinição pendentes do usuário. Access tokens já emitidos podem continuar válidos por
+até 15 minutos. Na recuperação, a interface apresenta a mensagem neutra definida em RF49-CA01; após
+sucesso encaminha ao login sem sessão automática (RF49-CA06); diante de `401`, informa que o link está
+indisponível e oferece nova solicitação (RF49-CA07). Esses comportamentos de interface pertencem à #140.
 
 `GET /invites` lista apenas convites ainda não expirados cujo e-mail não pertence a uma conta; a
 resposta inclui `id`, `email`, `invitedByUserId`, `invitedByName`, `createdAt` e `expiresAt`.
@@ -163,7 +166,7 @@ Pastas são persistidas na tabela `collection`. A raiz é o workspace e não pos
 |---|---|---|---|
 | POST | `/workspaces/{workspaceId}/items` | 201 | `item/create`; segredos exigem também `secret/create`. |
 | GET | `/workspaces/{workspaceId}/items` | 200 | Lista metadados paginados da raiz ou da pasta indicada por `collectionId`; segredos só aparecem para quem tem `secret/read`. |
-| GET | `/workspaces/{workspaceId}/items/search?q=...` | 200 | Busca paginada por todas as palavras do título, em qualquer ordem, ignorando caixa e acentos; aplica as mesmas permissões. |
+| GET | `/workspaces/{workspaceId}/items/search?q=...&includeArchived=false&page=0&size=20` | 200 | Busca paginada por todas as palavras do título, em qualquer ordem, ignorando caixa e acentos; `includeArchived=true` inclui arquivados e aplica as mesmas permissões. |
 | GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Retorna conteúdo/metadados do item autorizado; segredos ficam indisponíveis sem `secret/read`. |
 | GET | `/workspaces/{workspaceId}/items/{itemId}/secret` | 200 | Revela o valor somente com `item/read` e `secret/read`. |
 | POST | `/workspaces/{workspaceId}/items/attachments` | 201 | Cria item `file`/`image` com um anexo; exige `item/create`. |

@@ -1,24 +1,33 @@
 import {
   GearIcon,
   MagnifyingGlassIcon,
+  ShieldIcon,
   TrashIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
 import { isForbiddenOrNotFound } from '@/api/http-status'
 import {
   getMemberPermissions,
-  isWorkspaceOwner,
+  isOwnerRole,
   type MemberPermissions,
 } from '@/api/member-permissions'
-import type { WorkspaceMemberResponse } from '@/api/types'
-import { workspaceMembersQueryKey } from '@/api/workspace-keys'
+import type {
+  WorkspaceMemberResponse,
+  WorkspaceRoleResponse,
+} from '@/api/types'
+import {
+  workspaceMembersQueryKey,
+  workspaceRolesQueryKey,
+} from '@/api/workspace-keys'
 import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { ChangeMemberRoleDialog } from '@/components/change-member-role-dialog'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
+import { RemoveMemberDialog } from '@/components/remove-member-dialog'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
@@ -33,11 +42,14 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { WorkspaceRolesSection } from '@/components/workspace-roles-section'
+import { useChangeMemberRole } from '@/hooks/use-change-member-role'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
+import { useRemoveMember } from '@/hooks/use-remove-member'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
   component: WorkspaceSettingsPage,
-  head: () => ({ meta: [{ title: 'Membros do workspace | Vaulty' }] }),
+  head: () => ({ meta: [{ title: 'Configurações do workspace | Vaulty' }] }),
 })
 
 function WorkspaceSettingsPage() {
@@ -55,14 +67,46 @@ function WorkspaceSettingsPage() {
     },
     queryKey: workspaceMembersQueryKey(workspaceId),
   })
+  const currentUserRole = members.data?.find(
+    (member) => member.userId === session.user?.id
+  )?.roleName
+  const isOwner = isOwnerRole(currentUserRole)
+  const roles = useQuery({
+    enabled: Boolean(workspaceId && isOwner),
+    queryFn: async () => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      return (await workspaceApi.listRoles(workspaceId)).data
+    },
+    queryKey: workspaceRolesQueryKey(workspaceId),
+  })
   const retryWorkspaces = useCallback(async () => {
     await workspaces.refetch()
   }, [workspaces.refetch])
   const retryMembers = useCallback(async () => {
     await members.refetch()
   }, [members.refetch])
-  const isOwner = isWorkspaceOwner(session.user?.id, currentWorkspace?.ownerId)
-  const roles = useMemo(
+  const retryRoles = useCallback(async () => {
+    await roles.refetch()
+  }, [roles.refetch])
+  const roleChange = useChangeMemberRole({
+    currentUserId: session.user?.id,
+    roles: roles.data,
+    workspaceId,
+  })
+  const memberRemoval = useRemoveMember({
+    currentUserId: session.user?.id,
+    session,
+    workspaceId,
+  })
+  const roleSelectionDisabled =
+    isOwner &&
+    (roles.isPending ||
+      roles.isError ||
+      roleChange.isChangingRole ||
+      (roles.data?.length ?? 0) === 0)
+  const rolesLoadError =
+    isOwner && roles.isError ? <RolesLoadError onRetry={retryRoles} /> : null
+  const roleNames = useMemo(
     () =>
       [
         ...new Set((members.data ?? []).map((member) => member.roleName)),
@@ -80,6 +124,7 @@ function WorkspaceSettingsPage() {
   const memberAccessError = members.isError ? members.error : undefined
   const memberAccessDenied = isForbiddenOrNotFound(memberAccessError)
 
+  if (memberRemoval.signedOut) return null
   if (workspaces.isPending)
     return <LoadingState label='Carregando workspace…' />
   if (workspaces.isError)
@@ -107,7 +152,7 @@ function WorkspaceSettingsPage() {
         <AppBreadcrumb
           items={[
             { label: 'Início', to: '/' },
-            { label: 'Membros do workspace' },
+            { label: 'Configurações do workspace' },
           ]}
         />
         <div className='flex min-w-0 items-center gap-4'>
@@ -116,99 +161,167 @@ function WorkspaceSettingsPage() {
             className='size-6 shrink-0 text-primary'
           />
           <h1 className='truncate font-bold font-mono text-xl md:text-3xl'>
-            MEMBROS DO WORKSPACE
+            CONFIGURAÇÕES DO WORKSPACE
           </h1>
         </div>
       </header>
-      <div className='flex min-w-0 flex-col gap-8 md:flex-row'>
+      <Tabs
+        className='flex min-w-0 flex-col gap-8 md:flex-row'
+        defaultValue='members'
+        orientation='vertical'
+      >
         <nav
           aria-label='Configurações do workspace'
-          className='hidden w-full shrink-0 flex-col gap-1 md:flex md:w-52'
+          className='w-full shrink-0 md:w-52'
         >
-          <Link
-            activeProps={{
-              className: 'border-primary bg-primary/10 text-primary',
-            }}
-            className='flex items-center gap-2.5 border-l-2 px-3 py-2 font-mono font-semibold text-xs uppercase tracking-wide transition-colors'
-            inactiveProps={{
-              className:
-                'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground',
-            }}
-            to='/configuracoes-workspace'
+          <TabsList
+            aria-label='Seções das configurações do workspace'
+            className='flex h-auto w-full flex-col items-stretch gap-1 rounded-none bg-transparent p-0'
           >
-            <UsersThreeIcon aria-hidden='true' className='size-3.5 shrink-0' />{' '}
-            Membros
-          </Link>
+            <TabsTrigger
+              className='w-full justify-start gap-2 rounded-none border-l-2 px-3 py-2 text-left font-semibold tracking-wide data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none'
+              value='members'
+            >
+              <UsersThreeIcon
+                aria-hidden='true'
+                className='size-3.5 shrink-0'
+              />
+              Membros
+            </TabsTrigger>
+            <WorkspaceRolesTabTrigger isOwner={isOwner} />
+          </TabsList>
         </nav>
         <Separator className='hidden h-auto md:block' orientation='vertical' />
-        <section aria-label='Membros e convites' className='min-w-0 flex-1'>
-          <Tabs defaultValue='members'>
-            <div className='flex flex-wrap items-center justify-between gap-3'>
-              <TabsList>
-                <TabsTrigger value='members'>
-                  Membros ({members.isError ? 0 : (members.data?.length ?? 0)})
-                </TabsTrigger>
-                {isOwner ? (
-                  <TabsTrigger value='invites'>Convites</TabsTrigger>
-                ) : null}
-              </TabsList>
-              {isOwner ? <InviteMemberDialog /> : null}
-            </div>
-            <TabsContent className='mt-4 space-y-4' value='members'>
-              <div className='flex flex-col gap-2 md:flex-row'>
-                <div className='relative flex-1'>
-                  <label className='sr-only' htmlFor='member-search'>
-                    Buscar membro por nome
-                  </label>
-                  <MagnifyingGlassIcon
-                    aria-hidden='true'
-                    className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground'
-                  />
-                  <Input
-                    className='pl-9'
-                    id='member-search'
-                    onValueChange={setSearch}
-                    placeholder='Buscar por nome'
-                    value={search}
-                  />
-                </div>
-                <Select onValueChange={setRoleFilter} value={roleFilter}>
-                  <SelectTrigger
-                    aria-label='Filtrar por cargo'
-                    className='w-full md:w-40'
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='all'>Todos os cargos</SelectItem>
-                    {roles.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {role}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        <section
+          aria-label='Configurações do workspace'
+          className='min-w-0 flex-1'
+        >
+          <TabsContent className='mt-0' value='members'>
+            <Tabs defaultValue='members'>
+              <div className='flex flex-wrap items-center justify-between gap-3'>
+                <TabsList>
+                  <TabsTrigger value='members'>
+                    Membros ({members.isError ? 0 : (members.data?.length ?? 0)}
+                    )
+                  </TabsTrigger>
+                  {isOwner ? (
+                    <TabsTrigger value='invites'>Convites</TabsTrigger>
+                  ) : null}
+                </TabsList>
+                {isOwner ? <InviteMemberDialog /> : null}
               </div>
-              <MembersList
-                currentUserId={session.user?.id}
-                filteredMembers={filteredMembers}
-                isOwner={isOwner}
-                memberAccessDenied={memberAccessDenied}
-                members={members}
-                onRetry={retryMembers}
-                roles={roles}
-                workspaceOwnerId={currentWorkspace.ownerId}
-              />
-            </TabsContent>
-            {isOwner ? (
-              <TabsContent className='mt-4' value='invites'>
-                <PendingInvitesSection />
+              <TabsContent className='mt-4 space-y-4' value='members'>
+                <div className='flex flex-col gap-2 md:flex-row'>
+                  <div className='relative flex-1'>
+                    <label className='sr-only' htmlFor='member-search'>
+                      Buscar membro por nome
+                    </label>
+                    <MagnifyingGlassIcon
+                      aria-hidden='true'
+                      className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground'
+                    />
+                    <Input
+                      className='pl-9'
+                      id='member-search'
+                      onValueChange={setSearch}
+                      placeholder='Buscar por nome'
+                      value={search}
+                    />
+                  </div>
+                  <Select onValueChange={setRoleFilter} value={roleFilter}>
+                    <SelectTrigger
+                      aria-label='Filtrar por cargo'
+                      className='w-full md:w-40'
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='all'>Todos os cargos</SelectItem>
+                      {roleNames.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <MembersList
+                  currentUserRole={currentUserRole}
+                  filteredMembers={filteredMembers}
+                  isOwner={isOwner}
+                  isRemoving={memberRemoval.isPending}
+                  memberAccessDenied={memberAccessDenied}
+                  members={members}
+                  onChangeRole={roleChange.requestRoleChange}
+                  onRemove={memberRemoval.request}
+                  onRetry={retryMembers}
+                  roleSelectionDisabled={roleSelectionDisabled}
+                  roles={roles.data ?? []}
+                  rolesLoadError={rolesLoadError}
+                />
               </TabsContent>
-            ) : null}
-          </Tabs>
+              {isOwner ? (
+                <TabsContent className='mt-4' value='invites'>
+                  <PendingInvitesSection />
+                </TabsContent>
+              ) : null}
+            </Tabs>
+          </TabsContent>
+          <WorkspaceRolesTabContent
+            isOwner={isOwner}
+            onRetry={retryRoles}
+            roles={roles.data ?? []}
+            rolesError={roles.error}
+            rolesPending={roles.isPending}
+            workspaceId={workspaceId}
+          />
         </section>
-      </div>
+      </Tabs>
+      <ChangeMemberRoleDialog roleChange={roleChange} />
+      <RemoveMemberDialog removal={memberRemoval} />
     </main>
+  )
+}
+
+function WorkspaceRolesTabTrigger({ isOwner }: { isOwner: boolean }) {
+  if (!isOwner) return null
+  return (
+    <TabsTrigger
+      className='w-full justify-start gap-2 rounded-none border-l-2 px-3 py-2 text-left font-semibold tracking-wide data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none'
+      value='roles'
+    >
+      <ShieldIcon aria-hidden='true' className='size-3.5 shrink-0' />
+      Cargos e permissões
+    </TabsTrigger>
+  )
+}
+
+function WorkspaceRolesTabContent({
+  isOwner,
+  onRetry,
+  roles,
+  rolesError,
+  rolesPending,
+  workspaceId,
+}: {
+  isOwner: boolean
+  onRetry: () => Promise<void>
+  roles: WorkspaceRoleResponse[]
+  rolesError: unknown
+  rolesPending: boolean
+  workspaceId: string | undefined
+}) {
+  if (!(isOwner && workspaceId)) return null
+  return (
+    <TabsContent className='mt-4' value='roles'>
+      <WorkspaceRolesSection
+        onRetry={onRetry}
+        roles={roles}
+        rolesError={rolesError}
+        rolesPending={rolesPending}
+        workspaceId={workspaceId}
+      />
+    </TabsContent>
   )
 }
 
@@ -217,19 +330,27 @@ function MembersList({
   isOwner,
   memberAccessDenied,
   members,
-  currentUserId,
+  isRemoving,
   onRetry,
   roles,
-  workspaceOwnerId,
+  roleSelectionDisabled,
+  rolesLoadError,
+  onChangeRole,
+  currentUserRole,
+  onRemove,
 }: {
-  currentUserId: string | undefined
   filteredMembers: WorkspaceMemberResponse[]
   isOwner: boolean
   memberAccessDenied: boolean
   members: UseQueryResult<WorkspaceMemberResponse[]>
+  isRemoving: boolean
+  onRemove: (member: WorkspaceMemberResponse) => void
   onRetry: () => Promise<void>
-  roles: string[]
-  workspaceOwnerId: string | undefined
+  roles: WorkspaceRoleResponse[]
+  roleSelectionDisabled: boolean
+  rolesLoadError: ReactNode
+  onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
+  currentUserRole: string | undefined
 }) {
   if (members.isPending) return <LoadingState label='Carregando membros…' />
   if (members.isError) {
@@ -263,38 +384,63 @@ function MembersList({
     )
   }
 
+  const ownerCount = members.data.filter((member) =>
+    isOwnerRole(member.roleName)
+  ).length
   const membersWithPermissions = filteredMembers.map((member) => ({
     member,
     permissions: getMemberPermissions({
-      currentUserId,
-      memberUserId: member.userId,
-      workspaceOwnerId,
+      currentUserRole,
+      memberRoleName: member.roleName,
+      ownerCount,
     }),
   }))
   return (
-    <div className='max-h-120 overflow-auto border border-border'>
-      <table
-        aria-label='Membros e cargos'
-        className='w-full table-fixed border-collapse text-left'
-      >
-        <colgroup>
-          <col />
-          <col className='w-24 md:w-36' />
-          {isOwner ? <col className='w-11 md:w-15' /> : null}
-        </colgroup>
-        <tbody className='divide-y divide-border'>
-          {membersWithPermissions.map(({ member, permissions }, index) => (
-            <MemberRow
-              index={index}
-              isOwner={isOwner}
-              key={member.id}
-              member={member}
-              permissions={permissions}
-              roles={roles}
-            />
-          ))}
-        </tbody>
-      </table>
+    <>
+      {rolesLoadError}
+      <div className='max-h-120 overflow-auto border border-border'>
+        <table
+          aria-label='Membros e cargos'
+          className='w-full table-fixed border-collapse text-left'
+        >
+          <colgroup>
+            <col />
+            <col className='w-24 md:w-36' />
+            {isOwner ? <col className='w-11 md:w-15' /> : null}
+          </colgroup>
+          <tbody className='divide-y divide-border'>
+            {membersWithPermissions.map(({ member, permissions }, index) => (
+              <MemberRow
+                index={index}
+                isOwner={isOwner}
+                isRemoving={isRemoving}
+                key={member.id}
+                member={member}
+                onChangeRole={onChangeRole}
+                onRemove={onRemove}
+                permissions={permissions}
+                roleSelectDisabled={
+                  roleSelectionDisabled || permissions.isLastOwner
+                }
+                roles={roles}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function RolesLoadError({ onRetry }: { onRetry: () => Promise<void> }) {
+  return (
+    <div className='flex items-center justify-between border border-destructive/40 p-3'>
+      <p className='text-destructive text-xs' role='alert'>
+        Não foi possível carregar os cargos.
+      </p>
+      <Button onClick={onRetry} size='sm' variant='outline'>
+        Recarregar cargos
+      </Button>
     </div>
   )
 }
@@ -302,17 +448,30 @@ function MembersList({
 function MemberRow({
   index,
   isOwner,
+  isRemoving,
   member,
   permissions,
   roles,
+  roleSelectDisabled,
+  onChangeRole,
+  onRemove,
 }: {
   index: number
   isOwner: boolean
+  isRemoving: boolean
   member: WorkspaceMemberResponse
   permissions: MemberPermissions
-  roles: string[]
+  roles: WorkspaceRoleResponse[]
+  roleSelectDisabled: boolean
+  onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
+  onRemove: (member: WorkspaceMemberResponse) => void
 }) {
   const { name } = member
+  const handleRoleChange = useCallback(
+    (roleId: string) => onChangeRole(member, roleId),
+    [member, onChangeRole]
+  )
+  const handleRemove = useCallback(() => onRemove(member), [member, onRemove])
 
   return (
     <tr className={index % 2 === 0 ? 'bg-card' : 'bg-muted/10'}>
@@ -337,29 +496,39 @@ function MemberRow({
         </div>
       </td>
       <td className='px-1 py-3 md:px-2'>
-        <Select disabled value={member.roleName}>
-          <SelectTrigger
-            aria-label={`Cargo de ${name}`}
-            className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
-            title={permissions.changeRoleReason ?? 'Cargo disponível.'}
+        {isOwner ? (
+          <Select
+            disabled={roleSelectDisabled}
+            onValueChange={handleRoleChange}
+            value={member.roleId}
           >
-            <SelectValue className='truncate' />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map((role) => (
-              <SelectItem className='uppercase' key={role} value={role}>
-                {role}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              aria-label={`Cargo de ${name}`}
+              className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
+            >
+              <SelectValue className='truncate'>{member.roleName}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map((role) => (
+                <SelectItem className='uppercase' key={role.id} value={role.id}>
+                  {role.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className='font-mono text-primary text-xs uppercase'>
+            {member.roleName}
+          </span>
+        )}
       </td>
       {isOwner ? (
         <td className='px-2 py-3 text-right md:px-4'>
           <Button
             aria-label={`Remover ${name}`}
             className='size-7 shrink-0 border border-destructive/40 text-destructive hover:bg-destructive/10'
-            disabled
+            disabled={isRemoving || Boolean(permissions.removeReason)}
+            onClick={handleRemove}
             size='icon'
             title={permissions.removeReason ?? 'Remover membro.'}
             variant='outline'

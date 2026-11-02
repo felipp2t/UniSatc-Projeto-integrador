@@ -25,6 +25,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class JwtAuthenticationFilterTest {
@@ -46,7 +47,8 @@ class JwtAuthenticationFilterTest {
         stubMembership(membershipId, userId, "Owner");
         Authentication authentication = authenticate(jwtService.generateAccessToken(userId, membershipId, "Owner"));
         assertThat(authentication.getPrincipal()).isEqualTo(userId);
-        assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority).containsExactly("Owner");
+        assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
+                .containsExactly("WORKSPACE_MEMBER", "Owner");
     }
 
     @Test
@@ -63,7 +65,20 @@ class JwtAuthenticationFilterTest {
 
         Authentication authentication = authenticate(jwtService.generateAccessToken(userId, membershipId, "Owner"));
 
-        assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority).containsExactly("Member");
+        assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
+                .containsExactly("WORKSPACE_MEMBER", "Member");
+    }
+
+    @Test
+    void authenticatesAccountOnlyTokenWithoutWorkspaceAuthorities() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        Authentication authentication = authenticate(jwtService.generateAccountAccessToken(userId));
+
+        assertThat(authentication.getPrincipal()).isEqualTo(userId);
+        assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
+                .containsExactly("ACCOUNT_ONLY");
+        verifyNoInteractions(members);
     }
 
     @Test

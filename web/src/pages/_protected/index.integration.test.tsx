@@ -87,6 +87,7 @@ function itemPage(page = 0, type: 'link' | 'secret' | 'text' = 'text') {
     data: {
       items: [
         {
+          archivedAt: null,
           collectionId: null,
           id: `item-${page}`,
           linkUrl: null,
@@ -906,7 +907,8 @@ describe('workspace collection navigation', () => {
         workspaceId,
         undefined,
         1,
-        100
+        100,
+        { archived: false }
       )
       expect(within(items).getByText('Página 2 de 2')).toBeInTheDocument()
     })
@@ -932,5 +934,124 @@ describe('workspace collection navigation', () => {
         queryClient.getQueryState(anotherFolderItemsKey)?.isInvalidated
       ).toBe(true)
     })
+  })
+
+  it('a aba Arquivados consulta archived=true, mostra o badge e atualiza a URL', async () => {
+    apiMocks.itemsList.mockImplementation(
+      async (_id, _collectionId, _page, _size, options) =>
+        options?.archived
+          ? {
+              data: {
+                items: [
+                  {
+                    archivedAt: '2026-01-01T00:00:00Z',
+                    collectionId: null,
+                    id: 'archived-1',
+                    linkUrl: null,
+                    preview: null,
+                    textContent: null,
+                    title: 'Item velho',
+                    type: 'text',
+                  },
+                ],
+                page: 0,
+                size: 100,
+                totalItems: 1,
+                totalPages: 1,
+              },
+            }
+          : itemPage(0)
+    )
+    const user = userEvent.setup()
+    const { router } = await renderAt('/')
+    await screen.findByRole('heading', { name: 'Item 0' })
+
+    const archivedTab = screen.getByRole('button', { name: 'Arquivados' })
+    await user.click(archivedTab)
+
+    expect(
+      await screen.findByRole('heading', { name: 'Item velho' })
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Item 0' })).toBeNull()
+    expect(screen.getByText('Arquivado')).toBeInTheDocument()
+    expect(apiMocks.itemsList).toHaveBeenLastCalledWith(
+      workspaceId,
+      undefined,
+      0,
+      100,
+      { archived: true }
+    )
+    expect(router.state.location.search).toMatchObject({ archived: true })
+    expect(archivedTab).toBeInTheDocument()
+    expect(archivedTab).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'Ativos' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Item 0' })
+    ).toBeInTheDocument()
+  })
+
+  it('alternar para Arquivados reseta página e filtro de tipo', async () => {
+    apiMocks.itemsList.mockImplementation(async (_id, _collectionId, page) =>
+      itemPage(page, 'secret')
+    )
+    const user = userEvent.setup()
+    await renderAt('/')
+
+    await screen.findByRole('heading', { name: 'Item 0' })
+    const items = screen.getByRole('region', { name: 'Itens' })
+    await user.click(within(items).getByRole('button', { name: 'Próxima' }))
+    await screen.findByRole('heading', { name: 'Item 1' })
+    await user.click(
+      screen.getByRole('combobox', { name: 'Filtrar itens por tipo' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'Segredo' }))
+
+    await user.click(screen.getByRole('button', { name: 'Arquivados' }))
+
+    await waitFor(() =>
+      expect(apiMocks.itemsList).toHaveBeenLastCalledWith(
+        workspaceId,
+        undefined,
+        0,
+        100,
+        { archived: true }
+      )
+    )
+    expect(
+      screen.getByRole('combobox', { name: 'Filtrar itens por tipo' })
+    ).toHaveTextContent('Todos os tipos')
+  })
+
+  it('abre direto na aba Arquivados pelo search param e mostra o estado vazio', async () => {
+    apiMocks.itemsList.mockResolvedValue({
+      data: { items: [], page: 0, size: 100, totalItems: 0, totalPages: 1 },
+    })
+    await renderAt('/?archived=true')
+
+    expect(await screen.findByText('Nenhum item arquivado')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Arquivados' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(apiMocks.itemsList).toHaveBeenCalledWith(
+      workspaceId,
+      undefined,
+      0,
+      100,
+      { archived: true }
+    )
+  })
+
+  it('a aba Ativos vazia não usa o texto de arquivados', async () => {
+    apiMocks.itemsList.mockResolvedValue({
+      data: { items: [], page: 0, size: 100, totalItems: 0, totalPages: 1 },
+    })
+    await renderAt('/')
+
+    expect(
+      await screen.findByText('Nenhum item encontrado')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Nenhum item arquivado')).toBeNull()
   })
 })

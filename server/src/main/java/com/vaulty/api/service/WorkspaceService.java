@@ -33,15 +33,25 @@ public class WorkspaceService {
     private final WorkspaceMapper workspaceMapper;
     private final ActivityLogService activityLogService;
     private final WorkspaceContentAuthorization authorization;
+    private final NotificationService notificationService;
 
     @Transactional
     public WorkspaceMember addAsMember(User user) {
         Workspace workspace = singleton();
+        workspace = workspaceRepository.findByIdForUpdate(workspace.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
         WorkspaceRole memberRole = workspaceRoleRepository
                 .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
 
-        return workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
+        WorkspaceMember member = workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
+        notificationService.accessChanged(List.of(user.getId()));
+        return member;
+    }
+
+    public void lockWorkspace(UUID workspaceId) {
+        workspaceRepository.findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
     }
 
     @Transactional(readOnly = true)

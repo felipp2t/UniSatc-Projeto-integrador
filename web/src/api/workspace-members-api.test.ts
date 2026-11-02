@@ -15,7 +15,7 @@ const validMember = {
   id: 'membership-local-1',
   name: 'Ana Silva',
   roleId: 'role-local-owner',
-  roleName: 'owner',
+  roleName: 'Owner',
   userId: 'user-local-1',
 }
 
@@ -35,6 +35,87 @@ describe('workspaceApi member contracts', () => {
     ])
     expect(apiMocks.get).toHaveBeenCalledWith(
       '/workspaces/workspace-local/members'
+    )
+  })
+
+  it('lists valid workspace roles from the workspace role catalog', async () => {
+    const roles = [
+      { id: 'role-owner', name: 'Owner' },
+      { id: 'role-member', name: 'Member' },
+    ]
+    apiMocks.get.mockResolvedValue({ data: roles })
+
+    await expect(
+      workspaceApi.listRoles('workspace-local')
+    ).resolves.toMatchObject({ data: roles })
+    expect(apiMocks.get).toHaveBeenCalledWith(
+      '/workspaces/workspace-local/roles'
+    )
+  })
+
+  it('keeps role metadata and defaults missing fields', async () => {
+    apiMocks.get.mockResolvedValue({
+      data: [
+        { builtIn: true, id: 'role-owner', memberCount: 2, name: 'Owner' },
+        { id: 'role-member', name: 'Member' },
+      ],
+    })
+
+    const result = await workspaceApi.listRoles('workspace-local')
+    expect(result.data).toEqual([
+      { builtIn: true, id: 'role-owner', memberCount: 2, name: 'Owner' },
+      { builtIn: false, id: 'role-member', memberCount: 0, name: 'Member' },
+    ])
+  })
+
+  it.each([
+    ['an empty ID', { id: '', name: 'Owner' }],
+    ['an empty name', { id: 'role-owner', name: '' }],
+    ['a missing name', { id: 'role-owner' }],
+  ])('rejects a role with %s', async (_reason, invalidRole) => {
+    apiMocks.get.mockResolvedValue({ data: [invalidRole] })
+
+    await expect(workspaceApi.listRoles('workspace-local')).rejects.toThrow(
+      'A resposta da API contém cargos inválidos.'
+    )
+  })
+
+  it('changes a member role with the membership ID and validates the response', async () => {
+    apiMocks.put.mockResolvedValue({ data: validMember })
+
+    await expect(
+      workspaceApi.changeMemberRole(
+        'workspace-local',
+        'membership-local-1',
+        'role-member'
+      )
+    ).resolves.toMatchObject({ data: validMember })
+    expect(apiMocks.put).toHaveBeenCalledWith(
+      '/workspaces/workspace-local/members/membership-local-1/role',
+      { roleId: 'role-member' }
+    )
+  })
+
+  it('rejects an invalid member role response', async () => {
+    apiMocks.put.mockResolvedValue({ data: { ...validMember, roleId: '' } })
+
+    await expect(
+      workspaceApi.changeMemberRole(
+        'workspace-local',
+        'membership-local-1',
+        'role-member'
+      )
+    ).rejects.toThrow('A resposta da API contém um membro inválido.')
+  })
+
+  it('confirms member removal with the membership ID in the route and query', async () => {
+    apiMocks.delete.mockResolvedValue(undefined)
+
+    await workspaceApi.removeMember('workspace-local', 'membership-local-1')
+
+    expect(apiMocks.delete).toHaveBeenCalledWith(
+      '/workspaces/workspace-local/members/membership-local-1',
+      { params: { confirmMemberId: 'membership-local-1' } }
     )
   })
 
