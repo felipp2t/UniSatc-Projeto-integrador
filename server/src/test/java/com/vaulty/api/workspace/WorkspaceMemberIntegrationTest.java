@@ -63,6 +63,9 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     private UUID cleanupMember;
     private UUID cleanupThirdMember;
     private UUID cleanupCollection;
+    private UUID cleanupGroup;
+    private UUID cleanupRole;
+    private UUID cleanupItem;
 
     @AfterEach
     void cleanNonTransactionalFixtures() {
@@ -70,15 +73,26 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         jdbcTemplate.update("DELETE FROM notification WHERE recipient_id IN (?, ?, ?)", cleanupOwner,
                 cleanupMember, cleanupThirdMember == null ? cleanupMember : cleanupThirdMember);
         if (cleanupCollection != null) jdbcTemplate.update("DELETE FROM collection WHERE id=?", cleanupCollection);
+        if (cleanupGroup != null) jdbcTemplate.update("DELETE FROM access_group WHERE id=?", cleanupGroup);
+        if (cleanupItem != null) jdbcTemplate.update("DELETE FROM item WHERE id=?", cleanupItem);
         jdbcTemplate.update("UPDATE workspace SET owner_id='afd23ecc-4abb-4e2b-b985-3aaa8637a839' WHERE id=?", cleanupWorkspace);
         jdbcTemplate.update("DELETE FROM workspace_member WHERE user_id IN (?, ?, ?)", cleanupOwner,
                 cleanupMember, cleanupThirdMember == null ? cleanupMember : cleanupThirdMember);
+        if (cleanupRole != null) jdbcTemplate.update("DELETE FROM workspace_role WHERE id=?", cleanupRole);
         jdbcTemplate.update("""
                 INSERT INTO workspace_member (id,user_id,workspace_id,role_id)
                 SELECT gen_random_uuid(), 'afd23ecc-4abb-4e2b-b985-3aaa8637a839', ?, id
                 FROM workspace_role WHERE workspace_id=? AND name='Owner'
                 ON CONFLICT (workspace_id,user_id) DO NOTHING
                 """, cleanupWorkspace, cleanupWorkspace);
+        cleanupWorkspace = null;
+        cleanupOwner = null;
+        cleanupMember = null;
+        cleanupThirdMember = null;
+        cleanupCollection = null;
+        cleanupGroup = null;
+        cleanupRole = null;
+        cleanupItem = null;
     }
 
     @Test
@@ -491,10 +505,14 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void readmissionCreatesFreshMemberAccessWithoutRestoringOldAuthorityOrSessions() throws Exception {
         User owner = createUser("Proprietário");
         User target = createUser("Membro readmitido");
         UUID workspaceId = configureWorkspace(owner).id();
+        cleanupWorkspace = workspaceId;
+        cleanupOwner = owner.getId();
+        cleanupMember = target.getId();
         addMember(target, workspaceId);
         var oldMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, target.getId())
                 .orElseThrow();
@@ -502,6 +520,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         formerRole.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
         formerRole.setName("Former manager");
         formerRole = workspaceRoleRepository.saveAndFlush(formerRole);
+        cleanupRole = formerRole.getId();
         oldMembership.setRole(formerRole);
         workspaceMemberRepository.saveAndFlush(oldMembership);
 
@@ -509,8 +528,10 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         group.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
         group.setName("Former team");
         group = groupRepository.saveAndFlush(group);
+        cleanupGroup = group.getId();
         addGroupMember(group, oldMembership.getId(), workspaceId);
         UUID itemId = UUID.randomUUID();
+        cleanupItem = itemId;
         jdbcTemplate.update("INSERT INTO item (id, workspace_id, type, title) VALUES (?, ?, 'text', ?)",
                 itemId, workspaceId, "Former direct grant");
         jdbcTemplate.update("INSERT INTO item_member_grant (item_id, workspace_member_id, workspace_id) VALUES (?, ?, ?)",
@@ -535,8 +556,10 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         UUID newMembershipId = UUID.fromString(objectMapper.readTree(response.getResponse().getContentAsString())
                 .get("id").asText());
         assertThat(newMembershipId).isNotEqualTo(oldMembership.getId());
-        var newMembership = workspaceMemberRepository.findById(newMembershipId).orElseThrow();
-        assertThat(newMembership.getRole().getName()).isEqualTo(WorkspaceRole.MEMBER_ROLE_NAME);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT role.name FROM workspace_member member
+                JOIN workspace_role role ON role.id = member.role_id WHERE member.id = ?
+                """, String.class, newMembershipId)).isEqualTo(WorkspaceRole.MEMBER_ROLE_NAME);
         var readmissionActivity = jdbcTemplate.queryForMap("""
                 SELECT actor_id, actor_name, actor_context, action, resource_type, resource_id, snapshot
                 FROM activity_log WHERE action = 'member_joined' AND resource_id = ?
