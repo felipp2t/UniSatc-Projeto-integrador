@@ -22,11 +22,13 @@ pnpm exec playwright install chrome
 Copy-Item e2e/performance/config.example.json e2e/performance/config.json
 ```
 
-Edit local `config.json` with app/API URLs, workspace ID, deployed code revision or version, network conditions, adapter selectors, credentials, six storage-state paths, and 30 ACL-negative terms. For example, set `environment.network.connection` to `wired Ethernet`, `downlinkMbps` to the observed downlink, `rttMs` to the observed round-trip latency, and `notes` to details such as whether the connection was shared or under load. Do not commit it. Seed once in a clean workspace; the script creates 970 shared items (60 alphanumeric single-word titles, 30 multiword titles, and 880 filler titles):
+Edit local `config.json` with app/API URLs, workspace ID, deployed code revision or version, network conditions, adapter selectors, credentials, six storage-state paths, and 30 ACL-negative terms. For example, set `environment.network.connection` to `wired Ethernet`, `downlinkMbps` to the observed downlink, `rttMs` to the observed round-trip latency, and `notes` to details such as whether the connection was shared or under load. Do not commit it. In a clean isolated workspace, seed 970 shared items (60 alphanumeric single-word titles, 30 multiword titles, and 880 filler titles):
 
 ```powershell
 pnpm run performance:seed -- e2e/performance/config.json
 ```
+
+The seed script checks existing root-item titles and skips generated titles already present, so it can be rerun after an interruption without duplicating completed inserts. Keep the workspace isolated and do not run seeding during measurement.
 
 Create the remaining 30 restricted fixtures using the configured `noAccessQueries` terms to reach 1,000 total items, then verify them as described above. Set `datasetItems` to the operator-counted workspace total and `datasetVerified` to `true` only after confirming that total is exactly 1,000. `datasetItems` is operator-declared, not independently queried or verified by the harness; the verification flag is a required operator attestation for a passing run. Also set `aclFixturesVerified` to `true`. Prepare six storage states before the measurement. Logins are sequential and spaced 13 seconds apart to stay below the API's per-IP login rate limit; this setup is not part of measured time:
 

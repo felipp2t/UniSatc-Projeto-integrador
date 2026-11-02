@@ -24,7 +24,32 @@ try {
   )
   const result = await page.evaluate(
     async ({ apiUrl, workspaceId, seedTitles }) => {
+      const existingTitles = new Set()
+      let totalPages = 1
+      for (let page = 0; page < totalPages; page += 1) {
+        const response = await fetch(
+          `${apiUrl}/workspaces/${workspaceId}/items?page=${page}&size=100`,
+          { credentials: 'include' }
+        )
+        if (!response.ok) {
+          return {
+            created: 0,
+            error: `Could not read existing items: ${response.status} ${await response.text()}`,
+            skipped: 0,
+          }
+        }
+        const result = await response.json()
+        totalPages = result.totalPages
+        for (const item of result.items) existingTitles.add(item.title)
+      }
+
+      let created = 0
+      let skipped = 0
       for (const [index, title] of seedTitles.entries()) {
+        if (existingTitles.has(title)) {
+          skipped += 1
+          continue
+        }
         // biome-ignore lint/performance/noAwaitInLoops: sequential writes avoid overwhelming the API
         const response = await fetch(
           `${apiUrl}/workspaces/${workspaceId}/items`,
@@ -41,12 +66,15 @@ try {
         )
         if (!response.ok) {
           return {
-            created: index,
+            created,
             error: `${response.status} ${await response.text()}`,
+            skipped,
           }
         }
+        created += 1
+        existingTitles.add(title)
       }
-      return { created: 970 }
+      return { created, skipped }
     },
     {
       apiUrl: config.apiUrl,
@@ -55,13 +83,13 @@ try {
     }
   )
 
-  if (result.created !== 970) {
+  if (result.error) {
     throw new Error(
-      `Dataset stopped after ${result.created} records: ${result.error}`
+      `Dataset seeding failed after creating ${result.created} items and skipping ${result.skipped}: ${result.error}`
     )
   }
   console.log(
-    'Created 970 shared synthetic items; add the 30 restricted fixtures from config.json to reach 1,000. Run once in a clean workspace.'
+    `Seeded ${result.created} shared synthetic items and skipped ${result.skipped} existing ones. Add the 30 restricted fixtures from config.json to reach 1,000.`
   )
 } finally {
   await context.close()
