@@ -53,7 +53,7 @@ describe('workspaceApi member contracts', () => {
     )
   })
 
-  it('ignores extra role fields and keeps only id and name', async () => {
+  it('keeps role metadata and defaults missing fields', async () => {
     apiMocks.get.mockResolvedValue({
       data: [
         { builtIn: true, id: 'role-owner', memberCount: 2, name: 'Owner' },
@@ -63,8 +63,8 @@ describe('workspaceApi member contracts', () => {
 
     const result = await workspaceApi.listRoles('workspace-local')
     expect(result.data).toEqual([
-      { id: 'role-owner', name: 'Owner' },
-      { id: 'role-member', name: 'Member' },
+      { builtIn: true, id: 'role-owner', memberCount: 2, name: 'Owner' },
+      { builtIn: false, id: 'role-member', memberCount: 0, name: 'Member' },
     ])
   })
 
