@@ -17,8 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { appToast } from '@/components/ui/toast'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { appToast } from '@/components/ui/toast'
 
 const resources = [
   'workspace',
@@ -71,6 +71,21 @@ function fromSet(keys: Set<string>): RolePermission[] {
   })
 }
 
+function getAllowedPermissions(permissions: RolePermission[] | undefined) {
+  return new Set(
+    (permissions ?? [])
+      .filter(
+        (permission) =>
+          resources.includes(
+            permission.resource as (typeof resources)[number]
+          ) &&
+          actions.includes(permission.action as (typeof actions)[number]) &&
+          (permission.action !== 'invite' || permission.resource === 'member')
+      )
+      .map(permissionKey)
+  )
+}
+
 export function RolePermissionsEditor({
   builtIn,
   canManage,
@@ -104,19 +119,10 @@ export function RolePermissionsEditor({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const canEdit = canManage && !builtIn && !readOnly
 
-  const allowed = useMemo(() => {
-    const keys = new Set<string>()
-    for (const permission of catalog.data ?? []) {
-      if (
-        resources.includes(permission.resource as (typeof resources)[number]) &&
-        actions.includes(permission.action as (typeof actions)[number]) &&
-        (permission.action !== 'invite' || permission.resource === 'member')
-      ) {
-        keys.add(permissionKey(permission))
-      }
-    }
-    return keys
-  }, [catalog.data])
+  const allowed = useMemo(
+    () => getAllowedPermissions(catalog.data),
+    [catalog.data]
+  )
 
   useEffect(() => {
     setSelected(
@@ -240,7 +246,8 @@ export function RolePermissionsEditor({
       <DialogContent className='max-w-5xl'>
         <DialogHeader>
           <DialogTitle>
-            {readOnly ? 'Permissões do cargo' : 'Ajustar permissões'}: {roleName}
+            {readOnly ? 'Permissões do cargo' : 'Ajustar permissões'}:{' '}
+            {roleName}
           </DialogTitle>
           <DialogDescription>
             {readOnly
@@ -248,97 +255,96 @@ export function RolePermissionsEditor({
               : 'Ajuste as ações disponíveis para este papel. Alterações são aplicadas em lote.'}
           </DialogDescription>
         </DialogHeader>
+        <RolePermissionsDialogContent
+          additions={additions}
+          allowed={allowed}
+          builtIn={builtIn}
+          canEdit={canEdit}
+          close={close}
+          hasChanges={hasChanges}
+          isLoading={isLoading}
+          loadError={loadError}
+          onSave={handleSave}
+          permissionHandlers={permissionHandlers}
+          readOnly={readOnly}
+          removals={removals}
+          roleName={roleName}
+          rowHandlers={rowHandlers}
+          savePending={save.isPending}
+          selected={selected}
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}
 
-        {builtIn && !readOnly ? (
-          <p className='text-muted-foreground text-sm' role='status'>
-            As permissões dos papéis iniciais não podem ser alteradas.
-          </p>
-        ) : null}
-
-        {isLoading ? (
-          <p className='text-muted-foreground text-sm' role='status'>
-            Carregando permissões…
-          </p>
-        ) : loadError ? (
-          <p className='text-destructive text-sm' role='alert'>
-            {getApiErrorMessage(loadError, {
-              fallback: 'Não foi possível carregar as permissões.',
-            })}
-          </p>
-        ) : (
-          <>
-            <div
-              aria-label={`Matriz de permissões de ${roleName}`}
-              className='max-h-[55vh] overflow-auto border border-border'
-              role='region'
-              tabIndex={0}
+function RolePermissionsDialogContent({
+  additions,
+  allowed,
+  builtIn,
+  canEdit,
+  close,
+  hasChanges,
+  isLoading,
+  loadError,
+  onSave,
+  permissionHandlers,
+  readOnly,
+  removals,
+  roleName,
+  rowHandlers,
+  savePending,
+  selected,
+}: {
+  additions: string[]
+  allowed: Set<string>
+  builtIn: boolean
+  canEdit: boolean
+  close: () => void
+  hasChanges: boolean
+  isLoading: boolean
+  loadError: unknown
+  onSave: () => void
+  permissionHandlers: Map<string, (checked: CheckboxValue) => void>
+  readOnly: boolean
+  removals: string[]
+  roleName: string
+  rowHandlers: Map<(typeof resources)[number], (checked: CheckboxValue) => void>
+  savePending: boolean
+  selected: Set<string>
+}) {
+  return (
+    <>
+      {builtIn && !readOnly ? (
+        <p className='text-muted-foreground text-sm' role='status'>
+          As permissões dos papéis iniciais não podem ser alteradas.
+        </p>
+      ) : null}
+      {isLoading ? (
+        <p className='text-muted-foreground text-sm' role='status'>
+          Carregando permissões…
+        </p>
+      ) : loadError ? (
+        <p className='text-destructive text-sm' role='alert'>
+          {getApiErrorMessage(loadError, {
+            fallback: 'Não foi possível carregar as permissões.',
+          })}
+        </p>
+      ) : (
+        <>
+          <PermissionMatrix
+            allowed={allowed}
+            canEdit={canEdit}
+            permissionHandlers={permissionHandlers}
+            roleName={roleName}
+            rowHandlers={rowHandlers}
+            selected={selected}
+          />
+          {readOnly ? null : (
+            <section
+              aria-label='Resumo das alterações'
+              className='border border-border'
             >
-              <table className='w-full min-w-[760px] border-collapse text-sm'>
-                <thead className='sticky top-0 bg-muted/70'>
-                  <tr>
-                    <th className='p-3 text-left' scope='col'>
-                      Recurso
-                    </th>
-                    {[...actions, 'all' as const].map((action) => (
-                      <th className='p-3 text-center' key={action} scope='col'>
-                        {action === 'all' ? 'Todos' : labels[action]}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {resources.map((resource) => {
-                    const rowKeys = actions
-                      .filter((action) =>
-                        allowed.has(permissionKey({ action, resource }))
-                      )
-                      .map((action) => permissionKey({ action, resource }))
-                    const rowChecked =
-                      rowKeys.length > 0 &&
-                      rowKeys.every((key) => selected.has(key))
-                    const rowMixed =
-                      rowKeys.some((key) => selected.has(key)) && !rowChecked
-                    return (
-                      <tr className='border-border border-t' key={resource}>
-                        <th className='p-3 text-left font-medium' scope='row'>
-                          {labels[resource]}
-                        </th>
-                        {actions.map((action) => {
-                          const key = permissionKey({ action, resource })
-                          const visible = allowed.has(key)
-                          return (
-                            <td className='p-3 text-center' key={action}>
-                              {visible && (
-                                <Checkbox
-                                  aria-label={`${labels[action]}: ${labels[resource]}`}
-                                  checked={selected.has(key)}
-                                  disabled={!canEdit}
-                                  onCheckedChange={permissionHandlers.get(key)}
-                                />
-                              )}
-                            </td>
-                          )
-                        })}
-                        <td className='p-3 text-center'>
-                          <Checkbox
-                            aria-label={`Todas as ações: ${labels[resource]}`}
-                            checked={rowMixed ? 'indeterminate' : rowChecked}
-                            disabled={!canEdit || rowKeys.length === 0}
-                            onCheckedChange={rowHandlers.get(resource)}
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {!readOnly ? (
-              <section
-                aria-label='Resumo das alterações'
-                className='border border-border'
-              >
               <h3 className='border-border border-b p-3 font-semibold text-sm'>
                 Alterações pendentes
               </h3>
@@ -369,31 +375,112 @@ export function RolePermissionsEditor({
                   )}
                 </div>
               </ScrollArea>
-              </section>
-            ) : null}
-          </>
-        )}
-
-        <DialogFooter>
-          <Button onClick={close} variant='outline'>
-            Fechar
+            </section>
+          )}
+        </>
+      )}
+      <DialogFooter>
+        <Button onClick={close} variant='outline'>
+          Fechar
+        </Button>
+        {readOnly ? null : (
+          <Button
+            disabled={
+              !(canEdit && hasChanges) ||
+              isLoading ||
+              Boolean(loadError) ||
+              savePending
+            }
+            onClick={onSave}
+          >
+            {savePending ? 'Salvando…' : 'Salvar alterações'}
           </Button>
-          {!readOnly ? (
-            <Button
-              disabled={
-                !(canEdit && hasChanges) ||
-                isLoading ||
-                Boolean(loadError) ||
-                save.isPending
-              }
-              onClick={handleSave}
-            >
-              {save.isPending ? 'Salvando…' : 'Salvar alterações'}
-            </Button>
-          ) : null}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        )}
+      </DialogFooter>
+    </>
+  )
+}
+
+function PermissionMatrix({
+  allowed,
+  canEdit,
+  permissionHandlers,
+  roleName,
+  rowHandlers,
+  selected,
+}: {
+  allowed: Set<string>
+  canEdit: boolean
+  permissionHandlers: Map<string, (checked: CheckboxValue) => void>
+  roleName: string
+  rowHandlers: Map<(typeof resources)[number], (checked: CheckboxValue) => void>
+  selected: Set<string>
+}) {
+  return (
+    <section
+      aria-label={`Matriz de permissões de ${roleName}`}
+      className='max-h-[55vh] border border-border'
+    >
+      <ScrollArea className='max-h-[55vh]' type='always'>
+        <table className='w-full min-w-[760px] border-collapse text-sm'>
+          <thead className='sticky top-0 bg-muted/70'>
+            <tr>
+              <th className='p-3 text-left' scope='col'>
+                Recurso
+              </th>
+              {[...actions, 'all' as const].map((action) => (
+                <th className='p-3 text-center' key={action} scope='col'>
+                  {action === 'all' ? 'Todos' : labels[action]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {resources.map((resource) => {
+              const rowKeys = actions
+                .filter((action) =>
+                  allowed.has(permissionKey({ action, resource }))
+                )
+                .map((action) => permissionKey({ action, resource }))
+              const rowChecked =
+                rowKeys.length > 0 && rowKeys.every((key) => selected.has(key))
+              const rowMixed =
+                rowKeys.some((key) => selected.has(key)) && !rowChecked
+              return (
+                <tr className='border-border border-t' key={resource}>
+                  <th className='p-3 text-left font-medium' scope='row'>
+                    {labels[resource]}
+                  </th>
+                  {actions.map((action) => {
+                    const key = permissionKey({ action, resource })
+                    return (
+                      <td className='p-3 text-center' key={action}>
+                        {allowed.has(key) ? (
+                          <Checkbox
+                            aria-label={`${labels[action]}: ${labels[resource]}`}
+                            checked={selected.has(key)}
+                            disabled={!canEdit}
+                            onCheckedChange={permissionHandlers.get(key)}
+                          />
+                        ) : null}
+                      </td>
+                    )
+                  })}
+                  <td className='p-3 text-center'>
+                    <Checkbox
+                      aria-label={`Todas as ações: ${labels[resource]}`}
+                      checked={rowMixed ? 'indeterminate' : rowChecked}
+                      disabled={!canEdit || rowKeys.length === 0}
+                      onCheckedChange={rowHandlers.get(resource)}
+                    />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </ScrollArea>
+    </section>
   )
 }
 

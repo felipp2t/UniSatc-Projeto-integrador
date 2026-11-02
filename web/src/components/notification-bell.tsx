@@ -5,7 +5,6 @@ import { useCallback, useState } from 'react'
 import { notificationsApi } from '@/api/endpoints'
 import { notificationKeys } from '@/api/notification-keys'
 import type { NotificationResponse } from '@/api/types'
-import { appToast } from '@/components/ui/toast'
 import {
   NotificationContent,
   NotificationHeader,
@@ -24,6 +23,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { appToast } from '@/components/ui/toast'
 import { useNotificationRead } from '@/hooks/use-notification-read'
 import type { AppRoute } from '@/types/navigation'
 
@@ -130,28 +130,15 @@ export function NotificationBell({
           </Button>
         ) : null}
         <ScrollArea className='mt-3 max-h-80'>
-          {query.isLoading && suppliedNotifications === undefined ? (
-            <LoadingState label='Carregando notificações...' />
-          ) : query.isError && suppliedNotifications === undefined ? (
-            <ErrorState
-              error={query.error}
-              onRetry={handleRetry}
-              variant='compact'
-            />
-          ) : notifications.length === 0 ? (
-            <p className='px-2 py-6 text-center text-muted-foreground text-xs'>
-              Nenhuma notificação.
-            </p>
-          ) : (
-            notifications.map((notification) => (
-              <NotificationRow
-                key={notification.id}
-                notification={notification}
-                onMarkRead={handleMarkRead}
-                onOpen={onOpen}
-              />
-            ))
-          )}
+          <NotificationListContent
+            error={query.error}
+            isError={query.isError && suppliedNotifications === undefined}
+            isLoading={query.isLoading && suppliedNotifications === undefined}
+            notifications={notifications}
+            onMarkRead={handleMarkRead}
+            onOpen={onOpen}
+            onRetry={handleRetry}
+          />
         </ScrollArea>
         {suppliedNotifications === undefined && query.data ? (
           <div className='mt-2 flex items-center justify-between border-border border-t pt-2'>
@@ -182,6 +169,44 @@ export function NotificationBell({
   )
 }
 
+function NotificationListContent({
+  error,
+  isError,
+  isLoading,
+  notifications,
+  onMarkRead,
+  onOpen,
+  onRetry,
+}: {
+  error: Error | null
+  isError: boolean
+  isLoading: boolean
+  notifications: NotificationData[]
+  onMarkRead: (id: string) => void | Promise<void>
+  onOpen?: NotificationBellProps['onOpen']
+  onRetry: () => Promise<void>
+}) {
+  if (isLoading) return <LoadingState label='Carregando notificações...' />
+  if (isError) {
+    return <ErrorState error={error} onRetry={onRetry} variant='compact' />
+  }
+  if (notifications.length === 0) {
+    return (
+      <p className='px-2 py-6 text-center text-muted-foreground text-xs'>
+        Nenhuma notificação.
+      </p>
+    )
+  }
+  return notifications.map((notification) => (
+    <NotificationRow
+      key={notification.id}
+      notification={notification}
+      onMarkRead={onMarkRead}
+      onOpen={onOpen}
+    />
+  ))
+}
+
 function NotificationRow({
   notification,
   onMarkRead,
@@ -191,12 +216,13 @@ function NotificationRow({
   onMarkRead?: (id: string) => void | Promise<void>
   onOpen?: NotificationBellProps['onOpen']
 }) {
-  const handleOpen = useCallback(
-    () => {
-      if (!isRead(notification)) void onMarkRead?.(notification.id)
-      onOpen?.(notification)
-    },
-    [notification, onMarkRead, onOpen]
+  const handleOpen = useCallback(async () => {
+    if (!isRead(notification)) await onMarkRead?.(notification.id)
+    onOpen?.(notification)
+  }, [notification, onMarkRead, onOpen])
+  const handleMarkRead = useCallback(
+    () => onMarkRead?.(notification.id),
+    [notification.id, onMarkRead]
   )
   const content = (
     <NotificationRoot className='mb-2 p-3'>
@@ -219,17 +245,17 @@ function NotificationRow({
     return (
       <div>
         {content}
-        {!isRead(notification) ? (
+        {isRead(notification) ? null : (
           <Button
             className='mb-2'
-            onClick={() => onMarkRead?.(notification.id)}
+            onClick={handleMarkRead}
             size='sm'
             variant='ghost'
           >
             <CheckIcon aria-hidden='true' size={16} />
             Marcar como lida
           </Button>
-        ) : null}
+        )}
       </div>
     )
   }

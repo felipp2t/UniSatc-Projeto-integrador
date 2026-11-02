@@ -47,7 +47,8 @@ export function CreateRoleDialog({
   }, [])
 
   const createRole = useMutation({
-    mutationFn: (roleName: string) => workspaceApi.createRole(workspaceId, roleName),
+    mutationFn: (roleName: string) =>
+      workspaceApi.createRole(workspaceId, roleName),
     onError: (error) => {
       setRequestError(
         getApiErrorMessage(error, {
@@ -97,6 +98,7 @@ export function CreateRoleDialog({
     setNameError(undefined)
     setRequestError(undefined)
   }, [])
+  const cancel = useCallback(() => handleOpenChange(false), [handleOpenChange])
 
   return (
     <Dialog onOpenChange={handleOpenChange} open={open}>
@@ -109,7 +111,8 @@ export function CreateRoleDialog({
             Criar cargo
           </DialogTitle>
           <DialogDescription className='font-medium text-[10px]'>
-            O novo cargo começa sem permissões. Você poderá configurá-las depois.
+            O novo cargo começa sem permissões. Você poderá configurá-las
+            depois.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -141,7 +144,7 @@ export function CreateRoleDialog({
             <Button
               className='rounded-none'
               disabled={submitting}
-              onClick={() => handleOpenChange(false)}
+              onClick={cancel}
               variant='outline'
             >
               Cancelar

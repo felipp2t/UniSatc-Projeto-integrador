@@ -1,9 +1,9 @@
 import type { ZodType } from 'zod'
 import { apiClient } from './client'
 import type {
+  AccessGroupResponse,
   ActivityFilters,
   ActivityPageResponse,
-  AccessGroupResponse,
   AttachmentResponse,
   ChangePasswordRequest,
   CollectionPageResponse,
@@ -72,8 +72,6 @@ export const workspaceApi = {
     apiClient.get<ActivityPageResponse>(`/workspaces/${workspaceId}/activity`, {
       params: filters,
     }),
-  createRole: (workspaceId: string, name: string) =>
-    apiClient.post<void>(`/workspaces/${workspaceId}/roles`, { name }),
   changeMemberRole: async (
     workspaceId: string,
     memberId: string,
@@ -92,6 +90,8 @@ export const workspaceApi = {
       ),
     }
   },
+  createRole: (workspaceId: string, name: string) =>
+    apiClient.post<void>(`/workspaces/${workspaceId}/roles`, { name }),
   deleteRole: (workspaceId: string, roleId: string) =>
     apiClient.delete<void>(`/workspaces/${workspaceId}/roles/${roleId}`),
   get: (workspaceId: string) =>
@@ -110,19 +110,6 @@ export const workspaceApi = {
       ),
     }
   },
-  listRoles: async (workspaceId: string) => {
-    const response = await apiClient.get<unknown>(
-      `/workspaces/${workspaceId}/roles`
-    )
-    return {
-      ...response,
-      data: parseOrThrow(
-        workspaceRolesSchema,
-        response.data,
-        'A resposta da API contém cargos inválidos.'
-      ),
-    }
-  },
   listRolePermissions: async (workspaceId: string, roleId: string) => {
     const response = await apiClient.get<unknown>(
       `/workspaces/${workspaceId}/roles/${roleId}/permissions`
@@ -133,6 +120,19 @@ export const workspaceApi = {
         workspaceRolePermissionsSchema,
         response.data,
         'A resposta da API contém permissões inválidas.'
+      ),
+    }
+  },
+  listRoles: async (workspaceId: string) => {
+    const response = await apiClient.get<unknown>(
+      `/workspaces/${workspaceId}/roles`
+    )
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceRolesSchema,
+        response.data,
+        'A resposta da API contém cargos inválidos.'
       ),
     }
   },

@@ -1,5 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
-import { useCallback, useState } from 'react'
 import {
   DotsThreeVerticalIcon,
   EyeIcon,
@@ -7,6 +5,8 @@ import {
   SlidersHorizontalIcon,
   TrashIcon,
 } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
 import type {
   WorkspaceRolePermission,
@@ -56,8 +56,9 @@ export function WorkspaceRolesSection({
   rolesPending,
   workspaceId,
 }: WorkspaceRolesSectionProps) {
-  const [editingRole, setEditingRole] =
-    useState<WorkspaceRoleResponse | null>(null)
+  const [editingRole, setEditingRole] = useState<WorkspaceRoleResponse | null>(
+    null
+  )
   const [permissionsReadOnly, setPermissionsReadOnly] = useState(false)
   const roleIds = roles.map((role) => role.id).join(',')
   const permissions = useQuery({
@@ -84,14 +85,20 @@ export function WorkspaceRolesSection({
   const retryPermissions = useCallback(async () => {
     await permissions.refetch()
   }, [permissions.refetch])
-  const openPermissions = useCallback((role: WorkspaceRoleResponse) => {
-    setPermissionsReadOnly(false)
-    if (onEditPermissions) onEditPermissions(role)
-    else setEditingRole(role)
-  }, [onEditPermissions])
+  const openPermissions = useCallback(
+    (role: WorkspaceRoleResponse) => {
+      setPermissionsReadOnly(false)
+      if (onEditPermissions) onEditPermissions(role)
+      else setEditingRole(role)
+    },
+    [onEditPermissions]
+  )
   const viewPermissions = useCallback((role: WorkspaceRoleResponse) => {
     setPermissionsReadOnly(true)
     setEditingRole(role)
+  }, [])
+  const handleEditorOpenChange = useCallback((open: boolean) => {
+    if (!open) setEditingRole(null)
   }, [])
 
   if (rolesPending) return <LoadingState label='Carregando cargos…' />
@@ -107,13 +114,13 @@ export function WorkspaceRolesSection({
   if (roles.length === 0) {
     return (
       <EmptyState
-        description='Crie o primeiro cargo para definir as permissões dos membros.'
-        title='Nenhum cargo personalizado'
         action={
           <CreateRoleDialog workspaceId={workspaceId}>
             <Button>Criar primeiro cargo</Button>
           </CreateRoleDialog>
         }
+        description='Crie o primeiro cargo para definir as permissões dos membros.'
+        title='Nenhum cargo personalizado'
       />
     )
   }
@@ -169,9 +176,7 @@ export function WorkspaceRolesSection({
         <RolePermissionsEditor
           builtIn={editingRole.builtIn}
           canManage
-          onOpenChange={(open) => {
-            if (!open) setEditingRole(null)
-          }}
+          onOpenChange={handleEditorOpenChange}
           open
           readOnly={permissionsReadOnly}
           roleId={editingRole.id}
@@ -215,13 +220,10 @@ function WorkspaceRoleRow({
     () => onViewPermissions(role),
     [onViewPermissions, role]
   )
-  const handleDelete = useCallback(
-    () => {
-      if (onDeleteRole) onDeleteRole(role)
-      else setDeleteDialogOpen(true)
-    },
-    [onDeleteRole, role]
-  )
+  const handleDelete = useCallback(() => {
+    if (onDeleteRole) onDeleteRole(role)
+    else setDeleteDialogOpen(true)
+  }, [onDeleteRole, role])
 
   return (
     <TableRow>
@@ -246,7 +248,9 @@ function WorkspaceRoleRow({
         </div>
       </TableCell>
       <TableCell>{role.memberCount}</TableCell>
-      <TableCell>{permissionsPending ? '…' : permissionsCount}</TableCell>
+      <TableCell>
+        {permissionsPending ? <span>…</span> : <span>{permissionsCount}</span>}
+      </TableCell>
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -281,14 +285,14 @@ function WorkspaceRoleRow({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {!onDeleteRole ? (
+        {onDeleteRole ? null : (
           <DeleteRoleDialog
             onOpenChange={setDeleteDialogOpen}
             open={deleteDialogOpen}
             role={role}
             workspaceId={workspaceId}
           />
-        ) : null}
+        )}
       </TableCell>
     </TableRow>
   )

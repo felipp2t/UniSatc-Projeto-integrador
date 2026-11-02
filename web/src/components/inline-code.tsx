@@ -89,7 +89,10 @@ export function InlineCodeSeparator({
   return (
     <p
       aria-hidden='true'
-      className={cn('px-1 font-bold font-mono text-[#2f2f2f] text-xs', className)}
+      className={cn(
+        'px-1 font-bold font-mono text-[#2f2f2f] text-xs',
+        className
+      )}
       {...props}
     >
       /

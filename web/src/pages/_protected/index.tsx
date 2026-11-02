@@ -213,18 +213,12 @@ function WorkspaceBreadcrumbs({
 }) {
   if (!collectionId) return null
   const truncate = path.length > 3
-  const visiblePath = truncate
-    ? [path[0], null, ...path.slice(-2)]
-    : path
+  const visiblePath = truncate ? [path[0], null, ...path.slice(-2)] : path
 
   return (
     <InlineCodeRoot>
       <InlineCodeContent aria-label='Caminho da pasta' role='navigation'>
-        <Link
-          className='group'
-          search={{ collectionId: undefined }}
-          to='/'
-        >
+        <Link className='group' search={{ collectionId: undefined }} to='/'>
           <InlineCodeText className='text-primary transition-colors group-hover:text-foreground'>
             Início
           </InlineCodeText>
