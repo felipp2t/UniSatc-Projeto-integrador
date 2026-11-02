@@ -51,6 +51,14 @@ public class WorkspaceRoleController implements WorkspaceRoleControllerDocs {
         return ResponseEntity.status(HttpStatus.CREATED).body(roleService.create(userId, workspaceId, request));
     }
 
+    @PutMapping("/{roleId}")
+    public ResponseEntity<RoleResponse> rename(@AuthenticationPrincipal UUID userId,
+                                               @PathVariable UUID workspaceId,
+                                               @PathVariable UUID roleId,
+                                               @Valid @RequestBody RoleRequest request) {
+        return ResponseEntity.ok(roleService.rename(userId, workspaceId, roleId, request));
+    }
+
     @GetMapping("/{roleId}/permissions")
     public ResponseEntity<List<WorkspacePermission>> permissions(@AuthenticationPrincipal UUID userId,
                                                                  @PathVariable UUID workspaceId,
