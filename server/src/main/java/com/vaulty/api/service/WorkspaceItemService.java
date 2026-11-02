@@ -105,7 +105,8 @@ public class WorkspaceItemService {
     }
 
     @Transactional(readOnly = true)
-    public ItemPageResponse search(UUID userId, UUID workspaceId, String query, int page, int size) {
+    public ItemPageResponse search(UUID userId, UUID workspaceId, String query, boolean includeArchived,
+                                   int page, int size) {
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         validatePage(page, size);
@@ -115,7 +116,7 @@ public class WorkspaceItemService {
         var pageable = PageRequest.of(page, size);
         boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
         return ItemPageResponse.from(itemRepository.searchAccessible(
-                        workspaceId, userId, query.trim(), includeSecrets, pageable)
+                        workspaceId, userId, query.trim(), includeSecrets, includeArchived, pageable)
                 .map(item -> toAccessibleResponse(userId, workspace, item, false)));
     }
 

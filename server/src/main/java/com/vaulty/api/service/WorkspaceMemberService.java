@@ -1,6 +1,7 @@
 package com.vaulty.api.service;
 
 import com.vaulty.api.dto.workspace.ChangeMemberRoleRequest;
+import com.vaulty.api.dto.workspace.ReadmitMemberRequest;
 import com.vaulty.api.dto.workspace.WorkspaceMemberResponse;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.entity.User;
@@ -14,6 +15,7 @@ import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
+import com.vaulty.api.repository.UserRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,12 +28,34 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkspaceMemberService {
 
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final UserRepository userRepository;
     private final WorkspaceRoleRepository workspaceRoleRepository;
     private final WorkspaceMapper workspaceMapper;
     private final WorkspaceContentAuthorization authorization;
     private final ActivityLogService activityLogService;
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceAccessNotifications accessNotifications;
+    private final NotificationService notificationService;
+
+    @Transactional
+    public WorkspaceMemberResponse readmit(UUID userId, UUID workspaceId, ReadmitMemberRequest request) {
+        var workspace = authorization.requireOwnerForUpdate(userId, workspaceId);
+        var user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
+        if (workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, user.getId()).isPresent()) {
+            throw new ConflictException("Conta já é membro do workspace");
+        }
+        var memberRole = workspaceRoleRepository.findByWorkspaceIdAndName(workspaceId, WorkspaceRole.MEMBER_ROLE_NAME)
+                .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
+
+        var member = workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
+                ActivityAction.MEMBER_JOINED, ActivityResourceType.MEMBER, member.getId(),
+                Map.of("workspaceMemberId", member.getId(), "userId", user.getId(),
+                        "name", user.getName(), "email", user.getEmail(), "role", memberRole.getName()));
+        notificationService.accessChanged(List.of(user.getId()));
+        return workspaceMapper.toResponse(member, true);
+    }
 
     @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> list(UUID userId, UUID workspaceId) {

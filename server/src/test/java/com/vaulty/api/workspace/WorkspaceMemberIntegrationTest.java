@@ -63,22 +63,40 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     private UUID cleanupMember;
     private UUID cleanupThirdMember;
     private UUID cleanupCollection;
+    private UUID cleanupGroup;
+    private UUID cleanupRole;
+    private UUID cleanupItem;
 
     @AfterEach
     void cleanNonTransactionalFixtures() {
         if (cleanupWorkspace == null) return;
-        jdbcTemplate.update("DELETE FROM notification WHERE recipient_id IN (?, ?, ?)", cleanupOwner,
-                cleanupMember, cleanupThirdMember == null ? cleanupMember : cleanupThirdMember);
+        if (cleanupOwner != null || cleanupMember != null || cleanupThirdMember != null) {
+            jdbcTemplate.update("DELETE FROM notification WHERE recipient_id IN (?, ?, ?)", cleanupOwner,
+                    cleanupMember, cleanupThirdMember);
+        }
         if (cleanupCollection != null) jdbcTemplate.update("DELETE FROM collection WHERE id=?", cleanupCollection);
+        if (cleanupGroup != null) jdbcTemplate.update("DELETE FROM access_group WHERE id=?", cleanupGroup);
+        if (cleanupItem != null) jdbcTemplate.update("DELETE FROM item WHERE id=?", cleanupItem);
         jdbcTemplate.update("UPDATE workspace SET owner_id='afd23ecc-4abb-4e2b-b985-3aaa8637a839' WHERE id=?", cleanupWorkspace);
-        jdbcTemplate.update("DELETE FROM workspace_member WHERE user_id IN (?, ?, ?)", cleanupOwner,
-                cleanupMember, cleanupThirdMember == null ? cleanupMember : cleanupThirdMember);
+        if (cleanupOwner != null || cleanupMember != null || cleanupThirdMember != null) {
+            jdbcTemplate.update("DELETE FROM workspace_member WHERE user_id IN (?, ?, ?)", cleanupOwner,
+                    cleanupMember, cleanupThirdMember);
+        }
+        if (cleanupRole != null) jdbcTemplate.update("DELETE FROM workspace_role WHERE id=?", cleanupRole);
         jdbcTemplate.update("""
                 INSERT INTO workspace_member (id,user_id,workspace_id,role_id)
                 SELECT gen_random_uuid(), 'afd23ecc-4abb-4e2b-b985-3aaa8637a839', ?, id
                 FROM workspace_role WHERE workspace_id=? AND name='Owner'
                 ON CONFLICT (workspace_id,user_id) DO NOTHING
                 """, cleanupWorkspace, cleanupWorkspace);
+        cleanupWorkspace = null;
+        cleanupOwner = null;
+        cleanupMember = null;
+        cleanupThirdMember = null;
+        cleanupCollection = null;
+        cleanupGroup = null;
+        cleanupRole = null;
+        cleanupItem = null;
     }
 
     @Test
@@ -463,6 +481,117 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(delete(path).cookie(authCookie(owner)).param("confirmMemberId", UUID.randomUUID().toString()))
                 .andExpect(status().isBadRequest());
         assertThat(workspaceMemberRepository.findById(membership.getId())).isPresent();
+    }
+
+    @Test
+    void readmissionIsOwnerOnlyAndRequiresAnExistingRemovedAccount() throws Exception {
+        User owner = createUser("Proprietário");
+        User member = createUser("Membro");
+        UUID workspaceId = configureWorkspace(owner).id();
+        addMember(member, workspaceId);
+
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"missing@example.com\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"missing@example.com\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + member.getEmail() + "\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"invalid\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void readmissionCreatesFreshMemberAccessWithoutRestoringOldAuthorityOrSessions() throws Exception {
+        User owner = createUser("Proprietário");
+        User target = createUser("Membro readmitido");
+        UUID workspaceId = configureWorkspace(owner).id();
+        cleanupWorkspace = workspaceId;
+        cleanupOwner = owner.getId();
+        cleanupMember = target.getId();
+        addMember(target, workspaceId);
+        var oldMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, target.getId())
+                .orElseThrow();
+        WorkspaceRole formerRole = new WorkspaceRole();
+        formerRole.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
+        formerRole.setName("Former manager");
+        formerRole = workspaceRoleRepository.saveAndFlush(formerRole);
+        cleanupRole = formerRole.getId();
+        oldMembership.setRole(formerRole);
+        workspaceMemberRepository.saveAndFlush(oldMembership);
+
+        AccessGroup group = new AccessGroup();
+        group.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
+        group.setName("Former team");
+        group = groupRepository.saveAndFlush(group);
+        cleanupGroup = group.getId();
+        addGroupMember(group, oldMembership.getId(), workspaceId);
+        UUID itemId = UUID.randomUUID();
+        cleanupItem = itemId;
+        jdbcTemplate.update("INSERT INTO item (id, workspace_id, type, title) VALUES (?, ?, 'text', ?)",
+                itemId, workspaceId, "Former direct grant");
+        jdbcTemplate.update("INSERT INTO item_member_grant (item_id, workspace_member_id, workspace_id) VALUES (?, ?, ?)",
+                itemId, oldMembership.getId(), workspaceId);
+
+        var oldLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        var oldAccess = oldLogin.getResponse().getCookie("accessToken");
+        var oldRefresh = oldLogin.getResponse().getCookie("refreshToken");
+        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspaceId, oldMembership.getId())
+                        .cookie(authCookie(owner)).param("confirmMemberId", oldMembership.getId().toString()))
+                .andExpect(status().isNoContent());
+
+        var response = mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.roleName").value("Member"))
+                .andReturn();
+        UUID newMembershipId = UUID.fromString(objectMapper.readTree(response.getResponse().getContentAsString())
+                .get("id").asText());
+        assertThat(newMembershipId).isNotEqualTo(oldMembership.getId());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT role.name FROM workspace_member member
+                JOIN workspace_role role ON role.id = member.role_id WHERE member.id = ?
+                """, String.class, newMembershipId)).isEqualTo(WorkspaceRole.MEMBER_ROLE_NAME);
+        var readmissionActivity = jdbcTemplate.queryForMap("""
+                SELECT actor_id, actor_name, actor_context, action, resource_type, resource_id, snapshot
+                FROM activity_log WHERE action = 'member_joined' AND resource_id = ?
+                """, newMembershipId);
+        assertThat(readmissionActivity.get("actor_id")).isEqualTo(owner.getId());
+        assertThat(readmissionActivity.get("actor_name")).isEqualTo(owner.getName());
+        assertThat(readmissionActivity.get("actor_context")).isEqualTo("USER");
+        assertThat(readmissionActivity.get("resource_type")).isEqualTo("member");
+        assertThat(readmissionActivity.get("resource_id")).isEqualTo(newMembershipId);
+        assertThat(readmissionActivity.get("snapshot").toString())
+                .contains(target.getId().toString(), target.getName(), target.getEmail(), "Member");
+        assertThat(groupMemberRepository.findByGroupIdAndWorkspaceIdAndWorkspaceMemberId(
+                group.getId(), workspaceId, newMembershipId)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM item_member_grant WHERE item_id = ?",
+                Integer.class, itemId)).isZero();
+        mockMvc.perform(get("/workspaces/{workspaceId}/members", workspaceId).cookie(oldAccess))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/auth/refresh").cookie(oldRefresh)).andExpect(status().isUnauthorized());
+
+        var freshLogin = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + target.getEmail() + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk()).andReturn();
+        mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspaceId)
+                        .cookie(freshLogin.getResponse().getCookie("accessToken")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleName").value("Member"))
+                .andExpect(jsonPath("$.permissions.length()").value(2));
     }
 
     @Test

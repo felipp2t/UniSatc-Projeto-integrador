@@ -73,11 +73,14 @@ public interface WorkspaceItemControllerDocs {
                                           UUID workspaceId, UUID collectionId, boolean archived,
                                           int page, int size);
 
-    @Operation(summary = "Busca itens ativos por todas as palavras do título, ignorando caixa e acentos")
+    @Operation(summary = "Busca itens por todas as palavras do título, ignorando caixa e acentos; inclui arquivados quando solicitado")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
         @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
     ResponseEntity<ItemPageResponse> search(@Parameter(hidden = true) UUID userId,
-                                            UUID workspaceId, String q, int page, int size);
+                                            UUID workspaceId, String q,
+                                            @Parameter(description = "Inclui itens arquivados nos resultados")
+                                            boolean includeArchived,
+                                            int page, int size);
 
     @Operation(summary = "Consulta um item de texto, link ou metadados de segredo")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
