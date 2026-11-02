@@ -166,7 +166,7 @@ Pastas são persistidas na tabela `collection`. A raiz é o workspace e não pos
 |---|---|---|---|
 | POST | `/workspaces/{workspaceId}/items` | 201 | `item/create`; segredos exigem também `secret/create`. |
 | GET | `/workspaces/{workspaceId}/items` | 200 | Lista metadados paginados da raiz ou da pasta indicada por `collectionId`; segredos só aparecem para quem tem `secret/read`. |
-| GET | `/workspaces/{workspaceId}/items/search?q=...` | 200 | Busca paginada por todas as palavras do título, em qualquer ordem, ignorando caixa e acentos; aplica as mesmas permissões. |
+| GET | `/workspaces/{workspaceId}/items/search?q=...&includeArchived=false&page=0&size=20` | 200 | Busca paginada por todas as palavras do título, em qualquer ordem, ignorando caixa e acentos; `includeArchived=true` inclui arquivados e aplica as mesmas permissões. |
 | GET | `/workspaces/{workspaceId}/items/{itemId}` | 200 | Retorna conteúdo/metadados do item autorizado; segredos ficam indisponíveis sem `secret/read`. |
 | GET | `/workspaces/{workspaceId}/items/{itemId}/secret` | 200 | Revela o valor somente com `item/read` e `secret/read`. |
 | POST | `/workspaces/{workspaceId}/items/attachments` | 201 | Cria item `file`/`image` com um anexo; exige `item/create`. |

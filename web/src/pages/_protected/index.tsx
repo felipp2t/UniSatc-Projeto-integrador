@@ -1,4 +1,5 @@
 import {
+  ClockCounterClockwiseIcon,
   DotsThreeVerticalIcon,
   FileIcon,
   FolderIcon,
@@ -19,6 +20,12 @@ import type {
 } from '@/api/types'
 import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
+import {
+  InlineCodeContent,
+  InlineCodeRoot,
+  InlineCodeSeparator,
+  InlineCodeText,
+} from '@/components/inline-code'
 import { type CopyKind, ItemListCard } from '@/components/item-list-card'
 import { NotFoundPage } from '@/components/not-found-page'
 import {
@@ -168,7 +175,6 @@ function WorkspaceBrowser({
         collectionId={collectionId}
         isLoading={path.isPending}
         path={path.data ?? []}
-        workspaceName={workspaceName}
       />
       <WorkspaceHeading
         collectionId={collectionId}
@@ -200,49 +206,66 @@ function WorkspaceBreadcrumbs({
   collectionId,
   isLoading,
   path,
-  workspaceName,
 }: {
   collectionId: string | undefined
   isLoading: boolean
   path: CollectionPathEntry[]
-  workspaceName: string
 }) {
+  if (!collectionId) return null
+  const truncate = path.length > 3
+  const visiblePath = truncate ? [path[0], null, ...path.slice(-2)] : path
+
   return (
-    <nav
-      aria-label='breadcrumb'
-      className='flex flex-wrap items-center gap-2 font-mono text-xs uppercase'
-    >
-      <Link
-        className='border border-border bg-card px-2.5 py-1.5 text-primary transition-colors hover:border-primary/50 hover:text-foreground'
-        search={{ collectionId: undefined }}
-        to='/'
-      >
-        {workspaceName}
-      </Link>
-      {isLoading && collectionId ? (
-        <Skeleton aria-label='Carregando caminho' className='h-4 w-32' />
-      ) : null}
-      {path.map((folder, index) => (
-        <span className='flex items-center gap-2' key={folder.id}>
-          <span aria-hidden='true' className='text-muted-foreground'>
-            /
-          </span>
-          {index === path.length - 1 ? (
-            <span aria-current='page' className='text-foreground'>
-              {folder.name}
+    <InlineCodeRoot>
+      <InlineCodeContent aria-label='Caminho da pasta' role='navigation'>
+        <Link className='group' search={{ collectionId: undefined }} to='/'>
+          <InlineCodeText className='text-primary transition-colors group-hover:text-foreground'>
+            Início
+          </InlineCodeText>
+        </Link>
+        {isLoading ? (
+          <Skeleton aria-label='Carregando caminho' className='h-4 w-32' />
+        ) : null}
+        {visiblePath.map((folder, index) => {
+          if (folder === null) {
+            return (
+              <span className='flex items-center' key='ellipsis'>
+                <InlineCodeSeparator />
+                <InlineCodeText>...</InlineCodeText>
+              </span>
+            )
+          }
+
+          const originalIndex = truncate
+            ? index === 0
+              ? 0
+              : path.length + index - 4
+            : index
+          const isLast = originalIndex === path.length - 1
+
+          return (
+            <span className='flex items-center' key={folder.id}>
+              <InlineCodeSeparator />
+              {isLast ? (
+                <InlineCodeText className='max-w-[16ch] truncate text-primary'>
+                  {folder.name}
+                </InlineCodeText>
+              ) : (
+                <Link
+                  className='group'
+                  search={{ collectionId: folder.id }}
+                  to='/'
+                >
+                  <InlineCodeText className='max-w-[16ch] truncate transition-colors group-hover:text-foreground'>
+                    {folder.name}
+                  </InlineCodeText>
+                </Link>
+              )}
             </span>
-          ) : (
-            <Link
-              className='text-muted-foreground transition-colors hover:text-primary'
-              search={{ collectionId: folder.id }}
-              to='/'
-            >
-              {folder.name}
-            </Link>
-          )}
-        </span>
-      ))}
-    </nav>
+          )
+        })}
+      </InlineCodeContent>
+    </InlineCodeRoot>
   )
 }
 
@@ -299,6 +322,18 @@ function WorkspaceHeading({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align='start'>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        className='flex w-full items-center gap-2'
+                        to='/atividades'
+                      >
+                        <ClockCounterClockwiseIcon
+                          aria-hidden='true'
+                          size={14}
+                        />
+                        Histórico de atividades
+                      </Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link
                         className='flex w-full items-center gap-2'
@@ -407,7 +442,7 @@ function ItemsSection({
 
   return (
     <section aria-labelledby='items-heading' className='space-y-3'>
-      <div className='flex flex-wrap items-center justify-between gap-3'>
+      <div className='flex flex-col items-start gap-3'>
         <h2
           className='font-mono font-semibold text-muted-foreground text-xs uppercase tracking-widest'
           id='items-heading'

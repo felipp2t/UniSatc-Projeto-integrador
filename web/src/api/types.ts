@@ -83,6 +83,64 @@ export interface CollectionPathEntry {
   id: string
   name: string
 }
+export type ActivityAction =
+  | 'folder_created'
+  | 'folder_renamed'
+  | 'folder_deleted'
+  | 'item_created'
+  | 'item_updated'
+  | 'item_archived'
+  | 'item_restored'
+  | 'item_deleted'
+  | 'member_invited'
+  | 'member_joined'
+  | 'member_role_changed'
+  | 'member_removed'
+  | 'member_invite_revoked'
+  | 'member_invite_declined'
+  | 'workspace_renamed'
+  | 'role_created'
+  | 'role_deleted'
+  | 'role_permissions_changed'
+  | 'group_created'
+  | 'group_renamed'
+  | 'group_deleted'
+  | 'group_member_added'
+  | 'group_member_removed'
+export type ActivityResourceType =
+  | 'folder'
+  | 'item'
+  | 'member'
+  | 'workspace'
+  | 'role'
+  | 'group'
+export interface ActivityEntry {
+  action: ActivityAction
+  actorContext: string
+  actorId: string | null
+  actorName: string
+  createdAt: string
+  id: string
+  resourceId: string
+  resourceType: ActivityResourceType
+  snapshot: Record<string, unknown> | null
+}
+export interface ActivityPageResponse {
+  activities: ActivityEntry[]
+  page: number
+  size: number
+  totalItems: number
+  totalPages: number
+}
+export interface ActivityFilters {
+  action?: ActivityAction
+  actorId?: string
+  from?: string
+  page: number
+  resourceType?: ActivityResourceType
+  size: number
+  to?: string
+}
 export type ForgotPasswordRequest =
   components['schemas']['ForgotPasswordRequest']
 export type InviteUserRequest = components['schemas']['InviteUserRequest']
@@ -93,6 +151,22 @@ export interface InviteResponse {
   id: string
   invitedByName: string
   invitedByUserId: string
+}
+export interface NotificationResponse {
+  content: string
+  createdAt: string
+  id: string
+  metadata: Record<string, unknown>
+  readAt: string | null
+  title: string
+}
+export interface NotificationPageResponse {
+  notifications: NotificationResponse[]
+  page: number
+  size: number
+  totalItems: number
+  totalPages: number
+  unreadCount: number
 }
 export type InviteValidationRequest =
   components['schemas']['InviteValidationRequest']
@@ -109,6 +183,21 @@ export type WorkspaceMemberDto =
   components['schemas']['WorkspaceMemberResponse']
 export type {
   WorkspaceMemberResponse,
+  WorkspaceRolePermission,
   WorkspaceRoleResponse,
 } from './workspace-members'
 export type WorkspaceResponse = components['schemas']['WorkspaceResponse']
+export interface WorkspacePermission {
+  action: string
+  resource: string
+}
+export interface WorkspacePermissionsResponse {
+  isOwner: boolean
+  permissions: WorkspacePermission[]
+  roleId: string
+  roleName: string
+}
+export interface AccessGroupResponse {
+  id: string
+  name: string
+}

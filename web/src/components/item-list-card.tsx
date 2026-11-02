@@ -11,6 +11,10 @@ import { getArchiveError, getRestoreError } from '@/api/item-errors'
 import type { ItemResponse } from '@/api/types'
 import { DeleteItemDialog } from '@/components/delete-item-dialog'
 import { EditItemDialog } from '@/components/edit-item-dialog'
+import {
+  ShareAccessDialog,
+  useCanManageSharing,
+} from '@/components/share-access-dialog'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
@@ -42,15 +46,19 @@ export function ItemListCard({
   workspaceId: string
 }) {
   const [dialog, setDialog] = useState<OpenDialog>()
+  const [shareOpen, setShareOpen] = useState(false)
   const archive = useArchiveItem()
   const restore = useRestoreItem()
   const archived = Boolean(item.archivedAt)
+  const canManageSharing = useCanManageSharing(workspaceId)
   const Icon = typeIcons[item.type]
   const preview = item.type === 'secret' ? '••••••••••••' : item.preview
 
   const closeDialog = useCallback(() => setDialog(undefined), [])
   const openEdit = useCallback(() => setDialog('edit'), [])
   const openDelete = useCallback(() => setDialog('delete'), [])
+  const openSharing = useCallback(() => setShareOpen(true), [])
+  const closeSharing = useCallback(() => setShareOpen(false), [])
   const handleCopyTitle = useCallback(
     () => onCopy(item.title, 'title'),
     [item.title, onCopy]
@@ -121,6 +129,11 @@ export function ItemListCard({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end'>
+              {canManageSharing && !archived ? (
+                <DropdownMenuItem onSelect={openSharing}>
+                  Compartilhar
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onSelect={openEdit}>
                 {archived ? 'Ver' : 'Editar'}
               </DropdownMenuItem>
@@ -166,6 +179,14 @@ export function ItemListCard({
         <DeleteItemDialog
           item={item}
           onClose={closeDialog}
+          workspaceId={workspaceId}
+        />
+      ) : null}
+      {canManageSharing && !archived ? (
+        <ShareAccessDialog
+          onClose={closeSharing}
+          open={shareOpen}
+          target={{ id: item.id, kind: 'item', name: item.title }}
           workspaceId={workspaceId}
         />
       ) : null}

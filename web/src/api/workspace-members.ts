@@ -13,6 +13,18 @@ export const workspaceMembersSchema = z.array(workspaceMemberSchema)
 export type WorkspaceMemberResponse = z.infer<typeof workspaceMemberSchema>
 
 export const workspaceRolesSchema = z.array(
-  z.object({ id: z.string().min(1), name: z.string().min(1) })
+  z.object({
+    builtIn: z.boolean().default(false),
+    id: z.string().min(1),
+    memberCount: z.number().nonnegative().default(0),
+    name: z.string().min(1),
+  })
 )
 export type WorkspaceRoleResponse = z.infer<typeof workspaceRolesSchema>[number]
+
+export const workspaceRolePermissionsSchema = z.array(
+  z.object({ action: z.string().min(1), resource: z.string().min(1) })
+)
+export type WorkspaceRolePermission = z.infer<
+  typeof workspaceRolePermissionsSchema
+>[number]

@@ -10,6 +10,10 @@ import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
 import type { CollectionResponse } from '@/api/types'
+import {
+  ShareAccessDialog,
+  useCanManageSharing,
+} from '@/components/share-access-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -47,11 +51,15 @@ export function CollectionCard({
   collection,
   onDelete,
   onRename,
+  workspaceId,
 }: {
   collection: CollectionResponse
   onDelete: (collection: CollectionResponse) => void
   onRename: (collection: CollectionResponse) => void
+  workspaceId: string
 }) {
+  const [shareOpen, setShareOpen] = useState(false)
+  const canManageSharing = useCanManageSharing(workspaceId)
   const handleDelete = useCallback(
     () => onDelete({ ...collection }),
     [collection, onDelete]
@@ -60,6 +68,8 @@ export function CollectionCard({
     () => onRename({ ...collection }),
     [collection, onRename]
   )
+  const openSharing = useCallback(() => setShareOpen(true), [])
+  const closeSharing = useCallback(() => setShareOpen(false), [])
 
   return (
     <article className='relative flex min-h-24 flex-col justify-between gap-4 border-2 border-border bg-card p-4 transition-colors hover:border-primary/50'>
@@ -88,6 +98,11 @@ export function CollectionCard({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end'>
+            {canManageSharing ? (
+              <DropdownMenuItem onSelect={openSharing}>
+                Compartilhar
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem onSelect={handleRename}>
               <PencilSimpleIcon aria-hidden='true' />
               Renomear
@@ -102,6 +117,18 @@ export function CollectionCard({
       <span className='font-mono text-[10px] text-muted-foreground uppercase tracking-wider'>
         Pasta
       </span>
+      {canManageSharing ? (
+        <ShareAccessDialog
+          onClose={closeSharing}
+          open={shareOpen}
+          target={{
+            id: collection.id,
+            kind: 'collection',
+            name: collection.name,
+          }}
+          workspaceId={workspaceId}
+        />
+      ) : null}
     </article>
   )
 }
