@@ -1,6 +1,9 @@
 import type { ZodType } from 'zod'
 import { apiClient } from './client'
 import type {
+  ActivityFilters,
+  ActivityPageResponse,
+  AccessGroupResponse,
   AttachmentResponse,
   ChangePasswordRequest,
   CollectionPageResponse,
@@ -16,6 +19,7 @@ import type {
   ItemPageResponse,
   ItemResponse,
   LoginRequest,
+  NotificationPageResponse,
   RegisterRequest,
   RenameCollectionRequest,
   ResetPasswordRequest,
@@ -26,11 +30,13 @@ import type {
   UpdateWorkspaceRequest,
   UserResponse,
   WorkspaceMemberDto,
+  WorkspacePermissionsResponse,
   WorkspaceResponse,
 } from './types'
 import {
   workspaceMemberSchema,
   workspaceMembersSchema,
+  workspaceRolePermissionsSchema,
   workspaceRolesSchema,
 } from './workspace-members'
 
@@ -62,6 +68,12 @@ export const userApi = {
 }
 
 export const workspaceApi = {
+  activity: (workspaceId: string, filters: ActivityFilters) =>
+    apiClient.get<ActivityPageResponse>(`/workspaces/${workspaceId}/activity`, {
+      params: filters,
+    }),
+  createRole: (workspaceId: string, name: string) =>
+    apiClient.post<void>(`/workspaces/${workspaceId}/roles`, { name }),
   changeMemberRole: async (
     workspaceId: string,
     memberId: string,
@@ -80,6 +92,8 @@ export const workspaceApi = {
       ),
     }
   },
+  deleteRole: (workspaceId: string, roleId: string) =>
+    apiClient.delete<void>(`/workspaces/${workspaceId}/roles/${roleId}`),
   get: (workspaceId: string) =>
     apiClient.get<WorkspaceResponse>(`/workspaces/${workspaceId}`),
   list: () => apiClient.get<WorkspaceResponse[]>('/workspaces'),
@@ -109,6 +123,23 @@ export const workspaceApi = {
       ),
     }
   },
+  listRolePermissions: async (workspaceId: string, roleId: string) => {
+    const response = await apiClient.get<unknown>(
+      `/workspaces/${workspaceId}/roles/${roleId}/permissions`
+    )
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspaceRolePermissionsSchema,
+        response.data,
+        'A resposta da API contém permissões inválidas.'
+      ),
+    }
+  },
+  permissions: (workspaceId: string) =>
+    apiClient.get<WorkspacePermissionsResponse>(
+      `/workspaces/${workspaceId}/me/permissions`
+    ),
   removeMember: (workspaceId: string, membershipId: string) =>
     apiClient.delete<void>(
       `/workspaces/${workspaceId}/members/${membershipId}`,
@@ -128,6 +159,54 @@ export const inviteApi = {
     apiClient.post<void>(`/invites/${inviteId}/revoke`),
   validate: (request: InviteValidationRequest) =>
     apiClient.post<InviteValidationResponse>('/invites/validate', request),
+}
+
+export const notificationsApi = {
+  list: (page = 0, size = 10) =>
+    apiClient.get<NotificationPageResponse>('/notifications', {
+      params: { page, size },
+    }),
+  markAllRead: () => apiClient.patch<void>('/notifications/read'),
+  markRead: (notificationId: string) =>
+    apiClient.patch<void>(`/notifications/${notificationId}/read`),
+}
+
+export const accessGroupApi = {
+  list: (workspaceId: string) =>
+    apiClient.get<AccessGroupResponse[]>(`/workspaces/${workspaceId}/groups`),
+}
+
+export const sharingApi = {
+  grantEveryone: (workspaceId: string, collectionId: string) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/everyone`
+    ),
+  grantGroup: (workspaceId: string, collectionId: string, groupId: string) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/groups/${groupId}`
+    ),
+  grantMember: (workspaceId: string, itemId: string, memberId: string) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/sharing/items/${itemId}/members/${memberId}`
+    ),
+  origins: (workspaceId: string, type: 'collection' | 'item', id: string) =>
+    apiClient.get<string[]>(
+      `/workspaces/${workspaceId}/sharing/${type === 'collection' ? 'collections' : 'items'}/${id}/origins`
+    ),
+  revokeEveryone: (workspaceId: string, collectionId: string) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/everyone`
+    ),
+  setInheritance: (
+    workspaceId: string,
+    collectionId: string,
+    enabled: boolean
+  ) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/inheritance`,
+      undefined,
+      { params: { enabled } }
+    ),
 }
 
 export const collectionsApi = {
