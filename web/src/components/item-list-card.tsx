@@ -11,6 +11,7 @@ import { getArchiveError, getRestoreError } from '@/api/item-errors'
 import type { ItemResponse } from '@/api/types'
 import { DeleteItemDialog } from '@/components/delete-item-dialog'
 import { EditItemDialog } from '@/components/edit-item-dialog'
+import { ItemAttachmentDialog } from '@/components/item-attachment-dialog'
 import {
   ShareAccessDialog,
   useCanManageSharing,
@@ -167,6 +168,9 @@ export function ItemListCard({
         <p className='truncate font-mono text-muted-foreground text-xs'>
           {preview}
         </p>
+      ) : null}
+      {item.type === 'file' || item.type === 'image' ? (
+        <ItemAttachmentDialog item={item} workspaceId={workspaceId} />
       ) : null}
       {dialog === 'edit' ? (
         <EditItemDialog

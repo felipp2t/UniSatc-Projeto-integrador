@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { itemsApi } from '@/api/endpoints'
+import { itemsApi, type UploadOptions } from '@/api/endpoints'
 import { itemKeys } from '@/api/item-keys'
 import type {
   UpdateAttachmentMetadataRequest,
@@ -52,10 +52,10 @@ export function useReplaceAttachment() {
     ({
       file,
       itemId,
-      signal,
+      options,
       workspaceId,
-    }: ItemVariables & { file: File; signal?: AbortSignal }) =>
-      itemsApi.replaceAttachment(workspaceId, itemId, file, { signal })
+    }: ItemVariables & { file: File; options?: Partial<UploadOptions> }) =>
+      itemsApi.replaceAttachment(workspaceId, itemId, file, options)
   )
 }
 

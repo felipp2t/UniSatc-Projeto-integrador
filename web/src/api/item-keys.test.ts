@@ -33,4 +33,11 @@ describe('itemKeys', () => {
       itemKeys.all('ws')
     )
   })
+
+  it('attachment fica sob all e difere de detail', () => {
+    const attachment = itemKeys.attachment('ws', 'i')
+    expect(attachment.slice(0, 2)).toEqual(itemKeys.all('ws'))
+    expect(attachment).not.toEqual(itemKeys.detail('ws', 'i'))
+    expect(attachment).not.toEqual(itemKeys.attachment('ws', 'outro'))
+  })
 })

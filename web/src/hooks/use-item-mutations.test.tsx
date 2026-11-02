@@ -10,6 +10,7 @@ import '@/test/dom-setup'
 const apiMocks = vi.hoisted(() => ({
   archive: vi.fn(),
   remove: vi.fn(),
+  replaceAttachment: vi.fn(),
   restore: vi.fn(),
   update: vi.fn(),
 }))
@@ -22,6 +23,7 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
 import {
   useArchiveItem,
   useDeleteItem,
+  useReplaceAttachment,
   useRestoreItem,
   useUpdateItem,
 } from './use-item-mutations'
@@ -33,6 +35,7 @@ const listKey = itemKeys.list(workspaceId, {
   page: 0,
 })
 const detailKey = itemKeys.detail(workspaceId, 'item-1')
+const attachmentKey = itemKeys.attachment(workspaceId, 'item-1')
 
 function setup() {
   const queryClient = new QueryClient({
@@ -40,6 +43,7 @@ function setup() {
   })
   queryClient.setQueryData(listKey, { items: [] })
   queryClient.setQueryData(detailKey, { id: 'item-1' })
+  queryClient.setQueryData(attachmentKey, { blob: new Blob(['antigo']) })
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
@@ -127,5 +131,47 @@ describe('use-item-mutations', () => {
       expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true)
     )
     expect(apiMocks.remove).toHaveBeenCalledWith(workspaceId, 'item-1')
+  })
+
+  it('substituir anexo repassa as opções de upload e invalida o anexo em cache', async () => {
+    const { queryClient, wrapper } = setup()
+    const { result } = renderHook(() => useReplaceAttachment(), { wrapper })
+    const file = new File(['x'], 'doc.pdf')
+    const options = { signal: new AbortController().signal }
+
+    await result.current.mutateAsync({
+      file,
+      itemId: 'item-1',
+      options,
+      workspaceId,
+    })
+
+    expect(apiMocks.replaceAttachment).toHaveBeenCalledWith(
+      workspaceId,
+      'item-1',
+      file,
+      options
+    )
+    await waitFor(() =>
+      expect(queryClient.getQueryState(attachmentKey)?.isInvalidated).toBe(true)
+    )
+  })
+
+  it('falha ao substituir anexo também invalida o anexo para reler o servidor', async () => {
+    const { queryClient, wrapper } = setup()
+    apiMocks.replaceAttachment.mockRejectedValue(new Error('falhou'))
+    const { result } = renderHook(() => useReplaceAttachment(), { wrapper })
+
+    await expect(
+      result.current.mutateAsync({
+        file: new File(['x'], 'doc.pdf'),
+        itemId: 'item-1',
+        workspaceId,
+      })
+    ).rejects.toThrow('falhou')
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(attachmentKey)?.isInvalidated).toBe(true)
+    )
   })
 })

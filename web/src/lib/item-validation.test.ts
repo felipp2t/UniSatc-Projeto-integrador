@@ -93,6 +93,10 @@ describe('isHttpUrl', () => {
 })
 
 describe('validateAttachmentFile', () => {
+  it('define o limite em 20.000.000 bytes', () => {
+    expect(FILE_MAX_BYTES).toBe(20_000_000)
+  })
+
   it('aceita 20.000.000 bytes e rejeita 20.000.001', () => {
     expect(
       validateAttachmentFile(fileOf('a.pdf', FILE_MAX_BYTES))

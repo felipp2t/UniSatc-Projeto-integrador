@@ -191,4 +191,62 @@ describe('ReplaceAttachmentField', () => {
     expect(screen.getByLabelText('SUBSTITUIR ARQUIVO')).toBeDisabled()
     expect(replaceButton()).toBeDisabled()
   })
+
+  it('mostra o progresso real e bloqueia o input durante o envio', async () => {
+    let resolve: (value: unknown) => void = () => undefined
+    apiMocks.replaceAttachment.mockImplementation(
+      (
+        _w: string,
+        _i: string,
+        _f: File,
+        { onUploadProgress }: { onUploadProgress: (value: number) => void }
+      ) => {
+        onUploadProgress(42)
+        return new Promise((done) => {
+          resolve = done
+        })
+      }
+    )
+    const user = userEvent.setup()
+    renderField()
+
+    await user.upload(
+      screen.getByLabelText('SUBSTITUIR ARQUIVO'),
+      new File(['x'], 'doc.pdf')
+    )
+    await user.click(replaceButton())
+
+    expect(await screen.findByText('42%')).toBeInTheDocument()
+    expect(screen.getByLabelText('SUBSTITUIR ARQUIVO')).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Cancelar envio' })
+    ).toBeInTheDocument()
+
+    resolve({ data: {} })
+    await waitFor(() => expect(screen.queryByText('42%')).toBeNull())
+    expect(screen.queryByRole('button', { name: 'Cancelar envio' })).toBeNull()
+    expect(screen.getByLabelText('SUBSTITUIR ARQUIVO')).toBeEnabled()
+  })
+
+  it('não mostra progresso nem cancelar antes de enviar', () => {
+    renderField()
+
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Cancelar envio' })).toBeNull()
+  })
+
+  it('limpa o arquivo escolhido após substituir com sucesso', async () => {
+    const user = userEvent.setup()
+    renderField()
+
+    await user.upload(
+      screen.getByLabelText('SUBSTITUIR ARQUIVO'),
+      new File(['x'], 'doc.pdf')
+    )
+    expect(screen.getByText('doc.pdf')).toBeInTheDocument()
+    await user.click(replaceButton())
+
+    await waitFor(() => expect(screen.queryByText('doc.pdf')).toBeNull())
+    expect(replaceButton()).toBeDisabled()
+  })
 })

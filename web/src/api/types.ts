@@ -2,7 +2,7 @@ import type { components } from './generated/schema'
 
 export type ChangePasswordRequest =
   components['schemas']['ChangePasswordRequest']
-export type CreateItemType = 'text' | 'link' | 'secret'
+export type CreateItemType = 'file' | 'text' | 'link' | 'secret'
 export type CreateItemRequest =
   | {
       type: 'text'

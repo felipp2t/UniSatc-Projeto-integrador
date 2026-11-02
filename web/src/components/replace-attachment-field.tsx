@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import { getReplaceAttachmentError } from '@/api/item-errors'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { FileInput } from '@/components/ui/file-input'
 import { appToast } from '@/components/ui/toast'
+import { useAttachmentUpload } from '@/hooks/use-attachment-upload'
 import { useReplaceAttachment } from '@/hooks/use-item-mutations'
 import {
   ATTACHMENT_ACCEPT,
+  ATTACHMENT_HINT,
   validateAttachmentFile,
 } from '@/lib/item-validation'
+import { UploadProgress } from './upload-progress'
 
 export function ReplaceAttachmentField({
   disabled,
@@ -22,8 +25,8 @@ export function ReplaceAttachmentField({
   workspaceId: string
 }) {
   const id = useId()
-  const abortRef = useRef<AbortController>(null)
   const replace = useReplaceAttachment()
+  const { cancel, progress, upload } = useAttachmentUpload()
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string>()
   const [inputKey, setInputKey] = useState(0)
@@ -43,30 +46,22 @@ export function ReplaceAttachmentField({
 
   const handleReplace = useCallback(async () => {
     if (!file) return
-    const controller = new AbortController()
-    abortRef.current = controller
     setError(undefined)
     try {
-      await replace.mutateAsync({
-        file,
-        itemId,
-        signal: controller.signal,
-        workspaceId,
-      })
+      await upload((options) =>
+        replace.mutateAsync({ file, itemId, options, workspaceId })
+      )
       setFile(null)
       setInputKey((key) => key + 1)
       appToast.success('Arquivo substituído.')
     } catch (cause) {
       setError(getReplaceAttachmentError(cause))
-    } finally {
-      abortRef.current = null
     }
-  }, [file, itemId, replace, workspaceId])
+  }, [file, itemId, replace, upload, workspaceId])
 
   const handleReplaceClick = useCallback(() => {
     handleReplace().catch(() => undefined)
   }, [handleReplace])
-  const handleCancel = useCallback(() => abortRef.current?.abort(), [])
 
   return (
     <Field aria-invalid={Boolean(error) || undefined}>
@@ -80,6 +75,7 @@ export function ReplaceAttachmentField({
         accept={ATTACHMENT_ACCEPT}
         aria-describedby={error ? `${id}-error` : undefined}
         disabled={disabled || replace.isPending}
+        hint={ATTACHMENT_HINT}
         id={id}
         isInvalid={Boolean(error)}
         key={inputKey}
@@ -91,9 +87,12 @@ export function ReplaceAttachmentField({
           {error}
         </p>
       ) : null}
+      {progress === undefined ? null : (
+        <UploadProgress label={`${progress}%`} progress={progress} />
+      )}
       <div className='flex justify-end gap-2'>
         {replace.isPending ? (
-          <Button onClick={handleCancel} size='sm' variant='outline'>
+          <Button onClick={cancel} size='sm' variant='outline'>
             Cancelar envio
           </Button>
         ) : null}
