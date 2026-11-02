@@ -12,6 +12,9 @@
     "generate:api-types": "openapi-typescript http://localhost:8080/v3/api-docs -o src/api/generated/schema.d.ts",
     "lint": "biome lint .",
     "preview": "vite preview",
+    "performance:auth": "node e2e/performance/auth.mjs",
+    "performance:seed": "node e2e/performance/seed.mjs",
+    "performance:measure": "node e2e/performance/run.mjs",
     "test": "vitest run"
   },
   "dependencies": {
@@ -46,6 +49,7 @@
     "happy-dom": "^20.0.10",
     "knip": "6.34.0",
     "openapi-typescript": "^7.13.0",
+    "playwright": "1.56.1",
     "typescript": "~6.0.2",
     "ultracite": "7.10.7",
     "vite": "^8.3.5",
