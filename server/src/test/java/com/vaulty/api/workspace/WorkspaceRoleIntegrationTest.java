@@ -196,13 +196,13 @@ class WorkspaceRoleIntegrationTest extends WorkspaceIntegrationSupport {
                             .content(objectMapper.writeValueAsString(Map.of("name", invalid))))
                     .andExpect(status().isBadRequest());
         }
-        mockMvc.perform(put(role(workspace.id(), roleId)).cookie(authCookie(owner))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\" CAFE \"}"))
-                .andExpect(status().isConflict());
         mockMvc.perform(put(role(workspace.id(), UUID.randomUUID())).cookie(authCookie(owner))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Outro\"}"))
                 .andExpect(status().isNotFound());
         assertThat(activityCount("role_renamed", owner)).isZero();
+        mockMvc.perform(put(role(workspace.id(), roleId)).cookie(authCookie(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\" CAFE \"}"))
+                .andExpect(status().isConflict());
     }
 
     @Test
