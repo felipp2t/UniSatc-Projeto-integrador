@@ -34,6 +34,14 @@ public interface WorkspaceRoleControllerDocs {
                                         @PathVariable UUID workspaceId,
                                         @Valid @RequestBody RoleRequest request);
 
+    @Operation(summary = "Renomeia um papel personalizado")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+            @ApiResponse(responseCode = "401"), @ApiResponse(responseCode = "403"),
+            @ApiResponse(responseCode = "404"), @ApiResponse(responseCode = "409")})
+    ResponseEntity<RoleResponse> rename(@Parameter(hidden = true) UUID userId,
+                                        @PathVariable UUID workspaceId, @PathVariable UUID roleId,
+                                        @Valid @RequestBody RoleRequest request);
+
     @Operation(summary = "Consulta as permissões de um papel")
     @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "401"),
             @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})

@@ -60,6 +60,36 @@ public class WorkspaceRoleService {
         return new RoleResponse(role.getId(), role.getName(), 0);
     }
 
+    @Transactional
+    public RoleResponse rename(UUID userId, UUID workspaceId, UUID roleId, RoleRequest request) {
+        authorization.requireOwnerForUpdate(userId, workspaceId);
+        var role = roleRepository.findByIdAndWorkspaceIdForUpdate(roleId, workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Papel não encontrado"));
+        if (role.isProtected()) {
+            throw new ConflictException("Os papéis Dono e Membro não podem ser renomeados");
+        }
+        String previousName = role.getName();
+        if (previousName.equals(request.name())) {
+            return new RoleResponse(role.getId(), previousName,
+                    memberRepository.countByWorkspaceIdAndRoleId(workspaceId, roleId));
+        }
+        role.setName(request.name());
+        try {
+            roleRepository.saveAndFlush(role);
+        } catch (DataIntegrityViolationException exception) {
+            if (PersistenceConstraints.causedBy(
+                    exception, DUPLICATE_NAME_CONSTRAINT, BUILT_IN_NAME_CONSTRAINT)) {
+                throw new ConflictException("Já existe um papel com esse nome neste workspace");
+            }
+            throw exception;
+        }
+        activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
+                ActivityAction.ROLE_RENAMED, ActivityResourceType.ROLE, roleId,
+                Map.of("roleId", roleId, "previousName", previousName, "name", role.getName()));
+        return new RoleResponse(role.getId(), role.getName(),
+                memberRepository.countByWorkspaceIdAndRoleId(workspaceId, roleId));
+    }
+
     @Transactional(readOnly = true)
     public List<WorkspacePermission> permissions(UUID userId, UUID workspaceId, UUID roleId) {
         authorization.requireOwner(userId, workspaceId);

@@ -127,6 +127,93 @@ class WorkspaceRoleIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
+    void ownerRenamesCustomRolePreservingIdentityAssignmentsPermissionsAndRecordingActivity() throws Exception {
+        User owner = createUser();
+        User member = createUser("Membro");
+        WorkspaceResponse workspace = configureWorkspace(owner);
+        addMember(member, workspace.id());
+        UUID roleId = createRole(owner, workspace.id(), "Financeiro");
+        changeRole(owner, workspace.id(), memberId(member, workspace.id()), roleId).andExpect(status().isOk());
+        grant(roleId, "item", "read");
+
+        mockMvc.perform(put(role(workspace.id(), roleId)).cookie(authCookie(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"  Tesouraria  \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(roleId.toString()))
+                .andExpect(jsonPath("$.name").value("Tesouraria"))
+                .andExpect(jsonPath("$.memberCount").value(1));
+
+        assertThat(workspaceRoleRepository.findById(roleId).orElseThrow().getName()).isEqualTo("Tesouraria");
+        assertThat(workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace.id(), member.getId())
+                .orElseThrow().getRole().getId()).isEqualTo(roleId);
+        assertThat(rolePermissionRepository.findAllByRoleId(roleId))
+                .extracting(permission -> permission.getResource() + ":" + permission.getAction())
+                .containsExactly("item:read");
+        assertThat(activityCount("role_renamed", owner)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForMap("SELECT snapshot, resource_id, actor_context FROM activity_log "
+                        + "WHERE action = 'role_renamed' AND actor_id = ?", owner.getId()))
+                .containsEntry("resource_id", roleId)
+                .containsEntry("actor_context", "USER");
+        assertThat(jdbcTemplate.queryForObject("SELECT snapshot ->> 'previousName' FROM activity_log "
+                + "WHERE action = 'role_renamed' AND actor_id = ?", String.class, owner.getId()))
+                .isEqualTo("Financeiro");
+        assertThat(jdbcTemplate.queryForObject("SELECT snapshot ->> 'name' FROM activity_log "
+                + "WHERE action = 'role_renamed' AND actor_id = ?", String.class, owner.getId()))
+                .isEqualTo("Tesouraria");
+    }
+
+    @Test
+    void onlyOwnerCanRenameRoleAndBuiltInRolesAreProtected() throws Exception {
+        User owner = createUser();
+        User member = createUser("Membro");
+        WorkspaceResponse workspace = configureWorkspace(owner);
+        addMember(member, workspace.id());
+        UUID customRoleId = createRole(owner, workspace.id(), "Financeiro");
+
+        mockMvc.perform(put(role(workspace.id(), customRoleId)).cookie(authCookie(member))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Negado\"}"))
+                .andExpect(status().isForbidden());
+
+        for (String builtIn : new String[] {WorkspaceRole.OWNER_ROLE_NAME, WorkspaceRole.MEMBER_ROLE_NAME}) {
+            UUID builtInId = workspaceRoleRepository.findByWorkspaceIdAndName(workspace.id(), builtIn)
+                    .orElseThrow().getId();
+            mockMvc.perform(put(role(workspace.id(), builtInId)).cookie(authCookie(owner))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Renomeado\"}"))
+                    .andExpect(status().isConflict());
+        }
+        assertThat(activityCount("role_renamed", owner)).isZero();
+    }
+
+    @Test
+    void renameRejectsInvalidNamesAndUnknownRoles() throws Exception {
+        User owner = createUser();
+        WorkspaceResponse workspace = configureWorkspace(owner);
+        UUID roleId = createRole(owner, workspace.id(), "Financeiro");
+        for (String invalid : new String[] {"   ", "a".repeat(51)}) {
+            mockMvc.perform(put(role(workspace.id(), roleId)).cookie(authCookie(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(Map.of("name", invalid))))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(put(role(workspace.id(), UUID.randomUUID())).cookie(authCookie(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Outro\"}"))
+                .andExpect(status().isNotFound());
+        assertThat(activityCount("role_renamed", owner)).isZero();
+    }
+
+    @Test
+    void renameRejectsNormalizedDuplicateName() throws Exception {
+        User owner = createUser();
+        WorkspaceResponse workspace = configureWorkspace(owner);
+        UUID roleId = createRole(owner, workspace.id(), "Financeiro");
+        createRole(owner, workspace.id(), "Café");
+
+        mockMvc.perform(put(role(workspace.id(), roleId)).cookie(authCookie(owner))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\" CAFE \"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void permissionsExpandAllAndOwnerRoleHasFullCatalog() throws Exception {
         User owner = createUser();
         WorkspaceResponse workspace = configureWorkspace(owner);
