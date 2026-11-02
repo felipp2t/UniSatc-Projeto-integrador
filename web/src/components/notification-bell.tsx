@@ -1,5 +1,11 @@
-import { BellIcon } from '@phosphor-icons/react'
-import { useCallback } from 'react'
+import { BellIcon, CheckIcon } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import { useCallback, useState } from 'react'
+import { notificationsApi } from '@/api/endpoints'
+import { notificationKeys } from '@/api/notification-keys'
+import type { NotificationResponse } from '@/api/types'
+import { appToast } from '@/components/ui/toast'
 import {
   NotificationContent,
   NotificationHeader,
@@ -8,6 +14,8 @@ import {
   NotificationTitle,
 } from '@/components/notification'
 import { Button } from '@/components/ui/button'
+import { ErrorState } from '@/components/ui/error-state'
+import { LoadingState } from '@/components/ui/loading-state'
 import {
   Popover,
   PopoverContent,
@@ -16,39 +24,122 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useNotificationRead } from '@/hooks/use-notification-read'
+import type { AppRoute } from '@/types/navigation'
 
-export interface NotificationData {
-  content: string
-  href?: string
-  id: string
-  read?: boolean
-  title: string
-}
+const PAGE_SIZE = 10
+
+export type NotificationData = NotificationResponse
+
 interface NotificationBellProps {
   notifications?: NotificationData[]
+  onMarkAllRead?: () => void | Promise<void>
   onMarkRead?: (id: string) => void | Promise<void>
   onOpen?: (notification: NotificationData) => void
 }
 
 export function NotificationBell({
-  notifications = [],
+  notifications: suppliedNotifications,
+  onMarkAllRead,
   onMarkRead,
   onOpen,
 }: NotificationBellProps) {
+  const [open, setOpen] = useState(false)
+  const [page, setPage] = useState(0)
+  const { markAllRead, markRead } = useNotificationRead()
+  const query = useQuery({
+    enabled: suppliedNotifications === undefined,
+    queryFn: async () => (await notificationsApi.list(page, PAGE_SIZE)).data,
+    queryKey: notificationKeys.page(page),
+  })
+  const notifications = suppliedNotifications ?? query.data?.notifications ?? []
+  const unreadCount =
+    suppliedNotifications === undefined
+      ? (query.data?.unreadCount ?? 0)
+      : suppliedNotifications.filter((notification) => !isRead(notification))
+          .length
+  const unreadBadge = unreadCount > 99 ? '99+' : String(unreadCount)
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen)
+    if (nextOpen) setPage(0)
+  }, [])
+  const handleRetry = useCallback(async () => {
+    await query.refetch()
+  }, [query.refetch])
+  const handleMarkRead = useCallback(
+    async (notificationId: string) => {
+      try {
+        if (onMarkRead) await onMarkRead(notificationId)
+        else await markRead.mutateAsync(notificationId)
+      } catch {
+        appToast.error('Não foi possível marcar a notificação como lida.')
+      }
+    },
+    [markRead.mutateAsync, onMarkRead]
+  )
+  const handleMarkAllRead = useCallback(async () => {
+    try {
+      if (onMarkAllRead) await onMarkAllRead()
+      else await markAllRead.mutateAsync()
+    } catch {
+      appToast.error('Não foi possível marcar as notificações como lidas.')
+    }
+  }, [markAllRead.mutateAsync, onMarkAllRead])
+  const handlePreviousPage = useCallback(
+    () => setPage((current) => current - 1),
+    []
+  )
+  const handleNextPage = useCallback(
+    () => setPage((current) => current + 1),
+    []
+  )
+
   return (
-    <Popover modal>
+    <Popover onOpenChange={handleOpenChange} open={open}>
       <PopoverTrigger asChild>
-        <Button aria-label='Notificações' size='icon' variant='ghost'>
+        <Button
+          aria-label={`Notificações: ${unreadCount} não lidas`}
+          className='relative'
+          size='icon'
+          variant='ghost'
+        >
           <BellIcon aria-hidden='true' size={18} />
+          {unreadCount > 0 ? (
+            <span className='absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] text-primary-foreground'>
+              {unreadBadge}
+            </span>
+          ) : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent align='end' className='w-80 p-3'>
         <PopoverHeader>
           <PopoverTitle>Notificações</PopoverTitle>
+          <p className='text-muted-foreground text-xs'>
+            {unreadCount} não lidas
+          </p>
         </PopoverHeader>
-        <ScrollArea className='mt-3 max-h-72'>
-          {notifications.length === 0 ? (
-            <p className='text-muted-foreground text-xs'>
+        {unreadCount > 0 && suppliedNotifications === undefined ? (
+          <Button
+            className='mt-2 w-full justify-start'
+            onClick={handleMarkAllRead}
+            size='sm'
+            variant='ghost'
+          >
+            <CheckIcon aria-hidden='true' size={16} />
+            Marcar todas como lidas
+          </Button>
+        ) : null}
+        <ScrollArea className='mt-3 max-h-80'>
+          {query.isLoading && suppliedNotifications === undefined ? (
+            <LoadingState label='Carregando notificações...' />
+          ) : query.isError && suppliedNotifications === undefined ? (
+            <ErrorState
+              error={query.error}
+              onRetry={handleRetry}
+              variant='compact'
+            />
+          ) : notifications.length === 0 ? (
+            <p className='px-2 py-6 text-center text-muted-foreground text-xs'>
               Nenhuma notificação.
             </p>
           ) : (
@@ -56,12 +147,36 @@ export function NotificationBell({
               <NotificationRow
                 key={notification.id}
                 notification={notification}
-                onMarkRead={onMarkRead}
+                onMarkRead={handleMarkRead}
                 onOpen={onOpen}
               />
             ))
           )}
         </ScrollArea>
+        {suppliedNotifications === undefined && query.data ? (
+          <div className='mt-2 flex items-center justify-between border-border border-t pt-2'>
+            <Button
+              disabled={page === 0 || query.isFetching}
+              onClick={handlePreviousPage}
+              size='sm'
+              variant='ghost'
+            >
+              Anteriores
+            </Button>
+            <span className='text-muted-foreground text-xs'>
+              {query.data.totalPages === 0 ? 0 : page + 1} /{' '}
+              {query.data.totalPages}
+            </span>
+            <Button
+              disabled={page + 1 >= query.data.totalPages || query.isFetching}
+              onClick={handleNextPage}
+              size='sm'
+              variant='ghost'
+            >
+              Próximas
+            </Button>
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   )
@@ -73,59 +188,99 @@ function NotificationRow({
   onOpen,
 }: {
   notification: NotificationData
-  onMarkRead?: NotificationBellProps['onMarkRead']
+  onMarkRead?: (id: string) => void | Promise<void>
   onOpen?: NotificationBellProps['onOpen']
 }) {
-  const open = useCallback(async () => {
-    try {
-      await onMarkRead?.(notification.id)
-    } catch {
-      /* callback errors do not block opening */
-    }
-    try {
+  const handleOpen = useCallback(
+    () => {
+      if (!isRead(notification)) void onMarkRead?.(notification.id)
       onOpen?.(notification)
-    } catch {
-      /* consumer errors do not break the control */
-    }
-  }, [notification, onMarkRead, onOpen])
-  const handleOpen = useCallback(() => {
-    open().catch(() => undefined)
-  }, [open])
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return
-      event.preventDefault()
-      handleOpen()
     },
-    [handleOpen]
+    [notification, onMarkRead, onOpen]
   )
   const content = (
-    <>
+    <NotificationRoot className='mb-2 p-3'>
       <NotificationHeader>
         <NotificationTitle>{notification.title}</NotificationTitle>
-        <NotificationIndicator show={!notification.read} />
+        <NotificationIndicator show={!isRead(notification)} />
       </NotificationHeader>
       <NotificationContent>{notification.content}</NotificationContent>
-    </>
+      <time
+        className='mt-2 block text-[11px] text-muted-foreground'
+        dateTime={notification.createdAt}
+      >
+        {formatRelativeTime(notification.createdAt)}
+      </time>
+    </NotificationRoot>
   )
-  if (notification.href) {
+  const href = getNotificationHref(notification.metadata)
+
+  if (!href) {
     return (
-      <a className='mb-2 block' href={notification.href} onClick={handleOpen}>
-        <NotificationRoot>{content}</NotificationRoot>
-      </a>
+      <div>
+        {content}
+        {!isRead(notification) ? (
+          <Button
+            className='mb-2'
+            onClick={() => onMarkRead?.(notification.id)}
+            size='sm'
+            variant='ghost'
+          >
+            <CheckIcon aria-hidden='true' size={16} />
+            Marcar como lida
+          </Button>
+        ) : null}
+      </div>
     )
   }
+
   return (
-    <NotificationRoot
-      aria-label={notification.title}
-      className='mb-2 cursor-pointer'
+    <Link
+      className='block rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
       onClick={handleOpen}
-      onKeyDown={handleKeyDown}
-      role='button'
-      tabIndex={0}
+      to={href}
     >
       {content}
-    </NotificationRoot>
+    </Link>
+  )
+}
+
+function isRead(notification: NotificationData) {
+  return notification.readAt !== null
+}
+
+function getNotificationHref(
+  metadata: Record<string, unknown>
+): AppRoute | undefined {
+  switch (metadata.event) {
+    case 'PROFILE_UPDATED':
+    case 'PASSWORD_CHANGED':
+      return '/configuracoes'
+    case 'ACCESS_CHANGED':
+      return '/'
+    default:
+      return undefined
+  }
+}
+
+function formatRelativeTime(createdAt: string) {
+  const timestamp = new Date(createdAt).getTime()
+  if (Number.isNaN(timestamp)) return ''
+
+  const seconds = Math.round((timestamp - Date.now()) / 1000)
+  const absoluteSeconds = Math.abs(seconds)
+  const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
+    absoluteSeconds < 60
+      ? [seconds, 'second']
+      : absoluteSeconds < 3600
+        ? [Math.round(seconds / 60), 'minute']
+        : absoluteSeconds < 86_400
+          ? [Math.round(seconds / 3600), 'hour']
+          : [Math.round(seconds / 86_400), 'day']
+
+  return new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' }).format(
+    value,
+    unit
   )
 }
 
