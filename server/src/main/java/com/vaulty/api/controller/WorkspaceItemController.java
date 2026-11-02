@@ -124,9 +124,10 @@ public class WorkspaceItemController implements WorkspaceItemControllerDocs {
     public ResponseEntity<ItemPageResponse> search(@AuthenticationPrincipal UUID userId,
                                                    @PathVariable UUID workspaceId,
                                                    @RequestParam String q,
+                                                   @RequestParam(defaultValue = "false") boolean includeArchived,
                                                    @RequestParam(defaultValue = "0") int page,
                                                    @RequestParam(defaultValue = "20") int size) {
-        var items = itemService.search(userId, workspaceId, q, page, size);
+        var items = itemService.search(userId, workspaceId, q, includeArchived, page, size);
         return ResponseEntity.ok(items);
     }
 
