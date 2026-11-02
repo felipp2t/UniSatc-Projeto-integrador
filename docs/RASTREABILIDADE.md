@@ -137,6 +137,7 @@ Os detalhes de limites, pacote e automação foram aprovados em 12/10/2026 e est
 
 | Frente | Issues |
 |---|---|
+| Conta/sessão (RF01–RF07) | [#1](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/1) (épico), [#139](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/139) (RF49, recuperação de senha; fluxo separado), [#144](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/144) (conferência dos critérios da base histórica; não comprova implementação ou verificação) |
 | Grupos | [#130](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/130), [#131](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/131) |
 | Compartilhamento e herança | [#132](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/132), [#133](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/133) |
 | Interface de busca | [#134](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/134) |
