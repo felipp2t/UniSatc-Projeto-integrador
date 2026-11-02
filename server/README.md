@@ -23,20 +23,21 @@ de redefinição de uso único.
 
 ## Como rodar
 
-1. Inicie o PostgreSQL:
+1. Copie `.env.example` para `.env` e configure `DB_USERNAME=vaulty` e `DB_PASSWORD=vaulty`.
+   Gere `JWT_SECRET` com pelo menos 32 bytes aleatórios e `SECRET_ENCRYPTION_KEY` com
+   `openssl rand -base64 32`. Mantenha a chave de criptografia entre reinicializações.
+   Para o storage Garage, gere `GARAGE_RPC_SECRET` e `GARAGE_DEFAULT_SECRET_KEY` com
+   `openssl rand -hex 32`, e `GARAGE_DEFAULT_ACCESS_KEY` com `printf 'GK'; openssl rand -hex 16`.
+   Mantenha esses valores no `.env`; o Spring Boot o carrega automaticamente.
+2. Inicie o PostgreSQL e o Garage:
 
    ```bash
    docker compose up -d
    ```
 
-   O Compose cria o banco `vaulty`, exposto em `localhost:5432`, com usuário e senha `vaulty`.
-2. Copie `.env.example` para `.env` e ajuste as variáveis. Para o banco iniciado pelo Compose,
-   use `DB_USERNAME=vaulty` e `DB_PASSWORD=vaulty`. Gere um valor aleatório de pelo menos 32 bytes
-   para `JWT_SECRET`; a aplicação não inicia se essa variável estiver ausente. O `.env` é carregado
-   automaticamente pelo Spring Boot, sem precisar exportar as variáveis no terminal.
-   Para criar e consultar segredos, configure `SECRET_ENCRYPTION_KEY` com 32 bytes aleatórios
-   codificados em Base64. Gere-a, por exemplo, com `openssl rand -base64 32` e mantenha a mesma
-   chave entre reinicializações para poder descriptografar os valores já salvos.
+   O Garage cria o bucket `vaulty` e guarda dados e metadados em volumes Docker. A API S3
+   fica em `localhost:3900`. Esta instalação usa um único nó, sem redundância; preserve os
+   volumes e faça backups. Para outro serviço S3, ajuste as propriedades `app.storage.s3.*`.
 3. Para testar convites e recuperação de senha, configure `MAIL_HOST`, `MAIL_PORT`,
    `MAIL_USERNAME`, `MAIL_PASSWORD` e `MAIL_FROM`. Com Mailtrap Email Sandbox, use o host
    `sandbox.smtp.mailtrap.io`, porta `2525` e as credenciais exibidas na aba SMTP do seu Sandbox.

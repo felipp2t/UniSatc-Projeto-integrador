@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
@@ -25,7 +26,9 @@ public class S3StorageConfiguration {
         var builder = S3Client.builder()
                 .region(Region.of(region))
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
-                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(pathStyle).build());
+                .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(pathStyle)
+                        .chunkedEncodingEnabled(false).build());
 
         if (!endpoint.isBlank()) {
             builder.endpointOverride(URI.create(endpoint));
