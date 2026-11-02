@@ -321,6 +321,7 @@ class WorkspaceBackupServiceIntegrationTest extends PostgresIntegrationTest {
     @TestConfiguration
     static class TestStorageConfiguration {
         @Bean
+        @org.springframework.context.annotation.Primary
         ObjectStorage fileObjectStorage(@Value("${test.storage.root}") String root) throws IOException {
             return new DirectoryObjectStorage(Path.of(root));
         }

@@ -10,11 +10,20 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import com.vaulty.api.service.WorkspaceBackupService.BackupGenerationException;
+import com.vaulty.api.storage.StorageOperationException;
 import lombok.extern.slf4j.Slf4j;
 
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(StorageOperationException.class)
+    public ResponseEntity<ApiErrorBody> handleStorageFailure(StorageOperationException ex, HttpServletRequest request) {
+        log.error("Attachment storage operation failed", ex);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiErrorBody.of(503, "Service Unavailable", "Storage de anexos indisponível; tente novamente",
+                        request.getRequestURI()));
+    }
 
     @ExceptionHandler(BackupGenerationException.class)
     public ResponseEntity<ApiErrorBody> handleBackupFailure(BackupGenerationException ex, HttpServletRequest request) {
