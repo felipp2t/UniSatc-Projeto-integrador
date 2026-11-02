@@ -1,11 +1,12 @@
 import {
   GearIcon,
   MagnifyingGlassIcon,
+  ShieldIcon,
   TrashIcon,
   UsersThreeIcon,
 } from '@phosphor-icons/react'
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
 import { isForbiddenOrNotFound } from '@/api/http-status'
@@ -27,6 +28,7 @@ import { ChangeMemberRoleDialog } from '@/components/change-member-role-dialog'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { RemoveMemberDialog } from '@/components/remove-member-dialog'
+import { WorkspaceRolesSection } from '@/components/workspace-roles-section'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
@@ -47,7 +49,7 @@ import { useRemoveMember } from '@/hooks/use-remove-member'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
   component: WorkspaceSettingsPage,
-  head: () => ({ meta: [{ title: 'Membros do workspace | Vaulty' }] }),
+  head: () => ({ meta: [{ title: 'Configurações do workspace | Vaulty' }] }),
 })
 
 function WorkspaceSettingsPage() {
@@ -150,7 +152,7 @@ function WorkspaceSettingsPage() {
         <AppBreadcrumb
           items={[
             { label: 'Início', to: '/' },
-            { label: 'Membros do workspace' },
+            { label: 'Configurações do workspace' },
           ]}
         />
         <div className='flex min-w-0 items-center gap-4'>
@@ -159,33 +161,40 @@ function WorkspaceSettingsPage() {
             className='size-6 shrink-0 text-primary'
           />
           <h1 className='truncate font-bold font-mono text-xl md:text-3xl'>
-            MEMBROS DO WORKSPACE
+            CONFIGURAÇÕES DO WORKSPACE
           </h1>
         </div>
       </header>
-      <div className='flex min-w-0 flex-col gap-8 md:flex-row'>
+      <Tabs
+        className='flex min-w-0 flex-col gap-8 md:flex-row'
+        defaultValue='members'
+        orientation='vertical'
+      >
         <nav
           aria-label='Configurações do workspace'
-          className='hidden w-full shrink-0 flex-col gap-1 md:flex md:w-52'
+          className='w-full shrink-0 md:w-52'
         >
-          <Link
-            activeProps={{
-              className: 'border-primary bg-primary/10 text-primary',
-            }}
-            className='flex items-center gap-2.5 border-l-2 px-3 py-2 font-mono font-semibold text-xs uppercase tracking-wide transition-colors'
-            inactiveProps={{
-              className:
-                'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground',
-            }}
-            to='/configuracoes-workspace'
+          <TabsList
+            aria-label='Seções das configurações do workspace'
+            className='flex h-auto w-full flex-col items-stretch gap-1 rounded-none bg-transparent p-0'
           >
-            <UsersThreeIcon aria-hidden='true' className='size-3.5 shrink-0' />{' '}
-            Membros
-          </Link>
+            <TabsTrigger
+              className='w-full justify-start rounded-none border-l-2 px-3 py-2 text-left gap-2 font-semibold tracking-wide data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none'
+              value='members'
+            >
+              <UsersThreeIcon aria-hidden='true' className='size-3.5 shrink-0' />
+              Membros
+            </TabsTrigger>
+            <WorkspaceRolesTabTrigger isOwner={isOwner} />
+          </TabsList>
         </nav>
         <Separator className='hidden h-auto md:block' orientation='vertical' />
-        <section aria-label='Membros e convites' className='min-w-0 flex-1'>
-          <Tabs defaultValue='members'>
+        <section
+          aria-label='Configurações do workspace'
+          className='min-w-0 flex-1'
+        >
+          <TabsContent className='mt-0' value='members'>
+            <Tabs defaultValue='members'>
             <div className='flex flex-wrap items-center justify-between gap-3'>
               <TabsList>
                 <TabsTrigger value='members'>
@@ -252,12 +261,63 @@ function WorkspaceSettingsPage() {
                 <PendingInvitesSection />
               </TabsContent>
             ) : null}
-          </Tabs>
+            </Tabs>
+          </TabsContent>
+          <WorkspaceRolesTabContent
+            isOwner={isOwner}
+            onRetry={retryRoles}
+            roles={roles.data ?? []}
+            rolesError={roles.error}
+            rolesPending={roles.isPending}
+            workspaceId={workspaceId}
+          />
         </section>
-      </div>
+      </Tabs>
       <ChangeMemberRoleDialog roleChange={roleChange} />
       <RemoveMemberDialog removal={memberRemoval} />
     </main>
+  )
+}
+
+function WorkspaceRolesTabTrigger({ isOwner }: { isOwner: boolean }) {
+  if (!isOwner) return null
+  return (
+    <TabsTrigger
+      className='w-full justify-start rounded-none border-l-2 px-3 py-2 text-left font-semibold gap-2 tracking-wide data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none'
+      value='roles'
+    >
+      <ShieldIcon aria-hidden='true' className='size-3.5 shrink-0' />
+      Cargos e permissões
+    </TabsTrigger>
+  )
+}
+
+function WorkspaceRolesTabContent({
+  isOwner,
+  onRetry,
+  roles,
+  rolesError,
+  rolesPending,
+  workspaceId,
+}: {
+  isOwner: boolean
+  onRetry: () => Promise<void>
+  roles: WorkspaceRoleResponse[]
+  rolesError: unknown
+  rolesPending: boolean
+  workspaceId: string | undefined
+}) {
+  if (!(isOwner && workspaceId)) return null
+  return (
+    <TabsContent className='mt-4' value='roles'>
+      <WorkspaceRolesSection
+        onRetry={onRetry}
+        roles={roles}
+        rolesError={rolesError}
+        rolesPending={rolesPending}
+        workspaceId={workspaceId}
+      />
+    </TabsContent>
   )
 }
 
