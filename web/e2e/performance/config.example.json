@@ -31,11 +31,83 @@
     "resultTitleAttribute": "data-search-title"
   },
   "sessions": [
-    { "email": "user1@example.test", "expectedIdentity": "user1@example.test", "password": "replace-me", "storageState": "states/user-1.json", "noAccessQueries": ["rn15restricted1attempt1", "rn15restricted1attempt2", "rn15restricted1attempt3", "rn15restricted1attempt4", "rn15restricted1attempt5"] },
-    { "email": "user2@example.test", "expectedIdentity": "user2@example.test", "password": "replace-me", "storageState": "states/user-2.json", "noAccessQueries": ["rn15restricted2attempt1", "rn15restricted2attempt2", "rn15restricted2attempt3", "rn15restricted2attempt4", "rn15restricted2attempt5"] },
-    { "email": "user3@example.test", "expectedIdentity": "user3@example.test", "password": "replace-me", "storageState": "states/user-3.json", "noAccessQueries": ["rn15restricted3attempt1", "rn15restricted3attempt2", "rn15restricted3attempt3", "rn15restricted3attempt4", "rn15restricted3attempt5"] },
-    { "email": "user4@example.test", "expectedIdentity": "user4@example.test", "password": "replace-me", "storageState": "states/user-4.json", "noAccessQueries": ["rn15restricted4attempt1", "rn15restricted4attempt2", "rn15restricted4attempt3", "rn15restricted4attempt4", "rn15restricted4attempt5"] },
-    { "email": "user5@example.test", "expectedIdentity": "user5@example.test", "password": "replace-me", "storageState": "states/user-5.json", "noAccessQueries": ["rn15restricted5attempt1", "rn15restricted5attempt2", "rn15restricted5attempt3", "rn15restricted5attempt4", "rn15restricted5attempt5"] },
-    { "email": "user6@example.test", "expectedIdentity": "user6@example.test", "password": "replace-me", "storageState": "states/user-6.json", "noAccessQueries": ["rn15restricted6attempt1", "rn15restricted6attempt2", "rn15restricted6attempt3", "rn15restricted6attempt4", "rn15restricted6attempt5"] }
+    {
+      "email": "user1@example.test",
+      "expectedIdentity": "user1@example.test",
+      "password": "replace-me",
+      "storageState": "states/user-1.json",
+      "noAccessQueries": [
+        "rn15restricted1attempt1",
+        "rn15restricted1attempt2",
+        "rn15restricted1attempt3",
+        "rn15restricted1attempt4",
+        "rn15restricted1attempt5"
+      ]
+    },
+    {
+      "email": "user2@example.test",
+      "expectedIdentity": "user2@example.test",
+      "password": "replace-me",
+      "storageState": "states/user-2.json",
+      "noAccessQueries": [
+        "rn15restricted2attempt1",
+        "rn15restricted2attempt2",
+        "rn15restricted2attempt3",
+        "rn15restricted2attempt4",
+        "rn15restricted2attempt5"
+      ]
+    },
+    {
+      "email": "user3@example.test",
+      "expectedIdentity": "user3@example.test",
+      "password": "replace-me",
+      "storageState": "states/user-3.json",
+      "noAccessQueries": [
+        "rn15restricted3attempt1",
+        "rn15restricted3attempt2",
+        "rn15restricted3attempt3",
+        "rn15restricted3attempt4",
+        "rn15restricted3attempt5"
+      ]
+    },
+    {
+      "email": "user4@example.test",
+      "expectedIdentity": "user4@example.test",
+      "password": "replace-me",
+      "storageState": "states/user-4.json",
+      "noAccessQueries": [
+        "rn15restricted4attempt1",
+        "rn15restricted4attempt2",
+        "rn15restricted4attempt3",
+        "rn15restricted4attempt4",
+        "rn15restricted4attempt5"
+      ]
+    },
+    {
+      "email": "user5@example.test",
+      "expectedIdentity": "user5@example.test",
+      "password": "replace-me",
+      "storageState": "states/user-5.json",
+      "noAccessQueries": [
+        "rn15restricted5attempt1",
+        "rn15restricted5attempt2",
+        "rn15restricted5attempt3",
+        "rn15restricted5attempt4",
+        "rn15restricted5attempt5"
+      ]
+    },
+    {
+      "email": "user6@example.test",
+      "expectedIdentity": "user6@example.test",
+      "password": "replace-me",
+      "storageState": "states/user-6.json",
+      "noAccessQueries": [
+        "rn15restricted6attempt1",
+        "rn15restricted6attempt2",
+        "rn15restricted6attempt3",
+        "rn15restricted6attempt4",
+        "rn15restricted6attempt5"
+      ]
+    }
   ]
 }

@@ -6,11 +6,11 @@ import { chromium } from 'playwright'
 
 const ATTEMPTS_PER_SESSION = 20
 const SEARCH_TIMEOUT_MS = 10_000
-const PASS_LIMIT_MS = 2_000
+const PASS_LIMIT_MS = 2000
+const TIMEOUT_PATTERN = /timeout/i
 const configPath = path.resolve(process.argv[2] ?? 'config.json')
 const config = JSON.parse(await readFile(configPath, 'utf8'))
-const selectors = config.selectors
-const sessions = config.sessions
+const { selectors, sessions } = config
 const rows = []
 const evidencePaths = { csvPath: '' }
 
@@ -18,7 +18,9 @@ if (sessions.length !== 6) throw new Error('Exactly six sessions are required')
 if (new Set(sessions.map(({ email }) => email)).size !== 6) {
   throw new Error('Each session must use a distinct account')
 }
-if (new Set(sessions.map(({ expectedIdentity }) => expectedIdentity)).size !== 6) {
+if (
+  new Set(sessions.map(({ expectedIdentity }) => expectedIdentity)).size !== 6
+) {
   throw new Error('Each session must use a distinct expected identity')
 }
 if (!config.workspaceId || config.workspaceId.startsWith('replace-')) {
@@ -29,7 +31,9 @@ if (
   !config.deployedCodeRevision.trim() ||
   /replace|placeholder|unknown|todo/i.test(config.deployedCodeRevision)
 ) {
-  throw new Error('Set deployedCodeRevision to the deployed commit SHA or release version')
+  throw new Error(
+    'Set deployedCodeRevision to the deployed commit SHA or release version'
+  )
 }
 const network = config.environment?.network
 if (
@@ -44,33 +48,54 @@ if (
   network.notes.trim().length < 10 ||
   /replace|placeholder|unknown|todo/i.test(network.notes)
 ) {
-  throw new Error('Record connection, positive downlinkMbps, rttMs, and meaningful network notes')
+  throw new Error(
+    'Record connection, positive downlinkMbps, rttMs, and meaningful network notes'
+  )
 }
 if (config.uiAdapterVerified !== true) {
-  throw new Error('Verify the #134 search UI adapter and set uiAdapterVerified=true')
+  throw new Error(
+    'Verify the #134 search UI adapter and set uiAdapterVerified=true'
+  )
 }
 if (config.aclFixturesVerified !== true) {
-  throw new Error('Verify all restricted-item fixtures and set aclFixturesVerified=true')
+  throw new Error(
+    'Verify all restricted-item fixtures and set aclFixturesVerified=true'
+  )
 }
 if (config.datasetVerified !== true || config.datasetItems !== 1000) {
-  throw new Error('Verify the 1,000-item workspace and set datasetItems=1000 and datasetVerified=true')
+  throw new Error(
+    'Verify the 1,000-item workspace and set datasetItems=1000 and datasetVerified=true'
+  )
 }
 for (const [sessionIndex, session] of sessions.entries()) {
-  if (!session.storageState) throw new Error(`Session ${sessionIndex + 1} needs a prepared storageState`)
-  if (!session.expectedIdentity) throw new Error(`Session ${sessionIndex + 1} needs an expectedIdentity`)
+  if (!session.storageState)
+    throw new Error(`Session ${sessionIndex + 1} needs a prepared storageState`)
+  if (!session.expectedIdentity)
+    throw new Error(`Session ${sessionIndex + 1} needs an expectedIdentity`)
   if (session.noAccessQueries?.length !== 5) {
-    throw new Error(`Session ${sessionIndex + 1} needs five existing inaccessible-item queries`)
+    throw new Error(
+      `Session ${sessionIndex + 1} needs five existing inaccessible-item queries`
+    )
   }
 }
-if (!selectors.identity || !selectors.identityAttribute) {
-  throw new Error('Configure selectors.identity and selectors.identityAttribute to verify each session account')
+if (!(selectors.identity && selectors.identityAttribute)) {
+  throw new Error(
+    'Configure selectors.identity and selectors.identityAttribute to verify each session account'
+  )
 }
 const allQueries = sessions.flatMap((session, sessionIndex) => [
-  ...Array.from({ length: 10 }, (_, index) => `rn15single${sessionIndex + 1}term${index + 1}`),
-  ...Array.from({ length: 5 }, (_, index) => `rn15 phrase ${sessionIndex + 1} ${index + 1}`),
+  ...Array.from(
+    { length: 10 },
+    (_, index) => `rn15single${sessionIndex + 1}term${index + 1}`
+  ),
+  ...Array.from(
+    { length: 5 },
+    (_, index) => `rn15 phrase ${sessionIndex + 1} ${index + 1}`
+  ),
   ...session.noAccessQueries,
 ])
-if (new Set(allQueries).size !== 120) throw new Error('All 120 search terms must be unique')
+if (new Set(allQueries).size !== 120)
+  throw new Error('All 120 search terms must be unique')
 
 const browser = await chromium.launch({ channel: 'chrome', headless: false })
 let prepared = []
@@ -82,19 +107,35 @@ try {
     sessions.map(async (session, sessionIndex) => {
       try {
         const context = await browser.newContext({
-          storageState: path.resolve(path.dirname(configPath), session.storageState),
+          storageState: path.resolve(
+            path.dirname(configPath),
+            session.storageState
+          ),
         })
         const page = await context.newPage()
         await page.goto(config.appUrl)
-        await page.locator(selectors.identity).waitFor({ state: 'visible', timeout: 30_000 })
-        const identity = await page.locator(selectors.identity).getAttribute(selectors.identityAttribute)
+        await page
+          .locator(selectors.identity)
+          .waitFor({ state: 'visible', timeout: 30_000 })
+        const identity = await page
+          .locator(selectors.identity)
+          .getAttribute(selectors.identityAttribute)
         if (identity !== session.expectedIdentity) {
-          throw new Error(`Session ${sessionIndex + 1} storageState identity does not match its configured account`)
+          throw new Error(
+            `Session ${sessionIndex + 1} storageState identity does not match its configured account`
+          )
         }
-        await page.locator(selectors.searchInput).waitFor({ state: 'visible', timeout: 30_000 })
-        return { context, page, sessionIndex, error: '' }
+        await page
+          .locator(selectors.searchInput)
+          .waitFor({ state: 'visible', timeout: 30_000 })
+        return { context, error: '', page, sessionIndex }
       } catch (cause) {
-        return { context: null, page: null, sessionIndex, error: errorText(cause) }
+        return {
+          context: null,
+          error: errorText(cause),
+          page: null,
+          sessionIndex,
+        }
       }
     })
   )
@@ -108,78 +149,115 @@ try {
   await saveEvidence()
 }
 
-if (fatalError) throw new Error(`Runner failed after saving evidence: ${fatalError}`)
+if (fatalError)
+  throw new Error(`Runner failed after saving evidence: ${fatalError}`)
 console.log(`Recorded ${rows.length} attempts to ${evidencePaths.csvPath}`)
-console.log(`<=2s: ${rows.filter((row) => row.within2s).length}/120; pass requires 114`)
+console.log(
+  `<=2s: ${rows.filter((row) => row.within2s).length}/120; pass requires 114`
+)
 
-async function runSession({ context, page: initialPage, sessionIndex, error: setupError }) {
+async function runSession({
+  context,
+  page: initialPage,
+  sessionIndex,
+  error: setupError,
+}) {
   let page = initialPage
   let sessionError = setupError
 
-  for (let attemptIndex = 0; attemptIndex < ATTEMPTS_PER_SESSION; attemptIndex += 1) {
-    const attempt = makeAttempt(sessions[sessionIndex], sessionIndex, attemptIndex)
+  for (
+    let attemptIndex = 0;
+    attemptIndex < ATTEMPTS_PER_SESSION;
+    attemptIndex += 1
+  ) {
+    const attempt = makeAttempt(
+      sessions[sessionIndex],
+      sessionIndex,
+      attemptIndex
+    )
     const row = {
-      session: sessionIndex + 1,
       attempt: attemptIndex + 1,
+      durationMs: '',
+      error: sessionError,
       kind: attempt.kind,
       query: attempt.query,
-      startedAt: new Date().toISOString(),
-      submitted: false,
-      durationMs: '',
       resultCount: '',
+      session: sessionIndex + 1,
+      startedAt: new Date().toISOString(),
       status: 'not-submitted',
+      submitted: false,
       within2s: false,
-      error: sessionError,
     }
 
     if (!sessionError && page) {
-      let pendingSearch
-      let start
-      try {
-        const input = page.locator(selectors.searchInput)
-        await input.fill(attempt.query)
-        start = await page.evaluate(() => performance.now())
-        row.startedAt = new Date().toISOString()
-        pendingSearch = submitAndWait(page, attempt, () => {
-          row.submitted = true
-        })
-        const outcome = await withTimeout(pendingSearch, SEARCH_TIMEOUT_MS)
-        const elapsedMs = outcome.completedAt - start
-        row.durationMs = Math.round(elapsedMs * 100) / 100
-        row.resultCount = outcome.count
-        row.status = outcome.matchesExpectation
-          ? elapsedMs <= PASS_LIMIT_MS ? 'completed' : 'slow'
-          : 'functional-mismatch'
-        row.within2s = outcome.matchesExpectation && elapsedMs <= PASS_LIMIT_MS
-      } catch (cause) {
-        if (start !== undefined) {
-          const finishedAt = await page?.evaluate(() => performance.now()).catch(() => undefined)
-          if (finishedAt !== undefined) row.durationMs = Math.round((finishedAt - start) * 100) / 100
-        }
-        row.error = errorText(cause)
-        if (/timeout/i.test(row.error)) {
-          if (page) {
-            const failedPage = page
-            page = null
-            await failedPage.close().catch(() => {})
-            await pendingSearch?.catch(() => {})
-            try {
-              page = await context.newPage()
-              await page.goto(config.appUrl)
-              await page.locator(selectors.searchInput).waitFor({ state: 'visible', timeout: 30_000 })
-            } catch (recoveryError) {
-              sessionError = `recovery: ${errorText(recoveryError)}`
-              row.error += `; ${sessionError}`
-            }
-          }
-          row.status = row.submitted ? 'timeout' : 'not-submitted'
-        } else {
-          row.status = row.submitted ? 'error' : 'not-submitted'
-        }
-      }
+      // biome-ignore lint/performance/noAwaitInLoops: attempts for one session must stay sequential
+      const result = await runAttempt(page, context, attempt, row)
+      ;({ page, sessionError } = result)
     }
 
     rows.push(row)
+  }
+}
+
+async function runAttempt(page, context, attempt, row) {
+  let pendingSearch
+  let start
+  try {
+    await page.locator(selectors.searchInput).fill(attempt.query)
+    start = await page.evaluate(() => performance.now())
+    row.startedAt = new Date().toISOString()
+    pendingSearch = submitAndWait(page, attempt, () => {
+      row.submitted = true
+    })
+    const outcome = await withTimeout(pendingSearch, SEARCH_TIMEOUT_MS)
+    const elapsedMs = outcome.completedAt - start
+    row.durationMs = Math.round(elapsedMs * 100) / 100
+    row.resultCount = outcome.count
+    row.status = outcome.matchesExpectation
+      ? elapsedMs <= PASS_LIMIT_MS
+        ? 'completed'
+        : 'slow'
+      : 'functional-mismatch'
+    row.within2s = outcome.matchesExpectation && elapsedMs <= PASS_LIMIT_MS
+    return { page, sessionError: '' }
+  } catch (cause) {
+    if (start !== undefined) {
+      const finishedAt = await page
+        .evaluate(() => performance.now())
+        .catch(() => undefined)
+      if (finishedAt !== undefined)
+        row.durationMs = Math.round((finishedAt - start) * 100) / 100
+    }
+    row.error = errorText(cause)
+    if (!TIMEOUT_PATTERN.test(row.error)) {
+      row.status = row.submitted ? 'error' : 'not-submitted'
+      return { page, sessionError: '' }
+    }
+    const recovery = await recoverPage(page, context, pendingSearch)
+    row.status = row.submitted ? 'timeout' : 'not-submitted'
+    if (recovery.error) {
+      row.error += `; recovery: ${recovery.error}`
+      return {
+        page: recovery.page,
+        sessionError: `recovery: ${recovery.error}`,
+      }
+    }
+    return { page: recovery.page, sessionError: '' }
+  }
+}
+
+async function recoverPage(page, context, pendingSearch) {
+  await page.close().catch(() => undefined)
+  await pendingSearch?.catch(() => undefined)
+  try {
+    const recoveredPage = await context.newPage()
+    await recoveredPage.goto(config.appUrl)
+    await recoveredPage
+      .locator(selectors.searchInput)
+      .waitFor({ state: 'visible', timeout: 30_000 })
+    return { error: '', page: recoveredPage }
+  } catch (cause) {
+    return { error: errorText(cause), page: null }
   }
 }
 
@@ -189,12 +267,16 @@ async function submitAndWait(page, attempt, markSubmitted) {
   return waitForVisibleResults(page, attempt)
 }
 
-async function waitForVisibleResults(page, { kind, query }) {
+async function waitForVisibleResults(page, attempt) {
   const handle = await page.waitForFunction(
-    ({ selectors, kind, query }) => {
+    ({ selectors: pageSelectors, kind: attemptKind, query: attemptQuery }) => {
       const visible = (element) => {
         if (!element?.getClientRects().length) return false
-        for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+        for (
+          let ancestor = element;
+          ancestor;
+          ancestor = ancestor.parentElement
+        ) {
           const style = getComputedStyle(ancestor)
           if (
             style.display === 'none' ||
@@ -202,20 +284,39 @@ async function waitForVisibleResults(page, { kind, query }) {
             style.visibility === 'collapse' ||
             style.opacity === '0' ||
             style.contentVisibility === 'hidden'
-          ) return false
+          )
+            return false
         }
         return true
       }
-      const results = document.querySelector(selectors.visibleResults)
-      if (!visible(results) || results.getAttribute(selectors.resultQueryAttribute) !== query) return false
-      const items = [...results.querySelectorAll('[data-testid=search-result]')].filter(visible)
-      const emptyResultsVisible = visible(document.querySelector(selectors.emptyResults))
-      const matchesExpectation = kind === 'no-access'
-        ? items.length === 0 && emptyResultsVisible
-        : items.some((item) => item.getAttribute(selectors.resultTitleAttribute) === query)
-      return { count: items.length, matchesExpectation, completedAt: performance.now() }
+      const results = document.querySelector(pageSelectors.visibleResults)
+      if (
+        !visible(results) ||
+        results.getAttribute(pageSelectors.resultQueryAttribute) !==
+          attemptQuery
+      )
+        return false
+      const items = [
+        ...results.querySelectorAll('[data-testid=search-result]'),
+      ].filter(visible)
+      const emptyResultsVisible = visible(
+        document.querySelector(pageSelectors.emptyResults)
+      )
+      const matchesExpectation =
+        attemptKind === 'no-access'
+          ? items.length === 0 && emptyResultsVisible
+          : items.some(
+              (item) =>
+                item.getAttribute(pageSelectors.resultTitleAttribute) ===
+                attemptQuery
+            )
+      return {
+        completedAt: performance.now(),
+        count: items.length,
+        matchesExpectation,
+      }
     },
-    { selectors, kind, query },
+    { kind: attempt.kind, query: attempt.query, selectors },
     { timeout: SEARCH_TIMEOUT_MS }
   )
   try {
@@ -227,10 +328,16 @@ async function waitForVisibleResults(page, { kind, query }) {
 
 function makeAttempt(session, sessionIndex, attemptIndex) {
   if (attemptIndex < 10) {
-    return { kind: 'single', query: `rn15single${sessionIndex + 1}term${attemptIndex + 1}` }
+    return {
+      kind: 'single',
+      query: `rn15single${sessionIndex + 1}term${attemptIndex + 1}`,
+    }
   }
   if (attemptIndex < 15) {
-    return { kind: 'multi', query: `rn15 phrase ${sessionIndex + 1} ${attemptIndex - 9}` }
+    return {
+      kind: 'multi',
+      query: `rn15 phrase ${sessionIndex + 1} ${attemptIndex - 9}`,
+    }
   }
   return {
     kind: 'no-access',
@@ -253,7 +360,10 @@ async function withTimeout(promise, timeoutMs) {
 }
 
 async function saveEvidence() {
-  const timestamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-')
+  const timestamp = new Date()
+    .toISOString()
+    .replaceAll(':', '-')
+    .replaceAll('.', '-')
   const outputDir = path.resolve(path.dirname(configPath), 'results')
   const csvPath = path.join(outputDir, `rnf15-${timestamp}.csv`)
   const metadataPath = path.join(outputDir, `rnf15-${timestamp}.json`)
@@ -264,29 +374,33 @@ async function saveEvidence() {
     metadataPath,
     `${JSON.stringify(
       {
-        date: new Date().toISOString(),
-        startedAt,
-        os: `${os.type()} ${os.release()} ${os.arch()}`,
-        cpu: os.cpus()[0]?.model ?? 'unknown',
-        memoryGiB: Math.round(os.totalmem() / 1024 ** 3),
-        node: process.version,
-        browser: browser.version(),
-        appUrl: config.appUrl,
+        aclFixturesVerified: config.aclFixturesVerified,
         apiUrl: config.apiUrl,
-        workspaceId: config.workspaceId,
-        deployedCodeRevision: config.deployedCodeRevision,
-        environment: config.environment,
-        networkConditions: config.environment.network,
+        appUrl: config.appUrl,
+        browser: browser.version(),
+        cpu: os.cpus()[0]?.model ?? 'unknown',
         datasetItems: config.datasetItems,
         datasetVerified: config.datasetVerified,
-        uiAdapterVerified: config.uiAdapterVerified,
-        aclFixturesVerified: config.aclFixturesVerified,
-        scheduledAttempts: rows.length,
-        submittedAttempts: rows.filter((row) => row.submitted).length,
-        within2s,
-        passed: config.datasetVerified === true && rows.length === 120 && rows.filter((row) => row.submitted).length === 120 && within2s >= 114,
+        date: new Date().toISOString(),
+        deployedCodeRevision: config.deployedCodeRevision,
+        environment: config.environment,
         fatalError,
+        memoryGiB: Math.round(os.totalmem() / 1024 ** 3),
+        networkConditions: config.environment.network,
+        node: process.version,
         note: 'RNF15 evidence requires the configured #134 UI adapter and ACL fixtures; this run does not create or claim either.',
+        os: `${os.type()} ${os.release()} ${os.arch()}`,
+        passed:
+          config.datasetVerified === true &&
+          rows.length === 120 &&
+          rows.filter((row) => row.submitted).length === 120 &&
+          within2s >= 114,
+        scheduledAttempts: rows.length,
+        startedAt,
+        submittedAttempts: rows.filter((row) => row.submitted).length,
+        uiAdapterVerified: config.uiAdapterVerified,
+        within2s,
+        workspaceId: config.workspaceId,
       },
       null,
       2
@@ -296,7 +410,19 @@ async function saveEvidence() {
 }
 
 function toCsv(records) {
-  const fields = ['session', 'attempt', 'kind', 'query', 'startedAt', 'submitted', 'durationMs', 'resultCount', 'status', 'within2s', 'error']
+  const fields = [
+    'session',
+    'attempt',
+    'kind',
+    'query',
+    'startedAt',
+    'submitted',
+    'durationMs',
+    'resultCount',
+    'status',
+    'within2s',
+    'error',
+  ]
   const quote = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`
   return `${fields.map(quote).join(',')}\n${records
     .map((record) => fields.map((field) => quote(record[field])).join(','))
@@ -306,4 +432,3 @@ function toCsv(records) {
 function errorText(error) {
   return error instanceof Error ? error.message : String(error)
 }
-
