@@ -525,3 +525,34 @@ describe('EditItemDialog (documento)', () => {
     expect(apiMocks.replaceAttachment).not.toHaveBeenCalled()
   })
 })
+
+it.each(['text', 'file', 'secret'] as const)(
+  'keeps %s items read-only and rejects form submission',
+  async (type) => {
+    apiMocks.get.mockResolvedValue({ data: makeItem({ type }) })
+    renderWithProviders(
+      <EditItemDialog
+        itemId={itemId}
+        onClose={vi.fn()}
+        readOnly
+        workspaceId={workspaceId}
+      />
+    )
+    const title = await screen.findByLabelText('TÍTULO')
+    expect(title).toHaveAttribute('readonly')
+    expect(screen.queryByRole('button', { name: 'SALVAR' })).toBeNull()
+    expect(screen.queryByText('Substituir arquivo')).toBeNull()
+    fireEvent.submit(title.closest('form') as HTMLFormElement)
+    expect(apiMocks.update).not.toHaveBeenCalled()
+    expect(apiMocks.updateMetadata).not.toHaveBeenCalled()
+    if (type === 'secret') {
+      await userEvent
+        .setup()
+        .click(screen.getByRole('button', { name: 'Mostrar conteúdo' }))
+      expect(screen.getByLabelText('VALOR DO SEGREDO')).toHaveAttribute(
+        'type',
+        'text'
+      )
+    }
+  }
+)

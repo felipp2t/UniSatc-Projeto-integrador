@@ -4,6 +4,7 @@ import { isTitleInvalid } from '@/lib/item-validation'
 
 export function useEditForm({
   archived,
+  readOnly = false,
   extraBusy = false,
   getError,
   initialTitle,
@@ -14,6 +15,7 @@ export function useEditForm({
   validate,
 }: {
   archived: boolean
+  readOnly?: boolean
   extraBusy?: boolean
   getError: (cause: unknown) => string
   initialTitle: string
@@ -44,7 +46,7 @@ export function useEditForm({
   )
   const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (archived || busy) return
+    if (archived || readOnly || busy) return
     setError(undefined)
     const next = { ...validate(), title: isTitleInvalid(title) }
     setInvalid(next)

@@ -79,6 +79,7 @@ const resourceOptions = Object.entries(resourceLabels) as [
 export const Route = createFileRoute('/_protected/atividades')({
   component: ActivityHistoryPage,
   head: () => ({ meta: [{ title: 'Histórico de atividades | Vaulty' }] }),
+  staticData: { permission: { action: 'read', resource: 'activity' } },
 })
 
 function ActivityHistoryPage() {

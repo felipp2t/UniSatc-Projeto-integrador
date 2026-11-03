@@ -9,13 +9,11 @@ import { useCallback, useState } from 'react'
 import { itemsApi } from '@/api/endpoints'
 import { getArchiveError, getRestoreError } from '@/api/item-errors'
 import type { ItemResponse } from '@/api/types'
+import { canAccessItem } from '@/auth/permissions'
 import { DeleteItemDialog } from '@/components/delete-item-dialog'
 import { EditItemDialog } from '@/components/edit-item-dialog'
 import { ItemAttachmentDialog } from '@/components/item-attachment-dialog'
-import {
-  ShareAccessDialog,
-  useCanManageSharing,
-} from '@/components/share-access-dialog'
+import { ShareAccessDialog } from '@/components/share-access-dialog'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
@@ -25,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { appToast } from '@/components/ui/toast'
 import { useArchiveItem, useRestoreItem } from '@/hooks/use-item-mutations'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 type OpenDialog = 'delete' | 'edit' | undefined
 export type CopyKind = 'content' | 'title'
@@ -51,7 +50,11 @@ export function ItemListCard({
   const archive = useArchiveItem()
   const restore = useRestoreItem()
   const archived = Boolean(item.archivedAt)
-  const canManageSharing = useCanManageSharing(workspaceId)
+  const permissions = useWorkspacePermissions(workspaceId)
+  const canManageSharing = permissions.can('sharing', 'manage')
+  const canRead = canAccessItem(permissions, item.type, 'read')
+  const canUpdate = canAccessItem(permissions, item.type, 'update')
+  const canDelete = canAccessItem(permissions, item.type, 'delete')
   const Icon = typeIcons[item.type]
   const preview = item.type === 'secret' ? '••••••••••••' : item.preview
 
@@ -64,7 +67,8 @@ export function ItemListCard({
     () => onCopy(item.title, 'title'),
     [item.title, onCopy]
   )
-  const canCopyContent = item.type === 'link' || item.type === 'text'
+  const canCopyContent =
+    canRead && (item.type === 'link' || item.type === 'text')
   const handleCopyContent = useCallback(async () => {
     try {
       const { data } = await itemsApi.get(workspaceId, item.id)
@@ -119,49 +123,22 @@ export function ItemListCard({
           >
             {item.type}
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                aria-label={`Ações de ${item.title}`}
-                className='text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
-                type='button'
-              >
-                <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end'>
-              {canManageSharing && !archived ? (
-                <DropdownMenuItem onSelect={openSharing}>
-                  Compartilhar
-                </DropdownMenuItem>
-              ) : null}
-              <DropdownMenuItem onSelect={openEdit}>
-                {archived ? 'Ver' : 'Editar'}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={handleCopyTitle}>
-                Copiar título
-              </DropdownMenuItem>
-              {canCopyContent ? (
-                <DropdownMenuItem onSelect={handleCopyContent}>
-                  Copiar conteúdo
-                </DropdownMenuItem>
-              ) : null}
-              {archived ? (
-                <>
-                  <DropdownMenuItem onSelect={runRestore}>
-                    Restaurar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={openDelete}>
-                    Excluir definitivamente
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <DropdownMenuItem onSelect={runArchive}>
-                  Arquivar
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ItemActions
+            archived={archived}
+            canCopyContent={canCopyContent}
+            canDelete={canDelete}
+            canManageSharing={canManageSharing}
+            canRead={canRead}
+            canUpdate={canUpdate}
+            onArchive={runArchive}
+            onCopyContent={handleCopyContent}
+            onCopyTitle={handleCopyTitle}
+            onDelete={openDelete}
+            onEdit={openEdit}
+            onRestore={runRestore}
+            onShare={openSharing}
+            title={item.title}
+          />
         </div>
       </div>
       {preview ? (
@@ -169,17 +146,18 @@ export function ItemListCard({
           {preview}
         </p>
       ) : null}
-      {item.type === 'file' || item.type === 'image' ? (
+      {canRead && (item.type === 'file' || item.type === 'image') ? (
         <ItemAttachmentDialog item={item} workspaceId={workspaceId} />
       ) : null}
-      {dialog === 'edit' ? (
+      {dialog === 'edit' && canRead ? (
         <EditItemDialog
           itemId={item.id}
           onClose={closeDialog}
+          readOnly={!canUpdate}
           workspaceId={workspaceId}
         />
       ) : null}
-      {dialog === 'delete' ? (
+      {dialog === 'delete' && canDelete ? (
         <DeleteItemDialog
           item={item}
           onClose={closeDialog}
@@ -195,5 +173,85 @@ export function ItemListCard({
         />
       ) : null}
     </article>
+  )
+}
+
+function ItemActions({
+  archived,
+  canCopyContent,
+  canDelete,
+  canManageSharing,
+  canRead,
+  canUpdate,
+  onArchive,
+  onCopyContent,
+  onCopyTitle,
+  onDelete,
+  onEdit,
+  onRestore,
+  onShare,
+  title,
+}: {
+  archived: boolean
+  canCopyContent: boolean
+  canDelete: boolean
+  canManageSharing: boolean
+  canRead: boolean
+  canUpdate: boolean
+  onArchive: () => void
+  onCopyContent: () => void
+  onCopyTitle: () => void
+  onDelete: () => void
+  onEdit: () => void
+  onRestore: () => void
+  onShare: () => void
+  title: string
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          aria-label={`Ações de ${title}`}
+          className='text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
+          type='button'
+        >
+          <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end'>
+        {canManageSharing && !archived ? (
+          <DropdownMenuItem onSelect={onShare}>Compartilhar</DropdownMenuItem>
+        ) : null}
+        {canRead ? (
+          <DropdownMenuItem onSelect={onEdit}>
+            {archived || !canUpdate ? 'Ver' : 'Editar'}
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onSelect={onCopyTitle}>
+          Copiar título
+        </DropdownMenuItem>
+        {canCopyContent ? (
+          <DropdownMenuItem onSelect={onCopyContent}>
+            Copiar conteúdo
+          </DropdownMenuItem>
+        ) : null}
+        {archived ? (
+          <>
+            {canUpdate ? (
+              <DropdownMenuItem onSelect={onRestore}>
+                Restaurar
+              </DropdownMenuItem>
+            ) : null}
+            {canDelete ? (
+              <DropdownMenuItem onSelect={onDelete}>
+                Excluir definitivamente
+              </DropdownMenuItem>
+            ) : null}
+          </>
+        ) : canUpdate ? (
+          <DropdownMenuItem onSelect={onArchive}>Arquivar</DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

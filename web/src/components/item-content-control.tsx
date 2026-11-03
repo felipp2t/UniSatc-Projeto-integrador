@@ -13,6 +13,7 @@ export function ItemContentControl({
   describedBy,
   id,
   invalid,
+  readOnly = false,
   onChange,
   type,
   value,
@@ -20,6 +21,7 @@ export function ItemContentControl({
   describedBy?: string
   id: string
   invalid: boolean
+  readOnly?: boolean
   onChange: (value: string) => void
   type: TextualItemType
   value: string
@@ -35,6 +37,7 @@ export function ItemContentControl({
         name='content'
         onValueChange={onChange}
         placeholder='Escreva o conteúdo do texto aqui...'
+        readOnly={readOnly}
         required
         rows={7}
         value={value}
@@ -53,6 +56,7 @@ export function ItemContentControl({
         name='content'
         onValueChange={onChange}
         placeholder='https://'
+        readOnly={readOnly}
         required
         type='url'
         value={value}
@@ -69,6 +73,7 @@ export function ItemContentControl({
       name='content'
       onValueChange={onChange}
       placeholder='Valor do segredo'
+      readOnly={readOnly}
       required
       value={value}
     />
@@ -78,12 +83,14 @@ export function ItemContentControl({
 export function ItemContentField({
   id,
   invalid,
+  readOnly = false,
   onChange,
   type,
   value,
 }: {
   id: string
   invalid: boolean
+  readOnly?: boolean
   onChange: (value: string) => void
   type: TextualItemType
   value: string
@@ -104,6 +111,7 @@ export function ItemContentField({
         id={id}
         invalid={invalid}
         onChange={onChange}
+        readOnly={readOnly}
         type={type}
         value={value}
       />

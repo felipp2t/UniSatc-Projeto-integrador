@@ -8,6 +8,7 @@ import type {
   WorkspaceRoleResponse,
 } from '@/api/types'
 import { workspaceMembersQueryKey } from '@/api/workspace-keys'
+import { workspacePermissionQueryKey } from '@/auth/permissions'
 import { appToast } from '@/components/ui/toast'
 
 interface PendingRoleChange {
@@ -53,9 +54,14 @@ export function useChangeMemberRole({
         })
       ),
     onSettled: () =>
-      queryClient.invalidateQueries({
-        queryKey: workspaceMembersQueryKey(workspaceId),
-      }),
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: workspaceMembersQueryKey(workspaceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: workspacePermissionQueryKey(workspaceId),
+        }),
+      ]),
     onSuccess: () => appToast.success('Cargo alterado com sucesso.'),
   })
 

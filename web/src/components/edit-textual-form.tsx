@@ -26,6 +26,7 @@ function buildUpdateRequest(
 
 export function EditTextualForm({
   item,
+  readOnly = false,
   onBusyChange,
   onClose,
   type,
@@ -69,6 +70,7 @@ export function EditTextualForm({
       item={item}
       onBusyChange={onBusyChange}
       onClose={onClose}
+      readOnly={readOnly}
       type={type}
       workspaceId={workspaceId}
     />
@@ -79,6 +81,7 @@ function TextualFields({
   archived,
   initialContent,
   item,
+  readOnly = false,
   onBusyChange,
   onClose,
   type,
@@ -98,6 +101,7 @@ function TextualFields({
     onBusyChange,
     onClose,
     pending: update.isPending,
+    readOnly,
     save: (title) =>
       update.mutateAsync({
         itemId: item.id,
@@ -120,6 +124,7 @@ function TextualFields({
       archived={archived}
       form={form}
       onClose={onClose}
+      readOnly={readOnly}
       type={type}
     >
       {archived && type === 'secret' ? (
@@ -131,6 +136,7 @@ function TextualFields({
           id={`${id}-content`}
           invalid={Boolean(form.invalid.content)}
           onChange={handleContent}
+          readOnly={readOnly}
           type={type}
           value={content}
         />

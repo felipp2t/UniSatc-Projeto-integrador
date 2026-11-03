@@ -11,6 +11,7 @@ const apiMocks = vi.hoisted(() => ({
   createAttachment: vi.fn(),
   itemsCreate: vi.fn(),
   workspaceList: vi.fn(),
+  workspacePermissions: vi.fn(),
 }))
 
 vi.mock('@/api/endpoints', async (importOriginal) => {
@@ -26,7 +27,11 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       create: apiMocks.itemsCreate,
       createAttachment: apiMocks.createAttachment,
     },
-    workspaceApi: { ...actual.workspaceApi, list: apiMocks.workspaceList },
+    workspaceApi: {
+      ...actual.workspaceApi,
+      list: apiMocks.workspaceList,
+      permissions: apiMocks.workspacePermissions,
+    },
   }
 })
 
@@ -36,6 +41,18 @@ const workspaceId = 'workspace-1'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  apiMocks.workspacePermissions.mockResolvedValue({
+    data: {
+      isOwner: false,
+      permissions: [
+        { action: 'all', resource: 'item' },
+        { action: 'all', resource: 'collection' },
+        { action: 'all', resource: 'secret' },
+      ],
+      roleId: 'role-1',
+      roleName: 'Editor',
+    },
+  })
   apiMocks.collectionsList.mockResolvedValue({
     data: { items: [], page: 0, size: 100, totalItems: 0, totalPages: 1 },
   })
@@ -473,4 +490,20 @@ describe('document item creation', () => {
       within(reopened).queryByRole('button', { name: 'CANCELAR ENVIO' })
     ).toBeNull()
   })
+})
+
+it('hides secret creation when only ordinary item creation is granted', async () => {
+  apiMocks.workspacePermissions.mockResolvedValue({
+    data: {
+      isOwner: false,
+      permissions: [{ action: 'create', resource: 'item' }],
+    },
+  })
+  const user = userEvent.setup()
+  renderWithProviders(<CreateItemDialog workspaceId={workspaceId} />)
+  await user.click(screen.getByRole('button', { name: 'Novo item' }))
+  const create = await screen.findByRole('button', { name: 'CRIAR' })
+  await waitFor(() => expect(create).toBeEnabled())
+  expect(screen.queryByRole('button', { name: 'segredo' })).toBeNull()
+  expect(apiMocks.collectionsList).not.toHaveBeenCalled()
 })

@@ -11,17 +11,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { isUnavailableCollectionError } from '@/api/collection-errors'
-import { itemsApi, workspaceApi } from '@/api/endpoints'
+import { itemsApi } from '@/api/endpoints'
 import { itemKeys } from '@/api/item-keys'
 import type {
   CollectionPathEntry,
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
-import {
-  createPermissionChecker,
-  workspacePermissionQueryKey,
-} from '@/auth/permissions'
 import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
 import {
@@ -55,6 +51,7 @@ import {
 } from '@/components/workspace-collections'
 import { useCollectionPath } from '@/hooks/use-collection-path'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 const searchSchema = z.object({
   archived: z.boolean().optional().catch(undefined),
@@ -136,12 +133,7 @@ function WorkspaceBrowser({
   workspaceName: string
 }) {
   const queryClient = useQueryClient()
-  const permissions = useQuery({
-    queryFn: async () =>
-      (await workspaceApi.permissions(workspaceId)).data.permissions,
-    queryKey: workspacePermissionQueryKey(workspaceId),
-  })
-  const permissionChecker = createPermissionChecker(permissions.data ?? [])
+  const permissions = useWorkspacePermissions(workspaceId)
   const path = useCollectionPath(workspaceId, collectionId)
   const [createCollectionSignal, setCreateCollectionSignal] = useState(false)
   const openCreateCollection = useCallback(
@@ -195,8 +187,9 @@ function WorkspaceBrowser({
         path={path.data ?? []}
       />
       <WorkspaceHeading
-        canCreateCollection={permissionChecker.can('collection', 'create')}
-        canCreateItem={permissionChecker.can('item', 'create')}
+        canCreateCollection={permissions.can('collection', 'create')}
+        canCreateItem={permissions.can('item', 'create')}
+        canReadActivity={permissions.can('activity', 'read')}
         collectionId={collectionId}
         isLoading={path.isPending}
         onCreateCollection={openCreateCollection}
@@ -206,19 +199,21 @@ function WorkspaceBrowser({
         workspaceName={workspaceName}
       />
       <WorkspaceCollections
-        canCreateCollection={permissionChecker.can('collection', 'create')}
+        canCreateCollection={permissions.can('collection', 'create')}
         collectionId={collectionId}
         createCollectionSignal={createCollectionSignal}
         onCollectionDialogOpened={clearCreateCollectionSignal}
         pathUnavailable={pathUnavailable}
         workspaceId={workspaceId}
       />
-      <ItemsSection
-        archived={archived}
-        collectionId={collectionId}
-        onArchivedChange={onArchivedChange}
-        workspaceId={workspaceId}
-      />
+      {permissions.can('item', 'read') ? (
+        <ItemsSection
+          archived={archived}
+          collectionId={collectionId}
+          onArchivedChange={onArchivedChange}
+          workspaceId={workspaceId}
+        />
+      ) : null}
     </main>
   )
 }
@@ -300,6 +295,7 @@ function WorkspaceHeading({
   workspaceName,
   canCreateCollection,
   canCreateItem,
+  canReadActivity,
 }: {
   collectionId: string | undefined
   isLoading: boolean
@@ -310,6 +306,7 @@ function WorkspaceHeading({
   onItemCreated: () => void
   canCreateCollection: boolean
   canCreateItem: boolean
+  canReadActivity: boolean
 }) {
   const title = path.at(-1)?.name ?? workspaceName
 
@@ -347,18 +344,20 @@ function WorkspaceHeading({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align='start'>
-                    <DropdownMenuItem asChild>
-                      <Link
-                        className='flex w-full items-center gap-2'
-                        to='/atividades'
-                      >
-                        <ClockCounterClockwiseIcon
-                          aria-hidden='true'
-                          size={14}
-                        />
-                        Histórico de atividades
-                      </Link>
-                    </DropdownMenuItem>
+                    {canReadActivity ? (
+                      <DropdownMenuItem asChild>
+                        <Link
+                          className='flex w-full items-center gap-2'
+                          to='/atividades'
+                        >
+                          <ClockCounterClockwiseIcon
+                            aria-hidden='true'
+                            size={14}
+                          />
+                          Histórico de atividades
+                        </Link>
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem asChild>
                       <Link
                         className='flex w-full items-center gap-2'

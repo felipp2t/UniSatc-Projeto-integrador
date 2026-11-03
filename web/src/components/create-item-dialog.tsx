@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/select'
 import { appToast } from '@/components/ui/toast'
 import { useAttachmentUpload } from '@/hooks/use-attachment-upload'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 import {
   ATTACHMENT_REQUIRED_MESSAGE,
   isContentInvalid,
@@ -143,10 +144,12 @@ function ItemTypeButton({
 
 function ItemTypeSelector({
   disabled,
+  canCreateSecret,
   value,
   onChange,
 }: {
   disabled: boolean
+  canCreateSecret: boolean
   value: CreateItemType
   onChange: (type: CreateItemType) => void
 }) {
@@ -156,15 +159,17 @@ function ItemTypeSelector({
         TIPO
       </legend>
       <div className='flex items-center'>
-        {itemTypes.map((option) => (
-          <ItemTypeButton
-            disabled={disabled}
-            key={option.value}
-            onSelect={onChange}
-            option={option}
-            selected={value === option.value}
-          />
-        ))}
+        {itemTypes
+          .filter((option) => option.value !== 'secret' || canCreateSecret)
+          .map((option) => (
+            <ItemTypeButton
+              disabled={disabled}
+              key={option.value}
+              onSelect={onChange}
+              option={option}
+              selected={value === option.value}
+            />
+          ))}
       </div>
     </fieldset>
   )
@@ -334,6 +339,9 @@ export function CreateItemDialog({
   const [file, setFile] = useState<File>()
   const { cancel, progress, upload } = useAttachmentUpload()
   const [workspaceId, setWorkspaceId] = useState<string>()
+  const permissions = useWorkspacePermissions(open ? workspaceId : undefined)
+  const canCreateSecret = permissions.can('secret', 'create')
+  const canReadCollections = permissions.can('collection', 'read')
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[]>([])
   const [location, setLocation] = useState('root')
   const [locations, setLocations] = useState<CollectionLocation[]>([])
@@ -384,7 +392,8 @@ export function CreateItemDialog({
   }, [collectionId, initialWorkspaceId, open])
 
   useEffect(() => {
-    if (!(open && workspaceId)) {
+    if (!(open && workspaceId && canReadCollections)) {
+      setLocationsLoading(false)
       setLocations([])
       return
     }
@@ -410,7 +419,7 @@ export function CreateItemDialog({
     return () => {
       ignore = true
     }
-  }, [open, workspaceId])
+  }, [canReadCollections, open, workspaceId])
 
   const resetForm = useCallback(() => {
     setSelectedType('text')
@@ -576,6 +585,14 @@ export function CreateItemDialog({
         return
       }
 
+      if (
+        !permissions.can('item', 'create') ||
+        (selectedType === 'secret' && !canCreateSecret)
+      ) {
+        setSubmitError('Você não tem permissão para criar este tipo de item.')
+        return
+      }
+
       if (selectedType !== 'file') {
         await submitItem(workspaceId, selectedType)
         return
@@ -583,6 +600,8 @@ export function CreateItemDialog({
       if (file) await submitAttachment(workspaceId, file)
     },
     [
+      canCreateSecret,
+      permissions.can,
       content,
       file,
       selectedType,
@@ -649,7 +668,14 @@ export function CreateItemDialog({
             ) : null}
           </Field>
 
+          {permissions.isError ? (
+            <p className='text-destructive text-xs' role='alert'>
+              Não foi possível verificar suas permissões. Feche e abra o diálogo
+              para tentar novamente.
+            </p>
+          ) : null}
           <ItemTypeSelector
+            canCreateSecret={canCreateSecret}
             disabled={submitting}
             onChange={handleTypeChange}
             value={selectedType}
@@ -719,7 +745,13 @@ export function CreateItemDialog({
             </Button>
             <Button
               className='h-[30px] rounded-none px-4 text-[10px]'
-              disabled={workspaceLoading || locationsLoading || !workspaceId}
+              disabled={
+                workspaceLoading ||
+                locationsLoading ||
+                !workspaceId ||
+                !permissions.can('item', 'create') ||
+                (selectedType === 'secret' && !canCreateSecret)
+              }
               loading={submitting}
               type='submit'
             >

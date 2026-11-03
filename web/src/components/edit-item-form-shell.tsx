@@ -18,6 +18,7 @@ export interface FormProps {
   item: ItemResponse
   onBusyChange: (busy: boolean) => void
   onClose: () => void
+  readOnly?: boolean
   workspaceId: string
 }
 
@@ -42,11 +43,13 @@ function TypeField({ id, type }: { id: string; type: string }) {
 
 function TitleField({
   id,
+  readOnly,
   invalid,
   onChange,
   value,
 }: {
   id: string
+  readOnly: boolean
   invalid: boolean
   onChange: (value: string) => void
   value: string
@@ -70,6 +73,7 @@ function TitleField({
         maxLength={TITLE_MAX}
         name='title'
         onChange={handleChange}
+        readOnly={readOnly}
         required
         value={value}
       />
@@ -84,12 +88,14 @@ function TitleField({
 
 function FormFooter({
   archived,
+  readOnly,
   busy,
   error,
   onClose,
   saving,
 }: {
   archived: boolean
+  readOnly: boolean
   busy: boolean
   error: string | undefined
   onClose: () => void
@@ -114,9 +120,9 @@ function FormFooter({
           onClick={onClose}
           variant='outline'
         >
-          {archived ? 'FECHAR' : 'CANCELAR'}
+          {archived || readOnly ? 'FECHAR' : 'CANCELAR'}
         </Button>
-        {archived ? null : (
+        {archived || readOnly ? null : (
           <Button
             className='h-[30px] rounded-none px-4 text-[10px]'
             disabled={busy}
@@ -133,12 +139,14 @@ function FormFooter({
 
 export function EditFormShell({
   archived,
+  readOnly = false,
   children,
   form,
   onClose,
   type,
 }: {
   archived: boolean
+  readOnly?: boolean
   children: React.ReactNode
   form: ReturnType<typeof useEditForm>
   onClose: () => void
@@ -155,6 +163,7 @@ export function EditFormShell({
           id={`${id}-title`}
           invalid={Boolean(form.invalid.title)}
           onChange={form.handleTitle}
+          readOnly={readOnly}
           value={form.title}
         />
         <TypeField id={`${id}-type`} type={type} />
@@ -165,6 +174,7 @@ export function EditFormShell({
         busy={form.busy}
         error={form.error}
         onClose={onClose}
+        readOnly={readOnly}
         saving={form.saving}
       />
     </form>

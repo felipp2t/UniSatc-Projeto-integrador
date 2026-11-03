@@ -23,10 +23,12 @@ function isTextual(type: ItemResponse['type']): type is TextualItemType {
 
 export function EditItemDialog({
   itemId,
+  readOnly = false,
   onClose,
   workspaceId,
 }: {
   itemId: string
+  readOnly?: boolean
   onClose: () => void
   workspaceId: string
 }) {
@@ -59,6 +61,7 @@ export function EditItemDialog({
         item={item.data}
         onBusyChange={setBusy}
         onClose={onClose}
+        readOnly={readOnly}
         workspaceId={workspaceId}
       />
     )
@@ -69,12 +72,18 @@ export function EditItemDialog({
       <DialogContent className='max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto rounded-none border-border bg-black p-6 text-white shadow-none sm:max-w-sm'>
         <DialogHeader>
           <DialogTitle className='font-bold font-mono text-xs uppercase'>
-            {archived ? 'Item arquivado' : 'Editar item'}
+            {archived
+              ? 'Item arquivado'
+              : readOnly
+                ? 'Ver item'
+                : 'Editar item'}
           </DialogTitle>
           <DialogDescription className='sr-only'>
             {archived
               ? 'Consulte os dados do item arquivado.'
-              : 'Altere o título e o conteúdo do item.'}
+              : readOnly
+                ? 'Consulte os dados do item.'
+                : 'Altere o título e o conteúdo do item.'}
           </DialogDescription>
         </DialogHeader>
         <div className='mt-6'>{body}</div>

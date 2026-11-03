@@ -10,7 +10,6 @@ import { workspaceApi } from '@/api/endpoints'
 import {
   createPermissionChecker,
   enforceRoutePermission,
-  workspacePermissionQueryKey,
 } from '@/auth/permissions'
 import { sanitizeInternalRedirect } from '@/auth/redirect'
 import { Header } from '@/components/header'
@@ -18,6 +17,7 @@ import { NotFoundPage } from '@/components/not-found-page'
 import { OfflineBanner } from '@/components/offline-banner'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { workspacePermissionsQuery } from '@/hooks/use-workspace-permissions'
 
 const workspacesQuery = queryOptions({
   queryFn: async () => (await workspaceApi.list()).data,
@@ -42,13 +42,17 @@ export const Route = createFileRoute('/_protected')({
     const [workspace] =
       await context.queryClient.ensureQueryData(workspacesQuery)
     const workspaceId = workspace?.id
-    if (!workspaceId) return
-    const permissions = await context.queryClient.ensureQueryData({
-      queryFn: async () =>
-        (await workspaceApi.permissions(workspaceId)).data.permissions,
-      queryKey: workspacePermissionQueryKey(workspaceId),
-    })
-    enforceRoutePermission(matches, createPermissionChecker(permissions))
+    if (!workspaceId) {
+      enforceRoutePermission(matches, createPermissionChecker([]))
+      return
+    }
+    const permissions = await context.queryClient.fetchQuery(
+      workspacePermissionsQuery(workspaceId)
+    )
+    enforceRoutePermission(
+      matches,
+      createPermissionChecker(permissions.permissions, permissions.isOwner)
+    )
   },
   component: ProtectedLayout,
   notFoundComponent: NotFoundPage,
