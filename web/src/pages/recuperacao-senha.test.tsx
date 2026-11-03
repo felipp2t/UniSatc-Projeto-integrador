@@ -125,7 +125,6 @@ async function renderPage(entry: string) {
   const queryClient = createQueryClient()
   const router = createRouter({
     context: {
-      permissionChecker: { can: () => true },
       queryClient,
       session,
     },

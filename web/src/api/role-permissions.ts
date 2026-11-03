@@ -1,34 +1,6 @@
 import { z } from 'zod'
 import { apiClient } from './client'
-
-const resources = [
-  'workspace',
-  'collection',
-  'item',
-  'secret',
-  'member',
-  'role',
-  'activity',
-  'group',
-  'sharing',
-] as const
-
-const actions = [
-  'read',
-  'create',
-  'update',
-  'delete',
-  'invite',
-  'all',
-  'manage',
-] as const
-
-const permissionSchema = z.object({
-  action: z.enum(actions),
-  resource: z.enum(resources),
-})
-
-const permissionsSchema = z.array(permissionSchema)
+import { permissionsSchema, type WorkspacePermission } from './permissions'
 
 const replacePermissionsResponseSchema = z.object({
   permissions: permissionsSchema,
@@ -36,7 +8,7 @@ const replacePermissionsResponseSchema = z.object({
   roleName: z.string(),
 })
 
-export type RolePermission = z.infer<typeof permissionSchema>
+export type RolePermission = WorkspacePermission
 
 export const rolePermissionsQueryKey = (workspaceId: string, roleId: string) =>
   ['workspace-role-permissions', workspaceId, roleId] as const

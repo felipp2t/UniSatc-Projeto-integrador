@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { WorkspacePermission } from './permissions'
 
 export const workspaceMemberSchema = z.object({
   email: z.string().optional(),
@@ -22,9 +23,4 @@ export const workspaceRolesSchema = z.array(
 )
 export type WorkspaceRoleResponse = z.infer<typeof workspaceRolesSchema>[number]
 
-export const workspaceRolePermissionsSchema = z.array(
-  z.object({ action: z.string().min(1), resource: z.string().min(1) })
-)
-export type WorkspaceRolePermission = z.infer<
-  typeof workspaceRolePermissionsSchema
->[number]
+export type WorkspaceRolePermission = WorkspacePermission

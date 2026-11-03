@@ -26,7 +26,8 @@ import {
   InlineCodeSeparator,
   InlineCodeText,
 } from '@/components/inline-code'
-import { type CopyKind, ItemListCard } from '@/components/item-list-card'
+import type { CopyKind } from '@/components/item-actions'
+import { ItemListCard } from '@/components/item-list-card'
 import { NotFoundPage } from '@/components/not-found-page'
 import {
   DropdownMenu,
@@ -51,6 +52,7 @@ import {
 } from '@/components/workspace-collections'
 import { useCollectionPath } from '@/hooks/use-collection-path'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 const searchSchema = z.object({
   archived: z.boolean().optional().catch(undefined),
@@ -132,6 +134,7 @@ function WorkspaceBrowser({
   workspaceName: string
 }) {
   const queryClient = useQueryClient()
+  const permissions = useWorkspacePermissions(workspaceId)
   const path = useCollectionPath(workspaceId, collectionId)
   const [createCollectionSignal, setCreateCollectionSignal] = useState(false)
   const openCreateCollection = useCallback(
@@ -154,6 +157,14 @@ function WorkspaceBrowser({
       }),
     [queryClient, workspaceId]
   )
+  const retryPermissions = useCallback(async () => {
+    await permissions.refetch()
+  }, [permissions.refetch])
+  if (permissions.isPending)
+    return <LoadingState label='Carregando permissões…' />
+  if (permissions.isError) {
+    return <ErrorState error={permissions.error} onRetry={retryPermissions} />
+  }
   if (collectionId && path.isError && !pathUnavailable) {
     return (
       <div className='flex flex-col items-center gap-3 p-8'>
@@ -177,6 +188,9 @@ function WorkspaceBrowser({
         path={path.data ?? []}
       />
       <WorkspaceHeading
+        canCreateCollection={permissions.can('collection', 'create')}
+        canCreateItem={permissions.can('item', 'create')}
+        canReadActivity={permissions.can('activity', 'read')}
         collectionId={collectionId}
         isLoading={path.isPending}
         onCreateCollection={openCreateCollection}
@@ -186,18 +200,21 @@ function WorkspaceBrowser({
         workspaceName={workspaceName}
       />
       <WorkspaceCollections
+        canCreateCollection={permissions.can('collection', 'create')}
         collectionId={collectionId}
         createCollectionSignal={createCollectionSignal}
         onCollectionDialogOpened={clearCreateCollectionSignal}
         pathUnavailable={pathUnavailable}
         workspaceId={workspaceId}
       />
-      <ItemsSection
-        archived={archived}
-        collectionId={collectionId}
-        onArchivedChange={onArchivedChange}
-        workspaceId={workspaceId}
-      />
+      {permissions.can('item', 'read') ? (
+        <ItemsSection
+          archived={archived}
+          collectionId={collectionId}
+          onArchivedChange={onArchivedChange}
+          workspaceId={workspaceId}
+        />
+      ) : null}
     </main>
   )
 }
@@ -277,6 +294,9 @@ function WorkspaceHeading({
   onItemCreated,
   workspaceId,
   workspaceName,
+  canCreateCollection,
+  canCreateItem,
+  canReadActivity,
 }: {
   collectionId: string | undefined
   isLoading: boolean
@@ -285,6 +305,9 @@ function WorkspaceHeading({
   workspaceName: string
   workspaceId: string
   onItemCreated: () => void
+  canCreateCollection: boolean
+  canCreateItem: boolean
+  canReadActivity: boolean
 }) {
   const title = path.at(-1)?.name ?? workspaceName
 
@@ -322,18 +345,20 @@ function WorkspaceHeading({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align='start'>
-                    <DropdownMenuItem asChild>
-                      <Link
-                        className='flex w-full items-center gap-2'
-                        to='/atividades'
-                      >
-                        <ClockCounterClockwiseIcon
-                          aria-hidden='true'
-                          size={14}
-                        />
-                        Histórico de atividades
-                      </Link>
-                    </DropdownMenuItem>
+                    {canReadActivity ? (
+                      <DropdownMenuItem asChild>
+                        <Link
+                          className='flex w-full items-center gap-2'
+                          to='/atividades'
+                        >
+                          <ClockCounterClockwiseIcon
+                            aria-hidden='true'
+                            size={14}
+                          />
+                          Histórico de atividades
+                        </Link>
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem asChild>
                       <Link
                         className='flex w-full items-center gap-2'
@@ -351,13 +376,17 @@ function WorkspaceHeading({
         </div>
       </div>
       <div className='flex flex-wrap items-center gap-2'>
-        <CreateCollectionButton onClick={onCreateCollection} />
-        <CreateItemDialog
-          collectionId={collectionId}
-          onItemCreated={onItemCreated}
-          workspaceId={workspaceId}
-          workspaceName={workspaceName}
-        />
+        {canCreateCollection ? (
+          <CreateCollectionButton onClick={onCreateCollection} />
+        ) : null}
+        {canCreateItem ? (
+          <CreateItemDialog
+            collectionId={collectionId}
+            onItemCreated={onItemCreated}
+            workspaceId={workspaceId}
+            workspaceName={workspaceName}
+          />
+        ) : null}
       </div>
     </header>
   )

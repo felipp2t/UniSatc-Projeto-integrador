@@ -10,10 +10,7 @@ import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
 import type { CollectionResponse } from '@/api/types'
-import {
-  ShareAccessDialog,
-  useCanManageSharing,
-} from '@/components/share-access-dialog'
+import { ShareAccessDialog } from '@/components/share-access-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -31,6 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 const collectionNameSchema = z
   .string()
@@ -59,7 +57,10 @@ export function CollectionCard({
   workspaceId: string
 }) {
   const [shareOpen, setShareOpen] = useState(false)
-  const canManageSharing = useCanManageSharing(workspaceId)
+  const permissions = useWorkspacePermissions(workspaceId)
+  const canManageSharing = permissions.can('sharing', 'manage')
+  const canRename = permissions.can('collection', 'update')
+  const canDelete = permissions.can('collection', 'delete')
   const handleDelete = useCallback(
     () => onDelete({ ...collection }),
     [collection, onDelete]
@@ -87,32 +88,38 @@ export function CollectionCard({
             {collection.name}
           </span>
         </Link>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              aria-label={`Ações de ${collection.name}`}
-              className='relative z-10 shrink-0 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
-              type='button'
-            >
-              <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='end'>
-            {canManageSharing ? (
-              <DropdownMenuItem onSelect={openSharing}>
-                Compartilhar
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuItem onSelect={handleRename}>
-              <PencilSimpleIcon aria-hidden='true' />
-              Renomear
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={handleDelete} variant='destructive'>
-              <TrashIcon aria-hidden='true' />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {canManageSharing || canRename || canDelete ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                aria-label={`Ações de ${collection.name}`}
+                className='relative z-10 shrink-0 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
+                type='button'
+              >
+                <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end'>
+              {canManageSharing ? (
+                <DropdownMenuItem onSelect={openSharing}>
+                  Compartilhar
+                </DropdownMenuItem>
+              ) : null}
+              {canRename ? (
+                <DropdownMenuItem onSelect={handleRename}>
+                  <PencilSimpleIcon aria-hidden='true' />
+                  Renomear
+                </DropdownMenuItem>
+              ) : null}
+              {canDelete ? (
+                <DropdownMenuItem onSelect={handleDelete} variant='destructive'>
+                  <TrashIcon aria-hidden='true' />
+                  Excluir
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
       <span className='font-mono text-[10px] text-muted-foreground uppercase tracking-wider'>
         Pasta

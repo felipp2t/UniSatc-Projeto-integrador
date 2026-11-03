@@ -7,6 +7,7 @@ import {
   rolePermissionsApi,
   rolePermissionsQueryKey,
 } from '@/api/role-permissions'
+import { workspacePermissionQueryKey } from '@/api/workspace-keys'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -161,12 +162,17 @@ export function RolePermissionsEditor({
         rolePermissionsQueryKey(workspaceId, roleId),
         response.permissions
       )
-      await queryClient.invalidateQueries({
-        queryKey: rolePermissionsQueryKey(workspaceId, roleId),
-      })
-      await queryClient.invalidateQueries({
-        queryKey: ['workspace-role-permission-counts', workspaceId],
-      })
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: rolePermissionsQueryKey(workspaceId, roleId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: workspacePermissionQueryKey(workspaceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-role-permission-counts', workspaceId],
+        }),
+      ])
       appToast.success('Permissões salvas com sucesso.')
     },
   })
