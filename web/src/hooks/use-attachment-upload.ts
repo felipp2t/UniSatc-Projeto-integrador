@@ -12,14 +12,19 @@ export function useAttachmentUpload() {
       controller.current?.abort()
       const abortController = new AbortController()
       controller.current = abortController
+      setProgress(undefined)
       try {
         return await send({
-          onUploadProgress: setProgress,
+          onUploadProgress: (value) => {
+            if (controller.current === abortController) setProgress(value)
+          },
           signal: abortController.signal,
         })
       } finally {
-        if (controller.current === abortController) controller.current = null
-        setProgress(undefined)
+        if (controller.current === abortController) {
+          controller.current = null
+          setProgress(undefined)
+        }
       }
     },
     []
