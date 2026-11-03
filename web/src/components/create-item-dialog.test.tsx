@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
+import { workspacePermissionQueryKey } from '@/api/workspace-keys'
 import { renderWithProviders } from '@/test/render'
 
 const apiMocks = vi.hoisted(() => ({
@@ -11,6 +12,7 @@ const apiMocks = vi.hoisted(() => ({
   createAttachment: vi.fn(),
   itemsCreate: vi.fn(),
   workspaceList: vi.fn(),
+  workspacePermissions: vi.fn(),
 }))
 
 vi.mock('@/api/endpoints', async (importOriginal) => {
@@ -26,7 +28,11 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       create: apiMocks.itemsCreate,
       createAttachment: apiMocks.createAttachment,
     },
-    workspaceApi: { ...actual.workspaceApi, list: apiMocks.workspaceList },
+    workspaceApi: {
+      ...actual.workspaceApi,
+      list: apiMocks.workspaceList,
+      permissions: apiMocks.workspacePermissions,
+    },
   }
 })
 
@@ -36,6 +42,18 @@ const workspaceId = 'workspace-1'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  apiMocks.workspacePermissions.mockResolvedValue({
+    data: {
+      isOwner: false,
+      permissions: [
+        { action: 'all', resource: 'item' },
+        { action: 'all', resource: 'collection' },
+        { action: 'all', resource: 'secret' },
+      ],
+      roleId: 'role-1',
+      roleName: 'Editor',
+    },
+  })
   apiMocks.collectionsList.mockResolvedValue({
     data: { items: [], page: 0, size: 100, totalItems: 0, totalPages: 1 },
   })
@@ -473,4 +491,55 @@ describe('document item creation', () => {
       within(reopened).queryByRole('button', { name: 'CANCELAR ENVIO' })
     ).toBeNull()
   })
+})
+
+it('hides secret creation when only ordinary item creation is granted', async () => {
+  apiMocks.workspacePermissions.mockResolvedValue({
+    data: {
+      isOwner: false,
+      permissions: [{ action: 'create', resource: 'item' }],
+    },
+  })
+  const user = userEvent.setup()
+  renderWithProviders(<CreateItemDialog workspaceId={workspaceId} />)
+  await user.click(screen.getByRole('button', { name: 'Novo item' }))
+  const create = await screen.findByRole('button', { name: 'CRIAR' })
+  await waitFor(() => expect(create).toBeEnabled())
+  expect(screen.queryByRole('button', { name: 'segredo' })).toBeNull()
+  expect(apiMocks.collectionsList).not.toHaveBeenCalled()
+})
+
+it('requires a new selection when the selected type loses permission', async () => {
+  const user = userEvent.setup()
+  const { queryClient } = renderWithProviders(
+    <CreateItemDialog workspaceId={workspaceId} />
+  )
+  await user.click(screen.getByRole('button', { name: 'Novo item' }))
+  await user.click(await screen.findByRole('button', { name: 'segredo' }))
+  await user.type(
+    screen.getByLabelText('VALOR DO SEGREDO'),
+    'sensitive content'
+  )
+  act(() => {
+    queryClient.setQueryData(workspacePermissionQueryKey(workspaceId), {
+      isOwner: false,
+      permissions: [{ action: 'create', resource: 'item' }],
+      roleId: 'reader',
+      roleName: 'Member',
+    })
+  })
+  await waitFor(() =>
+    expect(screen.queryByRole('button', { name: 'segredo' })).toBeNull()
+  )
+  expect(screen.queryByLabelText('VALOR DO SEGREDO')).toBeNull()
+  expect(screen.getByRole('button', { name: 'CRIAR' })).toBeDisabled()
+  expect(
+    screen.getByText(
+      'O tipo selecionado não está disponível para seu papel. Selecione um tipo permitido.'
+    )
+  ).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'texto' }))
+  expect(screen.getByLabelText('CONTEÚDO')).toHaveValue('')
+  expect(screen.getByRole('button', { name: 'CRIAR' })).toBeEnabled()
+  expect(apiMocks.itemsCreate).not.toHaveBeenCalled()
 })

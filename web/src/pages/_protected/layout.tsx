@@ -5,13 +5,18 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { useCallback } from 'react'
-import { enforceRoutePermission } from '@/auth/permissions'
+import {
+  createPermissionChecker,
+  enforceRoutePermission,
+} from '@/auth/permissions'
 import { sanitizeInternalRedirect } from '@/auth/redirect'
 import { Header } from '@/components/header'
 import { NotFoundPage } from '@/components/not-found-page'
 import { OfflineBanner } from '@/components/offline-banner'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { workspacesQuery } from '@/hooks/use-current-workspace'
+import { workspacePermissionsQuery } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute('/_protected')({
   beforeLoad: async ({ context, location, matches }) => {
@@ -26,7 +31,22 @@ export const Route = createFileRoute('/_protected')({
       })
     }
 
-    enforceRoutePermission(matches, context.permissionChecker)
+    if (!matches.some((match) => match.staticData.permission)) return
+
+    const [workspace] =
+      await context.queryClient.ensureQueryData(workspacesQuery)
+    const workspaceId = workspace?.id
+    if (!workspaceId) {
+      enforceRoutePermission(matches, createPermissionChecker([]))
+      return
+    }
+    const permissions = await context.queryClient.fetchQuery(
+      workspacePermissionsQuery(workspaceId)
+    )
+    enforceRoutePermission(
+      matches,
+      createPermissionChecker(permissions.permissions, permissions.isOwner)
+    )
   },
   component: ProtectedLayout,
   notFoundComponent: NotFoundPage,

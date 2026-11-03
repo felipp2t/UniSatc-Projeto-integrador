@@ -54,7 +54,6 @@ async function renderAccountSettings() {
   })
   const router = createRouter({
     context: {
-      permissionChecker: { can: () => true },
       queryClient,
       session: createSession(),
     } satisfies RouterContext,

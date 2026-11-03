@@ -14,6 +14,7 @@ import { DESCRIPTION_MAX, isDescriptionInvalid } from '@/lib/item-validation'
 
 export function EditDocumentForm({
   item,
+  readOnly,
   onBusyChange,
   onClose,
   workspaceId,
@@ -31,6 +32,7 @@ export function EditDocumentForm({
     onBusyChange,
     onClose,
     pending: update.isPending,
+    readOnly,
     save: (title) =>
       update.mutateAsync({
         itemId: item.id,
@@ -71,6 +73,7 @@ export function EditDocumentForm({
             maxLength={DESCRIPTION_MAX}
             name='description'
             onValueChange={handleDescription}
+            readOnly={form.readOnly}
             value={description}
           />
           {descriptionInvalid ? (
@@ -84,7 +87,7 @@ export function EditDocumentForm({
           ) : null}
         </Field>
       </EditFormShell>
-      {archived ? null : (
+      {form.readOnly ? null : (
         <ReplaceAttachmentField
           disabled={update.isPending}
           itemId={item.id}

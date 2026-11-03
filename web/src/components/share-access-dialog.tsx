@@ -22,11 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { appToast } from '@/components/ui/toast'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
-const workspacePermissionsKey = (workspaceId: string) => [
-  'workspace-permissions',
-  workspaceId,
-]
 const sharingOriginsKey = (
   workspaceId: string,
   kind: ShareTarget['kind'],
@@ -37,19 +34,6 @@ export interface ShareTarget {
   id: string
   kind: 'collection' | 'item'
   name: string
-}
-
-export function useCanManageSharing(workspaceId: string) {
-  const permissions = useQuery({
-    queryFn: async () => (await workspaceApi.permissions(workspaceId)).data,
-    queryKey: workspacePermissionsKey(workspaceId),
-  })
-  return Boolean(
-    permissions.data?.isOwner ||
-      permissions.data?.permissions.some(
-        ({ action, resource }) => resource === 'sharing' && action === 'manage'
-      )
-  )
 }
 
 export function ShareAccessDialog({
@@ -63,16 +47,8 @@ export function ShareAccessDialog({
   target: ShareTarget
   workspaceId: string
 }) {
-  const permissions = useQuery({
-    enabled: open,
-    queryFn: async () => (await workspaceApi.permissions(workspaceId)).data,
-    queryKey: workspacePermissionsKey(workspaceId),
-  })
-  const canManage =
-    permissions.data?.isOwner ||
-    permissions.data?.permissions.some(
-      ({ action, resource }) => resource === 'sharing' && action === 'manage'
-    )
+  const permissions = useWorkspacePermissions(open ? workspaceId : undefined)
+  const canManage = permissions.can('sharing', 'manage')
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) onClose()
@@ -139,11 +115,12 @@ function SharingConfiguration({
   workspaceId: string
 }) {
   const queryClient = useQueryClient()
+  const permissions = useWorkspacePermissions(workspaceId)
   const [selectedGroup, setSelectedGroup] = useState('')
   const [selectedMember, setSelectedMember] = useState('')
   const [pendingAction, setPendingAction] = useState('')
   const groups = useQuery({
-    enabled: target.kind === 'collection',
+    enabled: target.kind === 'collection' && permissions.can('group', 'manage'),
     queryFn: async () => (await accessGroupApi.list(workspaceId)).data,
     queryKey: ['access-groups', workspaceId],
   })
@@ -247,7 +224,7 @@ function SharingConfiguration({
         groups={groups.data ?? []}
         isPending={
           (target.kind === 'collection'
-            ? groups.isPending
+            ? groups.isFetching
             : members.isPending) || origins.isPending
         }
         members={members.data ?? []}
@@ -381,33 +358,35 @@ function CollectionSharingControls({
 
   return (
     <>
-      <section aria-labelledby='share-groups-heading' className='space-y-2'>
-        <h3 className='font-mono text-xs uppercase' id='share-groups-heading'>
-          Grupos de acesso
-        </h3>
-        <Field>
-          <FieldLabel htmlFor='sharing-group'>Grupo</FieldLabel>
-          <Select onValueChange={onGroupChange} value={selectedGroup}>
-            <SelectTrigger id='sharing-group'>
-              <SelectValue placeholder='Selecione um grupo' />
-            </SelectTrigger>
-            <SelectContent>
-              {groups.map((group) => (
-                <SelectItem key={group.id} value={group.id}>
-                  {group.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Button
-          disabled={!selectedGroup || isPending}
-          onClick={onGrantGroup}
-          size='sm'
-        >
-          Conceder acesso ao grupo
-        </Button>
-      </section>
+      {groups.length > 0 ? (
+        <section aria-labelledby='share-groups-heading' className='space-y-2'>
+          <h3 className='font-mono text-xs uppercase' id='share-groups-heading'>
+            Grupos de acesso
+          </h3>
+          <Field>
+            <FieldLabel htmlFor='sharing-group'>Grupo</FieldLabel>
+            <Select onValueChange={onGroupChange} value={selectedGroup}>
+              <SelectTrigger id='sharing-group'>
+                <SelectValue placeholder='Selecione um grupo' />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Button
+            disabled={!selectedGroup || isPending}
+            onClick={onGrantGroup}
+            size='sm'
+          >
+            Conceder acesso ao grupo
+          </Button>
+        </section>
+      ) : null}
       <section aria-labelledby='share-public-heading' className='space-y-2'>
         <h3 className='font-mono text-xs uppercase' id='share-public-heading'>
           Todos os membros

@@ -1,5 +1,10 @@
 import type { components } from './generated/schema'
 
+export type {
+  WorkspacePermission,
+  WorkspacePermissionsResponse,
+} from './permissions'
+
 export type ChangePasswordRequest =
   components['schemas']['ChangePasswordRequest']
 export type CreateItemType = 'file' | 'text' | 'link' | 'secret'
@@ -187,16 +192,6 @@ export type {
   WorkspaceRoleResponse,
 } from './workspace-members'
 export type WorkspaceResponse = components['schemas']['WorkspaceResponse']
-export interface WorkspacePermission {
-  action: string
-  resource: string
-}
-export interface WorkspacePermissionsResponse {
-  isOwner: boolean
-  permissions: WorkspacePermission[]
-  roleId: string
-  roleName: string
-}
 export interface AccessGroupResponse {
   id: string
   name: string

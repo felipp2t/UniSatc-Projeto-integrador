@@ -1,5 +1,6 @@
 import type { ZodType } from 'zod'
 import { apiClient } from './client'
+import { permissionsSchema, workspacePermissionsSchema } from './permissions'
 import type {
   AccessGroupResponse,
   ActivityFilters,
@@ -30,13 +31,11 @@ import type {
   UpdateWorkspaceRequest,
   UserResponse,
   WorkspaceMemberDto,
-  WorkspacePermissionsResponse,
   WorkspaceResponse,
 } from './types'
 import {
   workspaceMemberSchema,
   workspaceMembersSchema,
-  workspaceRolePermissionsSchema,
   workspaceRolesSchema,
 } from './workspace-members'
 
@@ -117,7 +116,7 @@ export const workspaceApi = {
     return {
       ...response,
       data: parseOrThrow(
-        workspaceRolePermissionsSchema,
+        permissionsSchema,
         response.data,
         'A resposta da API contém permissões inválidas.'
       ),
@@ -136,10 +135,19 @@ export const workspaceApi = {
       ),
     }
   },
-  permissions: (workspaceId: string) =>
-    apiClient.get<WorkspacePermissionsResponse>(
+  permissions: async (workspaceId: string) => {
+    const response = await apiClient.get<unknown>(
       `/workspaces/${workspaceId}/me/permissions`
-    ),
+    )
+    return {
+      ...response,
+      data: parseOrThrow(
+        workspacePermissionsSchema,
+        response.data,
+        'A resposta da API contém permissões inválidas.'
+      ),
+    }
+  },
   removeMember: (workspaceId: string, membershipId: string) =>
     apiClient.delete<void>(
       `/workspaces/${workspaceId}/members/${membershipId}`,

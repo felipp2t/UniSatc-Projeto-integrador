@@ -12,6 +12,7 @@ const apiMocks = vi.hoisted(() => ({
   archive: vi.fn(),
   get: vi.fn(),
   restore: vi.fn(),
+  workspacePermissions: vi.fn(),
 }))
 
 vi.mock('@/api/endpoints', async (importOriginal) => {
@@ -23,6 +24,10 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       archive: apiMocks.archive,
       get: apiMocks.get,
       restore: apiMocks.restore,
+    },
+    workspaceApi: {
+      ...actual.workspaceApi,
+      permissions: apiMocks.workspacePermissions,
     },
   }
 })
@@ -63,6 +68,18 @@ const menuLabels = () =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  apiMocks.workspacePermissions.mockResolvedValue({
+    data: {
+      isOwner: false,
+      permissions: [
+        { action: 'all', resource: 'item' },
+        { action: 'all', resource: 'collection' },
+        { action: 'all', resource: 'secret' },
+      ],
+      roleId: 'role-1',
+      roleName: 'Editor',
+    },
+  })
   apiMocks.archive.mockResolvedValue({ data: undefined })
   apiMocks.restore.mockResolvedValue({ data: undefined })
   apiMocks.get.mockReturnValue(new Promise(() => undefined))
@@ -301,5 +318,41 @@ describe('ItemListCard', () => {
     expect(screen.getByText('••••••••••••')).toBeInTheDocument()
     expect(screen.getByText('doc.pdf')).toBeInTheDocument()
     expect(screen.getByText('file')).toBeInTheDocument()
+  })
+})
+
+describe('item permission gates', () => {
+  it('offers read-only viewing and hides mutations for a reader', async () => {
+    apiMocks.workspacePermissions.mockResolvedValue({
+      data: {
+        isOwner: false,
+        permissions: [{ action: 'read', resource: 'item' }],
+      },
+    })
+    await openMenu(makeItem())
+    expect(menuLabels()).toEqual(['Ver', 'Copiar título', 'Copiar conteúdo'])
+    expect(apiMocks.archive).not.toHaveBeenCalled()
+  })
+
+  it('hides restore and permanent deletion for an archived reader', async () => {
+    apiMocks.workspacePermissions.mockResolvedValue({
+      data: {
+        isOwner: false,
+        permissions: [{ action: 'read', resource: 'item' }],
+      },
+    })
+    await openMenu(makeItem({ archivedAt: '2026-01-01T00:00:00Z' }))
+    expect(menuLabels()).toEqual(['Ver', 'Copiar título', 'Copiar conteúdo'])
+  })
+
+  it('does not expose secret viewing or mutations with only item grants', async () => {
+    apiMocks.workspacePermissions.mockResolvedValue({
+      data: {
+        isOwner: false,
+        permissions: [{ action: 'all', resource: 'item' }],
+      },
+    })
+    await openMenu(makeItem({ type: 'secret' }))
+    expect(menuLabels()).toEqual(['Copiar título'])
   })
 })

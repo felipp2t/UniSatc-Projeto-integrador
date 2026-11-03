@@ -18,6 +18,7 @@ import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
 import { appToast } from '@/components/ui/toast'
 import { useCollectionMutations } from '@/hooks/use-collection-mutations'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 export function WorkspaceCollections({
   collectionId,
@@ -25,18 +26,23 @@ export function WorkspaceCollections({
   workspaceId,
   createCollectionSignal,
   onCollectionDialogOpened,
+  canCreateCollection,
 }: {
   collectionId: string | undefined
   pathUnavailable: boolean
   workspaceId: string
   createCollectionSignal: boolean
   onCollectionDialogOpened: () => void
+  canCreateCollection: boolean
 }) {
+  const permissions = useWorkspacePermissions(workspaceId)
+  const canRead = permissions.can('collection', 'read')
   const navigate = useNavigate()
   const collectionMutations = useCollectionMutations()
   const [dialog, setDialog] = useState<CollectionDialogState>(null)
   const [page, setPage] = useState(0)
   const collections = useQuery({
+    enabled: canRead,
     placeholderData: (previousData) => previousData,
     queryFn: async () =>
       (await collectionsApi.list(workspaceId, collectionId, page, 100)).data,
@@ -63,10 +69,10 @@ export function WorkspaceCollections({
 
   const { data } = collections
   useEffect(() => {
-    if (!createCollectionSignal) return
+    if (!(createCollectionSignal && canCreateCollection)) return
     setDialog({ type: 'create' })
     onCollectionDialogOpened()
-  }, [createCollectionSignal, onCollectionDialogOpened])
+  }, [canCreateCollection, createCollectionSignal, onCollectionDialogOpened])
 
   useEffect(() => {
     if (
@@ -155,28 +161,38 @@ export function WorkspaceCollections({
   return (
     <>
       <CollectionDialogHost
-        dialog={dialog}
+        dialog={
+          dialog &&
+          permissions.can(
+            'collection',
+            dialog.type === 'rename' ? 'update' : dialog.type
+          )
+            ? dialog
+            : null
+        }
         isPending={pending}
         onClose={closeDialog}
         onCreate={create}
         onDelete={remove}
         onRename={rename}
       />
-      <CollectionsSection
-        collectionId={collectionId}
-        collections={data}
-        error={collections.error}
-        isError={collections.isError}
-        isFetching={collections.isFetching}
-        isPlaceholderData={collections.isPlaceholderData}
-        onDelete={openDelete}
-        onNextPage={nextPage}
-        onPreviousPage={previousPage}
-        onRename={openRename}
-        onRetry={retry}
-        page={page}
-        workspaceId={workspaceId}
-      />
+      {canRead ? (
+        <CollectionsSection
+          collectionId={collectionId}
+          collections={data}
+          error={collections.error}
+          isError={collections.isError}
+          isFetching={collections.isFetching}
+          isPlaceholderData={collections.isPlaceholderData}
+          onDelete={openDelete}
+          onNextPage={nextPage}
+          onPreviousPage={previousPage}
+          onRename={openRename}
+          onRetry={retry}
+          page={page}
+          workspaceId={workspaceId}
+        />
+      ) : null}
     </>
   )
 }
