@@ -1,5 +1,7 @@
 export const itemKeys = {
   all: (workspaceId: string) => ['items', workspaceId] as const,
+  attachment: (workspaceId: string, itemId: string) =>
+    [...itemKeys.all(workspaceId), 'attachment', itemId] as const,
   detail: (workspaceId: string, itemId: string) =>
     [...itemKeys.all(workspaceId), 'detail', itemId] as const,
   list: (

@@ -5,7 +5,7 @@ import userEvent, { PointerEventsCheckLevel } from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import '../test/dom-setup'
 import { FolderCard } from './folder-card'
-import { ItemCard } from './item-card'
+import { ItemCard, NewItemCard } from './item-card'
 import { WorkspaceCard } from './workspace-card'
 
 const rejected = () => Promise.reject(new Error('Falha na operação'))
@@ -141,5 +141,21 @@ describe('card operation errors', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Falha na operação'
     )
+  })
+
+  it('keeps the explicit 10MB hint in the legacy new item dialog', async () => {
+    const user = userEvent.setup()
+    render(
+      <NewItemCard
+        onCreate={vi.fn()}
+        trigger={<button type='button'>Novo</button>}
+        workspaceId='ws-1'
+      />
+    )
+    await user.click(screen.getByRole('button', { name: 'Novo' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(
+      within(dialog).getByText('PDF, DOCX, TXT ou MD até 10MB')
+    ).toBeInTheDocument()
   })
 })
