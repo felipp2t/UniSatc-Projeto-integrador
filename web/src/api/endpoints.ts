@@ -239,11 +239,61 @@ export const collectionsApi = {
     ),
 }
 
+export interface CreateAttachmentRequest {
+  collectionId?: string
+  description?: string
+  file: File
+  title: string
+}
+
+export interface UploadOptions {
+  onUploadProgress: (progress: number) => void
+  signal: AbortSignal
+}
+
+function uploadAttachment(
+  method: 'post' | 'put',
+  url: string,
+  form: FormData,
+  options?: Partial<UploadOptions>
+) {
+  return apiClient.request<AttachmentResponse>({
+    data: form,
+    method,
+    onUploadProgress: ({ progress }) =>
+      options?.onUploadProgress?.(Math.round((progress ?? 0) * 100)),
+    signal: options?.signal,
+    url,
+  })
+}
+
 export const itemsApi = {
   archive: (workspaceId: string, itemId: string) =>
     apiClient.post<void>(`/workspaces/${workspaceId}/items/${itemId}/archive`),
   create: (workspaceId: string, request: CreateItemRequest) =>
     apiClient.post<ItemResponse>(`/workspaces/${workspaceId}/items`, request),
+  createAttachment: (
+    workspaceId: string,
+    { collectionId, description, file, title }: CreateAttachmentRequest,
+    options: UploadOptions
+  ) => {
+    const form = new FormData()
+    form.set('title', title)
+    form.set('file', file)
+    if (description) form.set('description', description)
+    if (collectionId) form.set('collectionId', collectionId)
+    return uploadAttachment(
+      'post',
+      `/workspaces/${workspaceId}/items/attachments`,
+      form,
+      options
+    )
+  },
+  downloadAttachment: (workspaceId: string, itemId: string) =>
+    apiClient.get<Blob>(
+      `/workspaces/${workspaceId}/items/${itemId}/attachment`,
+      { responseType: 'blob' }
+    ),
   get: (workspaceId: string, itemId: string) =>
     apiClient.get<ItemResponse>(`/workspaces/${workspaceId}/items/${itemId}`),
   list: (
@@ -264,14 +314,15 @@ export const itemsApi = {
     workspaceId: string,
     itemId: string,
     file: File,
-    { signal }: { signal?: AbortSignal } = {}
+    options?: Partial<UploadOptions>
   ) => {
-    const body = new FormData()
-    body.append('file', file)
-    return apiClient.put<AttachmentResponse>(
+    const form = new FormData()
+    form.append('file', file)
+    return uploadAttachment(
+      'put',
       `/workspaces/${workspaceId}/items/${itemId}/attachment`,
-      body,
-      { signal }
+      form,
+      options
     )
   },
   restore: (workspaceId: string, itemId: string) =>

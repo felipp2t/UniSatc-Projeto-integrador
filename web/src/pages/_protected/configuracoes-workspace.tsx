@@ -1,9 +1,7 @@
 import {
-  GearIcon,
   MagnifyingGlassIcon,
   ShieldIcon,
   TrashIcon,
-  UsersThreeIcon,
 } from '@phosphor-icons/react'
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
@@ -19,11 +17,7 @@ import type {
   WorkspaceMemberResponse,
   WorkspaceRoleResponse,
 } from '@/api/types'
-import {
-  workspaceMembersQueryKey,
-  workspaceRolesQueryKey,
-} from '@/api/workspace-keys'
-import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { workspaceRolesQueryKey } from '@/api/workspace-keys'
 import { ChangeMemberRoleDialog } from '@/components/change-member-role-dialog'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
@@ -40,12 +34,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WorkspaceRolesSection } from '@/components/workspace-roles-section'
+import { WorkspaceSettingsLayout } from '@/components/workspace-settings-layout'
 import { useChangeMemberRole } from '@/hooks/use-change-member-role'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useRemoveMember } from '@/hooks/use-remove-member'
+import { useWorkspaceMembers } from '@/hooks/use-workspace-members'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
   component: WorkspaceSettingsPage,
@@ -59,18 +54,10 @@ function WorkspaceSettingsPage() {
   const workspaces = useCurrentWorkspace()
   const currentWorkspace = workspaces.data
   const workspaceId = currentWorkspace?.id
-  const members = useQuery({
-    enabled: Boolean(workspaceId),
-    queryFn: async () => {
-      if (!workspaceId) throw new Error('Workspace indisponível.')
-      return (await workspaceApi.listMembers(workspaceId)).data
-    },
-    queryKey: workspaceMembersQueryKey(workspaceId),
-  })
-  const currentUserRole = members.data?.find(
-    (member) => member.userId === session.user?.id
-  )?.roleName
-  const isOwner = isOwnerRole(currentUserRole)
+  const { currentUserRole, isOwner, members } = useWorkspaceMembers(
+    workspaceId,
+    session.user?.id
+  )
   const roles = useQuery({
     enabled: Boolean(workspaceId && isOwner),
     queryFn: async () => {
@@ -147,56 +134,17 @@ function WorkspaceSettingsPage() {
   }
 
   return (
-    <main className='container mx-auto space-y-6 px-4 py-8 md:px-8 md:py-12'>
-      <header className='flex flex-col gap-6'>
-        <AppBreadcrumb
-          items={[
-            { label: 'Início', to: '/' },
-            { label: 'Configurações do workspace' },
-          ]}
-        />
-        <div className='flex min-w-0 items-center gap-4'>
-          <GearIcon
-            aria-hidden='true'
-            className='size-6 shrink-0 text-primary'
-          />
-          <h1 className='truncate font-bold font-mono text-xl md:text-3xl'>
-            CONFIGURAÇÕES DO WORKSPACE
-          </h1>
-        </div>
-      </header>
-      <Tabs
-        className='flex min-w-0 flex-col gap-8 md:flex-row'
-        defaultValue='members'
-        orientation='vertical'
+    <WorkspaceSettingsLayout breadcrumbLabel='Configurações do workspace'>
+      <section
+        aria-label='Configurações do workspace'
+        className='min-w-0 flex-1'
       >
-        <nav
-          aria-label='Configurações do workspace'
-          className='w-full shrink-0 md:w-52'
-        >
-          <TabsList
-            aria-label='Seções das configurações do workspace'
-            className='flex h-auto w-full flex-col items-stretch gap-1 rounded-none bg-transparent p-0'
-          >
-            <TabsTrigger
-              className='w-full justify-start gap-2 rounded-none border-l-2 px-3 py-2 text-left font-semibold tracking-wide data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none'
-              value='members'
-            >
-              <UsersThreeIcon
-                aria-hidden='true'
-                className='size-3.5 shrink-0'
-              />
-              Membros
-            </TabsTrigger>
+        <Tabs defaultValue='members'>
+          <TabsList>
+            <TabsTrigger value='members'>Membros</TabsTrigger>
             <WorkspaceRolesTabTrigger isOwner={isOwner} />
           </TabsList>
-        </nav>
-        <Separator className='hidden h-auto md:block' orientation='vertical' />
-        <section
-          aria-label='Configurações do workspace'
-          className='min-w-0 flex-1'
-        >
-          <TabsContent className='mt-0' value='members'>
+          <TabsContent className='mt-4' value='members'>
             <Tabs defaultValue='members'>
               <div className='flex flex-wrap items-center justify-between gap-3'>
                 <TabsList>
@@ -275,21 +223,18 @@ function WorkspaceSettingsPage() {
             rolesPending={roles.isPending}
             workspaceId={workspaceId}
           />
-        </section>
-      </Tabs>
+        </Tabs>
+      </section>
       <ChangeMemberRoleDialog roleChange={roleChange} />
       <RemoveMemberDialog removal={memberRemoval} />
-    </main>
+    </WorkspaceSettingsLayout>
   )
 }
 
 function WorkspaceRolesTabTrigger({ isOwner }: { isOwner: boolean }) {
   if (!isOwner) return null
   return (
-    <TabsTrigger
-      className='w-full justify-start gap-2 rounded-none border-l-2 px-3 py-2 text-left font-semibold tracking-wide data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none'
-      value='roles'
-    >
+    <TabsTrigger className='gap-2' value='roles'>
       <ShieldIcon aria-hidden='true' className='size-3.5 shrink-0' />
       Cargos e permissões
     </TabsTrigger>

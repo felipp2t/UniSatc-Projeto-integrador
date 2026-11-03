@@ -221,6 +221,7 @@ function ItemContentControl({
         aria-describedby={describedBy}
         aria-invalid={invalid}
         disabled={disabled}
+        hint='PDF, DOCX, TXT ou MD até 10MB'
         id='item-content'
         isInvalid={invalid}
         onBlur={field.handleBlur}

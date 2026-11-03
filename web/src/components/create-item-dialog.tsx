@@ -30,14 +30,20 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { appToast } from '@/components/ui/toast'
+import { useAttachmentUpload } from '@/hooks/use-attachment-upload'
 import {
+  ATTACHMENT_REQUIRED_MESSAGE,
   isContentInvalid,
   isTitleInvalid,
+  type TextualItemType,
   TITLE_MAX,
+  validateAttachmentFile,
 } from '@/lib/item-validation'
+import { AttachmentFields } from './attachment-fields'
+import { UploadProgress } from './upload-progress'
 
 const itemTypes = [
-  { icon: FileTextIcon, label: 'documento', value: 'document' },
+  { icon: FileTextIcon, label: 'documento', value: 'file' },
   { icon: LinkSimpleIcon, label: 'link', value: 'link' },
   { icon: KeyIcon, label: 'segredo', value: 'secret' },
   { icon: ParagraphIcon, label: 'texto', value: 'text' },
@@ -88,7 +94,7 @@ async function loadCollectionLocations(
 }
 
 function buildCreateItemRequest(
-  type: CreateItemType,
+  type: TextualItemType,
   title: string,
   content: string,
   location: string
@@ -104,16 +110,18 @@ function buildCreateItemRequest(
 }
 
 function ItemTypeButton({
+  disabled,
   option,
   selected,
   onSelect,
 }: {
+  disabled: boolean
   option: (typeof itemTypes)[number]
   selected: boolean
   onSelect: (type: CreateItemType) => void
 }) {
   const handleClick = useCallback(() => {
-    if (option.value !== 'document') onSelect(option.value)
+    onSelect(option.value)
   }, [onSelect, option.value])
   const Icon = option.icon
   const secretActive = selected && option.value === 'secret'
@@ -122,14 +130,9 @@ function ItemTypeButton({
     <button
       aria-pressed={selected}
       className={`flex h-8 flex-1 cursor-pointer items-center justify-center gap-1 border border-accent not-first:border-l-0 bg-outline font-mono text-[9px] text-muted-foreground uppercase disabled:cursor-not-allowed disabled:opacity-40 ${selected && !secretActive ? 'border-primary border-x-0 border-t-0 border-b-2 bg-background text-primary' : ''} ${secretActive ? 'border-amber-600 border-x-0 border-y-0 border-b-2 bg-amber-500/20 text-amber-500' : ''}`}
-      disabled={option.value === 'document'}
+      disabled={disabled}
       key={option.value}
       onClick={handleClick}
-      title={
-        option.value === 'document'
-          ? 'O envio de documentos ainda não é suportado'
-          : undefined
-      }
       type='button'
     >
       <Icon aria-hidden='true' size={13} />
@@ -139,9 +142,11 @@ function ItemTypeButton({
 }
 
 function ItemTypeSelector({
+  disabled,
   value,
   onChange,
 }: {
+  disabled: boolean
   value: CreateItemType
   onChange: (type: CreateItemType) => void
 }) {
@@ -153,6 +158,7 @@ function ItemTypeSelector({
       <div className='flex items-center'>
         {itemTypes.map((option) => (
           <ItemTypeButton
+            disabled={disabled}
             key={option.value}
             onSelect={onChange}
             option={option}
@@ -264,9 +270,24 @@ async function fetchAvailableWorkspaces(): Promise<WorkspaceOption[]> {
 
 function getFormErrors(title: string, type: CreateItemType, content: string) {
   return {
-    content: isContentInvalid(type, content),
+    content: type !== 'file' && isContentInvalid(type, content),
     title: isTitleInvalid(title),
   }
+}
+
+function getFileError(type: CreateItemType, file: File | undefined) {
+  if (type !== 'file') return
+  return file ? validateAttachmentFile(file) : ATTACHMENT_REQUIRED_MESSAGE
+}
+
+function getFirstInvalidField(
+  errors: ReturnType<typeof getFormErrors>,
+  fileError: string | undefined
+): 'title' | 'content' | 'file' | undefined {
+  if (errors.title) return 'title'
+  if (errors.content) return 'content'
+  if (fileError) return 'file'
+  return undefined
 }
 
 const secretStatusMessages: Record<number, string> = {
@@ -309,6 +330,9 @@ export function CreateItemDialog({
   const [selectedType, setSelectedType] = useState<CreateItemType>('text')
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [description, setDescription] = useState('')
+  const [file, setFile] = useState<File>()
+  const { cancel, progress, upload } = useAttachmentUpload()
   const [workspaceId, setWorkspaceId] = useState<string>()
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[]>([])
   const [location, setLocation] = useState('root')
@@ -319,7 +343,10 @@ export function CreateItemDialog({
   const [submitError, setSubmitError] = useState<string>()
   const [titleInvalid, setTitleInvalid] = useState(false)
   const [contentInvalid, setContentInvalid] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [attachmentError, setAttachmentError] = useState<string>()
+  const [submittingType, setSubmittingType] = useState<CreateItemType>()
+  const submitting = submittingType !== undefined
+  const isUploading = submittingType === 'file'
 
   useEffect(() => {
     if (!open) {
@@ -389,6 +416,8 @@ export function CreateItemDialog({
     setSelectedType('text')
     setTitle('')
     setContent('')
+    setDescription('')
+    setFile(undefined)
     setWorkspaceId(undefined)
     setWorkspaces([])
     setLocation('root')
@@ -399,21 +428,27 @@ export function CreateItemDialog({
     setSubmitError(undefined)
     setTitleInvalid(false)
     setContentInvalid(false)
+    setAttachmentError(undefined)
   }, [])
+
+  const closeDialog = useCallback(() => {
+    setOpen(false)
+    resetForm()
+  }, [resetForm])
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen && submitting) {
         return
       }
-      setOpen(nextOpen)
       if (nextOpen) {
+        setOpen(true)
         setWorkspaceLoading(true)
         return
       }
-      resetForm()
+      closeDialog()
     },
-    [resetForm, submitting]
+    [closeDialog, submitting]
   )
 
   const handleTitleChange = useCallback(
@@ -433,7 +468,9 @@ export function CreateItemDialog({
     setSelectedType(type)
     setContent('')
     setContentInvalid(false)
+    setAttachmentError(undefined)
     setSubmitError(undefined)
+    setFile(undefined)
   }, [])
 
   const handleWorkspaceChange = useCallback((id: string) => {
@@ -442,9 +479,78 @@ export function CreateItemDialog({
   }, [])
 
   const handleCancel = useCallback(() => {
+    if (isUploading) {
+      cancel()
+      setSubmitError(
+        'Envio cancelado. Confira se o item foi criado antes de tentar novamente.'
+      )
+      return
+    }
     setSubmitError(undefined)
     handleOpenChange(false)
-  }, [handleOpenChange])
+  }, [cancel, handleOpenChange, isUploading])
+
+  const handleFileChange = useCallback((selectedFile: File | undefined) => {
+    setFile(selectedFile)
+    setAttachmentError(undefined)
+  }, [])
+
+  const submitAttachment = useCallback(
+    async (targetWorkspaceId: string, selectedFile: File) => {
+      setSubmittingType('file')
+      try {
+        await upload((options) =>
+          itemsApi.createAttachment(
+            targetWorkspaceId,
+            {
+              collectionId: location === 'root' ? undefined : location,
+              description: description.trim() || undefined,
+              file: selectedFile,
+              title: title.trim(),
+            },
+            options
+          )
+        )
+        appToast.success('Documento criado.', {
+          description: `${title.trim()} foi salvo com sucesso.`,
+        })
+        onItemCreated?.()
+        closeDialog()
+      } catch (error) {
+        if (!toApiError(error).isCanceled) {
+          setSubmitError(getCreateError(error, 'file'))
+        }
+      } finally {
+        setSubmittingType(undefined)
+      }
+    },
+    [closeDialog, description, location, onItemCreated, title, upload]
+  )
+
+  const submitItem = useCallback(
+    async (targetWorkspaceId: string, type: TextualItemType) => {
+      const request = buildCreateItemRequest(
+        type,
+        title.trim(),
+        content,
+        location
+      )
+      setSubmittingType(type)
+      try {
+        await itemsApi.create(targetWorkspaceId, request)
+        appToast.success('Item criado.', {
+          description: `${request.title} foi salvo com sucesso.`,
+        })
+        onItemCreated?.()
+        closeDialog()
+      } catch (error) {
+        setSubmitError(getCreateError(error, type))
+      } finally {
+        setSubmittingType(undefined)
+      }
+    },
+    [closeDialog, content, location, onItemCreated, title]
+  )
 
   const handleSubmit = useCallback(
     async (event: React.SubmitEvent<HTMLFormElement>) => {
@@ -452,19 +558,16 @@ export function CreateItemDialog({
       setSubmitError(undefined)
 
       const errors = getFormErrors(title, selectedType, content)
+      const fileError = getFileError(selectedType, file)
       setTitleInvalid(errors.title)
       setContentInvalid(errors.content)
+      setAttachmentError(fileError)
 
-      if (errors.title || errors.content) {
-        if (errors.title) {
-          formRef.current
-            ?.querySelector<HTMLInputElement>('[name="title"]')
-            ?.focus()
-        } else {
-          formRef.current
-            ?.querySelector<HTMLElement>('[name="content"]')
-            ?.focus()
-        }
+      const firstInvalid = getFirstInvalidField(errors, fileError)
+      if (firstInvalid) {
+        formRef.current
+          ?.querySelector<HTMLElement>(`[name="${firstInvalid}"]`)
+          ?.focus()
         return
       }
 
@@ -473,33 +576,18 @@ export function CreateItemDialog({
         return
       }
 
-      const request = buildCreateItemRequest(
-        selectedType,
-        title.trim(),
-        content,
-        location
-      )
-
-      setSubmitting(true)
-      try {
-        await itemsApi.create(workspaceId, request)
-        appToast.success('Item criado.', {
-          description: `${request.title} foi salvo com sucesso.`,
-        })
-        onItemCreated?.()
-        handleOpenChange(false)
-      } catch (error) {
-        setSubmitError(getCreateError(error, selectedType))
-      } finally {
-        setSubmitting(false)
+      if (selectedType !== 'file') {
+        await submitItem(workspaceId, selectedType)
+        return
       }
+      if (file) await submitAttachment(workspaceId, file)
     },
     [
       content,
-      handleOpenChange,
-      location,
-      onItemCreated,
+      file,
       selectedType,
+      submitAttachment,
+      submitItem,
       title,
       workspaceId,
     ]
@@ -561,7 +649,11 @@ export function CreateItemDialog({
             ) : null}
           </Field>
 
-          <ItemTypeSelector onChange={handleTypeChange} value={selectedType} />
+          <ItemTypeSelector
+            disabled={submitting}
+            onChange={handleTypeChange}
+            value={selectedType}
+          />
 
           <ItemDestinationFields
             location={location}
@@ -581,13 +673,34 @@ export function CreateItemDialog({
             }))}
           />
 
-          <ItemContentField
-            id={`${titleId}-content`}
-            invalid={contentInvalid}
-            onChange={handleContentChange}
-            type={selectedType}
-            value={content}
-          />
+          {selectedType === 'file' ? (
+            <AttachmentFields
+              description={description}
+              disabled={isUploading}
+              error={attachmentError}
+              file={file}
+              id={titleId}
+              onDescriptionChange={setDescription}
+              onFileChange={handleFileChange}
+            />
+          ) : (
+            <ItemContentField
+              id={`${titleId}-content`}
+              invalid={contentInvalid}
+              onChange={handleContentChange}
+              type={selectedType}
+              value={content}
+            />
+          )}
+          {isUploading ? (
+            <UploadProgress progress={progress ?? 0}>
+              <p>
+                O cancelamento é garantido antes da confirmação. Se o envio ou
+                resposta for interrompido, confira se o documento foi criado
+                antes de tentar novamente.
+              </p>
+            </UploadProgress>
+          ) : null}
 
           {submitError ? (
             <p className='text-destructive text-sm' role='alert'>
@@ -598,11 +711,11 @@ export function CreateItemDialog({
           <DialogFooter className='mt-1 flex-col-reverse border-border border-t pt-4 sm:flex-row sm:justify-end'>
             <Button
               className='h-[30px] rounded-none border border-accent bg-outline px-4 text-[10px] text-muted-foreground hover:text-foreground'
-              disabled={submitting}
+              disabled={submitting && !isUploading}
               onClick={handleCancel}
               variant='outline'
             >
-              CANCELAR
+              {isUploading ? 'CANCELAR ENVIO' : 'CANCELAR'}
             </Button>
             <Button
               className='h-[30px] rounded-none px-4 text-[10px]'
