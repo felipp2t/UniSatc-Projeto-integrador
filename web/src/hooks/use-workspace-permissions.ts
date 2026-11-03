@@ -1,9 +1,7 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { workspaceApi } from '@/api/endpoints'
-import {
-  createPermissionChecker,
-  workspacePermissionQueryKey,
-} from '@/auth/permissions'
+import { workspacePermissionQueryKey } from '@/api/workspace-keys'
+import { createPermissionChecker, denyAllPermissions } from '@/auth/permissions'
 
 export function workspacePermissionsQuery(workspaceId: string | undefined) {
   return queryOptions({
@@ -19,9 +17,9 @@ export function workspacePermissionsQuery(workspaceId: string | undefined) {
 
 export function useWorkspacePermissions(workspaceId: string | undefined) {
   const query = useQuery(workspacePermissionsQuery(workspaceId))
-  const checker = createPermissionChecker(
-    query.isError ? [] : (query.data?.permissions ?? []),
-    !query.isError && query.data?.isOwner === true
-  )
+  const checker =
+    query.isError || !query.data
+      ? denyAllPermissions
+      : createPermissionChecker(query.data.permissions, query.data.isOwner)
   return { ...query, can: checker.can }
 }

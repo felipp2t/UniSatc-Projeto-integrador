@@ -7,8 +7,10 @@ import type {
   WorkspaceMemberResponse,
   WorkspaceRoleResponse,
 } from '@/api/types'
-import { workspaceMembersQueryKey } from '@/api/workspace-keys'
-import { workspacePermissionQueryKey } from '@/auth/permissions'
+import {
+  workspaceMembersQueryKey,
+  workspacePermissionQueryKey,
+} from '@/api/workspace-keys'
 import { appToast } from '@/components/ui/toast'
 
 interface PendingRoleChange {

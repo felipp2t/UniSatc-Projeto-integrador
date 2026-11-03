@@ -1,4 +1,3 @@
-import { queryOptions } from '@tanstack/react-query'
 import {
   createFileRoute,
   Outlet,
@@ -6,7 +5,6 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { useCallback } from 'react'
-import { workspaceApi } from '@/api/endpoints'
 import {
   createPermissionChecker,
   enforceRoutePermission,
@@ -17,12 +15,8 @@ import { NotFoundPage } from '@/components/not-found-page'
 import { OfflineBanner } from '@/components/offline-banner'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { workspacesQuery } from '@/hooks/use-current-workspace'
 import { workspacePermissionsQuery } from '@/hooks/use-workspace-permissions'
-
-const workspacesQuery = queryOptions({
-  queryFn: async () => (await workspaceApi.list()).data,
-  queryKey: ['workspaces'],
-})
 
 export const Route = createFileRoute('/_protected')({
   beforeLoad: async ({ context, location, matches }) => {

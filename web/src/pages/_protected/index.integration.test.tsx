@@ -1,187 +1,25 @@
 // @vitest-environment happy-dom
 
-import {
-  createMemoryHistory,
-  createRouter,
-  RouterProvider,
-} from '@tanstack/react-router'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createElement } from 'react'
 import { toast } from 'sonner'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
-import { createQueryClient } from '@/api/query-client'
-import type { SessionService } from '@/auth/session'
-import type { RouterContext } from '@/router-context'
-import { routerDefaults } from '@/router-defaults'
-import { renderWithProviders } from '@/test/render'
-import { createSessionStub } from '@/test/session-stub'
-import '@/test/dom-setup'
+import {
+  apiMocks,
+  collectionPage,
+  folderAId,
+  folderBId,
+  itemPage,
+  renderAt,
+  workspaceId,
+} from '@/test/workspace-browser-fixtures'
 
-const folderAId = '00000000-0000-0000-0000-000000000001'
-const folderBId = '00000000-0000-0000-0000-000000000002'
 const folderAName = /Folder A/i
 const aChildName = /A child/i
 const bChildName = /B child/i
 const firstPageFolderName = /First page folder/i
 const secondPageFolderName = /Second page folder/i
-const workspaceId = 'workspace-1'
-
-const apiMocks = vi.hoisted(() => ({
-  collectionsCreate: vi.fn(),
-  collectionsList: vi.fn(),
-  collectionsPath: vi.fn(),
-  collectionsRemove: vi.fn(),
-  collectionsRename: vi.fn(),
-  itemsList: vi.fn(),
-  workspaceList: vi.fn(),
-  workspacePermissions: vi.fn(),
-}))
-
-vi.mock('@/api/endpoints', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/api/endpoints')>()
-  return {
-    ...actual,
-    collectionsApi: {
-      ...actual.collectionsApi,
-      create: apiMocks.collectionsCreate,
-      list: apiMocks.collectionsList,
-      path: apiMocks.collectionsPath,
-      remove: apiMocks.collectionsRemove,
-      rename: apiMocks.collectionsRename,
-    },
-    itemsApi: { ...actual.itemsApi, list: apiMocks.itemsList },
-    workspaceApi: {
-      ...actual.workspaceApi,
-      list: apiMocks.workspaceList,
-      permissions: apiMocks.workspacePermissions,
-    },
-  }
-})
-
-vi.mock('@/components/create-item-dialog', () => ({
-  CreateItemDialog: ({ onItemCreated }: { onItemCreated: () => void }) =>
-    createElement(
-      'button',
-      { onClick: onItemCreated, type: 'button' },
-      'Simulate item created'
-    ),
-}))
-
-import { routeTree } from '@/route-tree.gen'
-
-function collectionPage(
-  items: Array<{ id: string; name: string; parentId: string | null }>,
-  page = 0,
-  totalPages = 1
-) {
-  return {
-    data: {
-      items,
-      page,
-      size: 100,
-      totalItems: items.length,
-      totalPages,
-    },
-  }
-}
-
-function itemPage(page = 0, type: 'link' | 'secret' | 'text' = 'text') {
-  return {
-    data: {
-      items: [
-        {
-          archivedAt: null,
-          collectionId: null,
-          id: `item-${page}`,
-          linkUrl: null,
-          preview: null,
-          textContent: null,
-          title: `Item ${page}`,
-          type,
-        },
-      ],
-      page,
-      size: 100,
-      totalItems: 200,
-      totalPages: 2,
-    },
-  }
-}
-
-function createSession(): SessionService {
-  return createSessionStub({
-    status: 'authenticated',
-    user: { email: 'user@example.com', id: 'user-1', name: 'User' },
-  })
-}
-
-async function renderAt(entry: string) {
-  const queryClient = createQueryClient()
-  queryClient.setDefaultOptions({
-    queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
-  })
-  const router = createRouter({
-    context: {
-      permissionChecker: { can: () => true },
-      queryClient,
-      session: createSession(),
-    } satisfies RouterContext,
-    history: createMemoryHistory({ initialEntries: [entry] }),
-    isServer: false,
-    routeTree,
-    ...routerDefaults,
-  })
-  router.startTransition = (transition) => {
-    transition()
-    return Promise.resolve(true)
-  }
-  router.updateLatestLocation()
-  await router.load({ sync: true })
-
-  const rendered = renderWithProviders(<RouterProvider router={router} />, {
-    queryClient,
-  })
-  return { router, ...rendered }
-}
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  apiMocks.collectionsCreate.mockResolvedValue({
-    data: { id: 'created-folder', name: 'New folder', parentId: null },
-  })
-  apiMocks.collectionsRename.mockResolvedValue({
-    data: { id: folderAId, name: 'Renamed folder', parentId: null },
-  })
-  apiMocks.collectionsRemove.mockResolvedValue({ data: undefined })
-  apiMocks.workspaceList.mockResolvedValue({
-    data: [{ id: workspaceId, name: 'Workspace' }],
-  })
-  apiMocks.workspacePermissions.mockResolvedValue({
-    data: {
-      isOwner: false,
-      permissions: [
-        { action: 'all', resource: 'collection' },
-        { action: 'all', resource: 'item' },
-      ],
-      roleId: 'role-1',
-      roleName: 'Owner',
-    },
-  })
-  apiMocks.collectionsList.mockResolvedValue(collectionPage([]))
-  apiMocks.collectionsPath.mockImplementation(async (_id, collectionId) => ({
-    data: [
-      {
-        id: collectionId,
-        name: collectionId === folderAId ? 'Folder A' : 'Folder B',
-      },
-    ],
-  }))
-  apiMocks.itemsList.mockResolvedValue(itemPage(0))
-})
-
-afterEach(() => vi.restoreAllMocks())
 
 describe('workspace settings entry', () => {
   it('hides the workspace actions menu inside a collection', async () => {
@@ -1069,87 +907,5 @@ describe('workspace collection navigation', () => {
       await screen.findByText('Nenhum item encontrado')
     ).toBeInTheDocument()
     expect(screen.queryByText('Nenhum item arquivado')).toBeNull()
-  })
-})
-
-describe('workspace permission gates', () => {
-  function grant(permissions: { resource: string; action: string }[]) {
-    apiMocks.workspacePermissions.mockResolvedValue({
-      data: {
-        isOwner: false,
-        permissions,
-        roleId: 'reader',
-        roleName: 'Reader',
-      },
-    })
-  }
-
-  it('hides creation and folder mutations for a reader', async () => {
-    grant([
-      { action: 'read', resource: 'collection' },
-      { action: 'read', resource: 'item' },
-    ])
-    apiMocks.collectionsList.mockResolvedValue(
-      collectionPage([{ id: folderAId, name: 'Folder A', parentId: null }])
-    )
-    await renderAt('/')
-    await screen.findByRole('link', { name: 'Folder A' })
-    expect(screen.queryByRole('button', { name: 'Nova pasta' })).toBeNull()
-    expect(
-      screen.queryByRole('button', { name: 'Simulate item created' })
-    ).toBeNull()
-    expect(
-      screen.queryByRole('button', { name: 'Ações de Folder A' })
-    ).toBeNull()
-  })
-
-  it('does not fetch lists without read grants', async () => {
-    grant([])
-    await renderAt('/')
-    await screen.findByRole('heading', { name: 'Workspace' })
-    expect(apiMocks.itemsList).not.toHaveBeenCalled()
-    expect(apiMocks.collectionsList).not.toHaveBeenCalled()
-  })
-
-  it('can create a root folder without permission to list folders', async () => {
-    grant([{ action: 'create', resource: 'collection' }])
-    const user = userEvent.setup()
-    await renderAt('/')
-    await user.click(await screen.findByRole('button', { name: 'Nova pasta' }))
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Nome'), {
-      target: { value: 'New' },
-    })
-    await user.click(
-      within(dialog).getByRole('button', { name: 'Criar pasta' })
-    )
-    await waitFor(() =>
-      expect(apiMocks.collectionsCreate).toHaveBeenCalledWith(workspaceId, {
-        name: 'New',
-        parentId: undefined,
-      })
-    )
-    expect(apiMocks.collectionsList).not.toHaveBeenCalled()
-  })
-
-  it('blocks direct navigation to history without activity read', async () => {
-    grant([])
-    await renderAt('/atividades')
-    expect(await screen.findByText('Página não encontrada')).toBeInTheDocument()
-    expect(
-      screen.queryByRole('heading', { name: 'Histórico de atividades' })
-    ).toBeNull()
-  })
-
-  it('hides the history link without activity read', async () => {
-    grant([])
-    const user = userEvent.setup()
-    await renderAt('/')
-    await user.click(
-      await screen.findByRole('button', { name: 'Ações do workspace' })
-    )
-    expect(
-      screen.queryByRole('menuitem', { name: 'Histórico de atividades' })
-    ).toBeNull()
   })
 })

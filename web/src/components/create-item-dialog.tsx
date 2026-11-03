@@ -32,6 +32,7 @@ import {
 import { appToast } from '@/components/ui/toast'
 import { useAttachmentUpload } from '@/hooks/use-attachment-upload'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
+import { canCreateItem } from '@/lib/item-permissions'
 import {
   ATTACHMENT_REQUIRED_MESSAGE,
   isContentInvalid,
@@ -144,12 +145,12 @@ function ItemTypeButton({
 
 function ItemTypeSelector({
   disabled,
-  canCreateSecret,
+  options,
   value,
   onChange,
 }: {
   disabled: boolean
-  canCreateSecret: boolean
+  options: readonly (typeof itemTypes)[number][]
   value: CreateItemType
   onChange: (type: CreateItemType) => void
 }) {
@@ -159,17 +160,15 @@ function ItemTypeSelector({
         TIPO
       </legend>
       <div className='flex items-center'>
-        {itemTypes
-          .filter((option) => option.value !== 'secret' || canCreateSecret)
-          .map((option) => (
-            <ItemTypeButton
-              disabled={disabled}
-              key={option.value}
-              onSelect={onChange}
-              option={option}
-              selected={value === option.value}
-            />
-          ))}
+        {options.map((option) => (
+          <ItemTypeButton
+            disabled={disabled}
+            key={option.value}
+            onSelect={onChange}
+            option={option}
+            selected={value === option.value}
+          />
+        ))}
       </div>
     </fieldset>
   )
@@ -340,7 +339,10 @@ export function CreateItemDialog({
   const { cancel, progress, upload } = useAttachmentUpload()
   const [workspaceId, setWorkspaceId] = useState<string>()
   const permissions = useWorkspacePermissions(open ? workspaceId : undefined)
-  const canCreateSecret = permissions.can('secret', 'create')
+  const allowedTypes = itemTypes.filter((option) =>
+    canCreateItem(permissions, option.value)
+  )
+  const canCreateSelectedType = canCreateItem(permissions, selectedType)
   const canReadCollections = permissions.can('collection', 'read')
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[]>([])
   const [location, setLocation] = useState('root')
@@ -585,10 +587,7 @@ export function CreateItemDialog({
         return
       }
 
-      if (
-        !permissions.can('item', 'create') ||
-        (selectedType === 'secret' && !canCreateSecret)
-      ) {
+      if (!canCreateSelectedType) {
         setSubmitError('Você não tem permissão para criar este tipo de item.')
         return
       }
@@ -600,8 +599,7 @@ export function CreateItemDialog({
       if (file) await submitAttachment(workspaceId, file)
     },
     [
-      canCreateSecret,
-      permissions.can,
+      canCreateSelectedType,
       content,
       file,
       selectedType,
@@ -675,9 +673,9 @@ export function CreateItemDialog({
             </p>
           ) : null}
           <ItemTypeSelector
-            canCreateSecret={canCreateSecret}
             disabled={submitting}
             onChange={handleTypeChange}
+            options={allowedTypes}
             value={selectedType}
           />
 
@@ -699,24 +697,32 @@ export function CreateItemDialog({
             }))}
           />
 
-          {selectedType === 'file' ? (
-            <AttachmentFields
-              description={description}
-              disabled={isUploading}
-              error={attachmentError}
-              file={file}
-              id={titleId}
-              onDescriptionChange={setDescription}
-              onFileChange={handleFileChange}
-            />
+          {canCreateSelectedType ? (
+            selectedType === 'file' ? (
+              <AttachmentFields
+                description={description}
+                disabled={isUploading}
+                error={attachmentError}
+                file={file}
+                id={titleId}
+                onDescriptionChange={setDescription}
+                onFileChange={handleFileChange}
+              />
+            ) : (
+              <ItemContentField
+                id={`${titleId}-content`}
+                invalid={contentInvalid}
+                onChange={handleContentChange}
+                type={selectedType}
+                value={content}
+              />
+            )
           ) : (
-            <ItemContentField
-              id={`${titleId}-content`}
-              invalid={contentInvalid}
-              onChange={handleContentChange}
-              type={selectedType}
-              value={content}
-            />
+            <p className='text-muted-foreground text-xs' role='status'>
+              {permissions.isPending
+                ? 'Verificando permissões…'
+                : 'O tipo selecionado não está disponível para seu papel. Selecione um tipo permitido.'}
+            </p>
           )}
           {isUploading ? (
             <UploadProgress progress={progress ?? 0}>
@@ -749,8 +755,7 @@ export function CreateItemDialog({
                 workspaceLoading ||
                 locationsLoading ||
                 !workspaceId ||
-                !permissions.can('item', 'create') ||
-                (selectedType === 'secret' && !canCreateSecret)
+                !canCreateSelectedType
               }
               loading={submitting}
               type='submit'

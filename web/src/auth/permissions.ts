@@ -1,5 +1,5 @@
 import { notFound } from '@tanstack/react-router'
-import type { ItemType } from '@/api/types'
+import type { WorkspacePermission } from '@/api/permissions'
 import type { FileRouteTypes } from '@/route-tree.gen'
 
 export interface PermissionRequirement {
@@ -7,26 +7,8 @@ export interface PermissionRequirement {
   resource: PermissionResource
 }
 
-export type PermissionAction =
-  | 'read'
-  | 'create'
-  | 'update'
-  | 'delete'
-  | 'invite'
-  | 'manage'
-  | (string & {})
-export type PermissionResource =
-  | 'workspace'
-  | 'collection'
-  | 'item'
-  | 'member'
-  | 'role'
-  | 'activity'
-  | (string & {})
-export interface EffectivePermission {
-  action: PermissionAction | 'all'
-  resource: PermissionResource
-}
+export type PermissionAction = Exclude<WorkspacePermission['action'], 'all'>
+export type PermissionResource = WorkspacePermission['resource']
 
 export interface PermissionChecker {
   can: (resource: PermissionResource, action: PermissionAction) => boolean
@@ -37,7 +19,7 @@ export const denyAllPermissions: PermissionChecker = {
 }
 
 export function createPermissionChecker(
-  permissions: EffectivePermission[],
+  permissions: WorkspacePermission[],
   isOwner = false
 ): PermissionChecker {
   return {
@@ -74,20 +56,4 @@ export function enforceRoutePermission(
       throw notFound({ routeId: match.routeId })
     }
   }
-}
-
-export const workspacePermissionQueryKey = (
-  workspaceId: string | undefined
-) => ['workspace-permissions', workspaceId]
-
-export function canAccessItem(
-  checker: PermissionChecker,
-  type: ItemType,
-  action: 'read' | 'update' | 'delete'
-) {
-  return (
-    checker.can('item', action) &&
-    (type !== 'secret' ||
-      (checker.can('secret', 'read') && checker.can('secret', action)))
-  )
 }

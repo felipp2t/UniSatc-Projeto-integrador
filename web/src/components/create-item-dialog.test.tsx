@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
+import { workspacePermissionQueryKey } from '@/api/workspace-keys'
 import { renderWithProviders } from '@/test/render'
 
 const apiMocks = vi.hoisted(() => ({
@@ -506,4 +507,39 @@ it('hides secret creation when only ordinary item creation is granted', async ()
   await waitFor(() => expect(create).toBeEnabled())
   expect(screen.queryByRole('button', { name: 'segredo' })).toBeNull()
   expect(apiMocks.collectionsList).not.toHaveBeenCalled()
+})
+
+it('requires a new selection when the selected type loses permission', async () => {
+  const user = userEvent.setup()
+  const { queryClient } = renderWithProviders(
+    <CreateItemDialog workspaceId={workspaceId} />
+  )
+  await user.click(screen.getByRole('button', { name: 'Novo item' }))
+  await user.click(await screen.findByRole('button', { name: 'segredo' }))
+  await user.type(
+    screen.getByLabelText('VALOR DO SEGREDO'),
+    'sensitive content'
+  )
+  act(() => {
+    queryClient.setQueryData(workspacePermissionQueryKey(workspaceId), {
+      isOwner: false,
+      permissions: [{ action: 'create', resource: 'item' }],
+      roleId: 'reader',
+      roleName: 'Member',
+    })
+  })
+  await waitFor(() =>
+    expect(screen.queryByRole('button', { name: 'segredo' })).toBeNull()
+  )
+  expect(screen.queryByLabelText('VALOR DO SEGREDO')).toBeNull()
+  expect(screen.getByRole('button', { name: 'CRIAR' })).toBeDisabled()
+  expect(
+    screen.getByText(
+      'O tipo selecionado não está disponível para seu papel. Selecione um tipo permitido.'
+    )
+  ).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'texto' }))
+  expect(screen.getByLabelText('CONTEÚDO')).toHaveValue('')
+  expect(screen.getByRole('button', { name: 'CRIAR' })).toBeEnabled()
+  expect(apiMocks.itemsCreate).not.toHaveBeenCalled()
 })

@@ -69,7 +69,6 @@ function createTestRouter(child: () => ReactElement, session: SessionService) {
 
   const router = createRouter({
     context: {
-      permissionChecker: { can: () => true },
       queryClient,
       session,
     },

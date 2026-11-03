@@ -63,6 +63,7 @@ async function openDialog(item: ItemResponse) {
     <EditItemDialog
       itemId={itemId}
       onClose={onClose}
+      readOnly={false}
       workspaceId={workspaceId}
     />
   )
@@ -221,6 +222,7 @@ describe('EditItemDialog (texto, link e segredo)', () => {
       <EditItemDialog
         itemId={itemId}
         onClose={vi.fn()}
+        readOnly={false}
         workspaceId={workspaceId}
       />
     )
@@ -325,6 +327,7 @@ describe('EditItemDialog (texto, link e segredo)', () => {
       <EditItemDialog
         itemId={itemId}
         onClose={vi.fn()}
+        readOnly={false}
         workspaceId={workspaceId}
       />
     )
@@ -340,6 +343,7 @@ describe('EditItemDialog (texto, link e segredo)', () => {
       <EditItemDialog
         itemId={itemId}
         onClose={vi.fn()}
+        readOnly={false}
         workspaceId={workspaceId}
       />
     )

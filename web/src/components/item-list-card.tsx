@@ -1,32 +1,10 @@
-import {
-  DotsThreeVerticalIcon,
-  FileIcon,
-  ImageIcon,
-  KeyIcon,
-  LinkIcon,
-} from '@phosphor-icons/react'
-import { useCallback, useState } from 'react'
-import { itemsApi } from '@/api/endpoints'
-import { getArchiveError, getRestoreError } from '@/api/item-errors'
+import { FileIcon, ImageIcon, KeyIcon, LinkIcon } from '@phosphor-icons/react'
 import type { ItemResponse } from '@/api/types'
-import { canAccessItem } from '@/auth/permissions'
-import { DeleteItemDialog } from '@/components/delete-item-dialog'
-import { EditItemDialog } from '@/components/edit-item-dialog'
+import { type CopyKind, ItemActions } from '@/components/item-actions'
 import { ItemAttachmentDialog } from '@/components/item-attachment-dialog'
-import { ShareAccessDialog } from '@/components/share-access-dialog'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { appToast } from '@/components/ui/toast'
-import { useArchiveItem, useRestoreItem } from '@/hooks/use-item-mutations'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
-
-type OpenDialog = 'delete' | 'edit' | undefined
-export type CopyKind = 'content' | 'title'
+import { canAccessItem } from '@/lib/item-permissions'
 
 const typeIcons = {
   file: FileIcon,
@@ -45,56 +23,11 @@ export function ItemListCard({
   onCopy: (text: string, kind: CopyKind) => void
   workspaceId: string
 }) {
-  const [dialog, setDialog] = useState<OpenDialog>()
-  const [shareOpen, setShareOpen] = useState(false)
-  const archive = useArchiveItem()
-  const restore = useRestoreItem()
-  const archived = Boolean(item.archivedAt)
   const permissions = useWorkspacePermissions(workspaceId)
-  const canManageSharing = permissions.can('sharing', 'manage')
   const canRead = canAccessItem(permissions, item.type, 'read')
-  const canUpdate = canAccessItem(permissions, item.type, 'update')
-  const canDelete = canAccessItem(permissions, item.type, 'delete')
+  const archived = Boolean(item.archivedAt)
   const Icon = typeIcons[item.type]
   const preview = item.type === 'secret' ? '••••••••••••' : item.preview
-
-  const closeDialog = useCallback(() => setDialog(undefined), [])
-  const openEdit = useCallback(() => setDialog('edit'), [])
-  const openDelete = useCallback(() => setDialog('delete'), [])
-  const openSharing = useCallback(() => setShareOpen(true), [])
-  const closeSharing = useCallback(() => setShareOpen(false), [])
-  const handleCopyTitle = useCallback(
-    () => onCopy(item.title, 'title'),
-    [item.title, onCopy]
-  )
-  const canCopyContent =
-    canRead && (item.type === 'link' || item.type === 'text')
-  const handleCopyContent = useCallback(async () => {
-    try {
-      const { data } = await itemsApi.get(workspaceId, item.id)
-      const content = data.type === 'link' ? data.linkUrl : data.textContent
-      if (!content) throw new Error('Item sem conteúdo para copiar')
-      onCopy(content, 'content')
-    } catch {
-      appToast.error('Não foi possível copiar o conteúdo.')
-    }
-  }, [item.id, onCopy, workspaceId])
-  const isBusy = archive.isPending || restore.isPending
-  const runArchive = useCallback(() => {
-    if (isBusy) return
-    archive
-      .mutateAsync({ itemId: item.id, workspaceId })
-      .then(() => appToast.success('Item arquivado.'))
-      .catch((error: unknown) => appToast.error(getArchiveError(error)))
-  }, [archive, isBusy, item.id, workspaceId])
-  const runRestore = useCallback(() => {
-    if (isBusy) return
-    restore
-      .mutateAsync({ itemId: item.id, workspaceId })
-      .then(() => appToast.success('Item restaurado.'))
-      .catch((error: unknown) => appToast.error(getRestoreError(error)))
-  }, [isBusy, item.id, restore, workspaceId])
-
   return (
     <article className='flex min-h-21 cursor-default flex-col justify-between gap-3 border-2 border-border bg-card p-4 transition-all hover:border-primary/50'>
       <div className='flex w-full items-start justify-between gap-2'>
@@ -123,22 +56,7 @@ export function ItemListCard({
           >
             {item.type}
           </span>
-          <ItemActions
-            archived={archived}
-            canCopyContent={canCopyContent}
-            canDelete={canDelete}
-            canManageSharing={canManageSharing}
-            canRead={canRead}
-            canUpdate={canUpdate}
-            onArchive={runArchive}
-            onCopyContent={handleCopyContent}
-            onCopyTitle={handleCopyTitle}
-            onDelete={openDelete}
-            onEdit={openEdit}
-            onRestore={runRestore}
-            onShare={openSharing}
-            title={item.title}
-          />
+          <ItemActions item={item} onCopy={onCopy} workspaceId={workspaceId} />
         </div>
       </div>
       {preview ? (
@@ -149,109 +67,6 @@ export function ItemListCard({
       {canRead && (item.type === 'file' || item.type === 'image') ? (
         <ItemAttachmentDialog item={item} workspaceId={workspaceId} />
       ) : null}
-      {dialog === 'edit' && canRead ? (
-        <EditItemDialog
-          itemId={item.id}
-          onClose={closeDialog}
-          readOnly={!canUpdate}
-          workspaceId={workspaceId}
-        />
-      ) : null}
-      {dialog === 'delete' && canDelete ? (
-        <DeleteItemDialog
-          item={item}
-          onClose={closeDialog}
-          workspaceId={workspaceId}
-        />
-      ) : null}
-      {canManageSharing && !archived ? (
-        <ShareAccessDialog
-          onClose={closeSharing}
-          open={shareOpen}
-          target={{ id: item.id, kind: 'item', name: item.title }}
-          workspaceId={workspaceId}
-        />
-      ) : null}
     </article>
-  )
-}
-
-function ItemActions({
-  archived,
-  canCopyContent,
-  canDelete,
-  canManageSharing,
-  canRead,
-  canUpdate,
-  onArchive,
-  onCopyContent,
-  onCopyTitle,
-  onDelete,
-  onEdit,
-  onRestore,
-  onShare,
-  title,
-}: {
-  archived: boolean
-  canCopyContent: boolean
-  canDelete: boolean
-  canManageSharing: boolean
-  canRead: boolean
-  canUpdate: boolean
-  onArchive: () => void
-  onCopyContent: () => void
-  onCopyTitle: () => void
-  onDelete: () => void
-  onEdit: () => void
-  onRestore: () => void
-  onShare: () => void
-  title: string
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          aria-label={`Ações de ${title}`}
-          className='text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
-          type='button'
-        >
-          <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align='end'>
-        {canManageSharing && !archived ? (
-          <DropdownMenuItem onSelect={onShare}>Compartilhar</DropdownMenuItem>
-        ) : null}
-        {canRead ? (
-          <DropdownMenuItem onSelect={onEdit}>
-            {archived || !canUpdate ? 'Ver' : 'Editar'}
-          </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem onSelect={onCopyTitle}>
-          Copiar título
-        </DropdownMenuItem>
-        {canCopyContent ? (
-          <DropdownMenuItem onSelect={onCopyContent}>
-            Copiar conteúdo
-          </DropdownMenuItem>
-        ) : null}
-        {archived ? (
-          <>
-            {canUpdate ? (
-              <DropdownMenuItem onSelect={onRestore}>
-                Restaurar
-              </DropdownMenuItem>
-            ) : null}
-            {canDelete ? (
-              <DropdownMenuItem onSelect={onDelete}>
-                Excluir definitivamente
-              </DropdownMenuItem>
-            ) : null}
-          </>
-        ) : canUpdate ? (
-          <DropdownMenuItem onSelect={onArchive}>Arquivar</DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }

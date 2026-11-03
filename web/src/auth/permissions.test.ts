@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  canAccessItem,
   createPermissionChecker,
   denyAllPermissions,
   enforceRoutePermission,
@@ -31,21 +30,6 @@ describe('permission guards', () => {
 
   it('allows owners to access secrets even when effective permissions omit secret grants', () => {
     expect(createPermissionChecker([], true).can('secret', 'read')).toBe(true)
-  })
-
-  it('requires both item and secret grants to change a secret', () => {
-    const itemOnly = createPermissionChecker([
-      { action: 'all', resource: 'item' },
-    ])
-    expect(canAccessItem(itemOnly, 'text', 'update')).toBe(true)
-    expect(canAccessItem(itemOnly, 'secret', 'update')).toBe(false)
-    const secretEditor = createPermissionChecker([
-      { action: 'update', resource: 'item' },
-      { action: 'read', resource: 'secret' },
-      { action: 'update', resource: 'secret' },
-    ])
-    expect(canAccessItem(secretEditor, 'secret', 'update')).toBe(true)
-    expect(canAccessItem(secretEditor, 'secret', 'delete')).toBe(false)
   })
 
   it('enforces every annotated route, including parent routes', () => {

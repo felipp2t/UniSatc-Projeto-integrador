@@ -93,7 +93,6 @@ export async function renderWorkspaceSettings(
   const session = createSession(userId)
   const router = createRouter({
     context: {
-      permissionChecker: { can: () => true },
       queryClient,
       session,
     } satisfies RouterContext,

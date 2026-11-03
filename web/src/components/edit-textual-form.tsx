@@ -26,7 +26,7 @@ function buildUpdateRequest(
 
 export function EditTextualForm({
   item,
-  readOnly = false,
+  readOnly,
   onBusyChange,
   onClose,
   type,
@@ -81,7 +81,7 @@ function TextualFields({
   archived,
   initialContent,
   item,
-  readOnly = false,
+  readOnly,
   onBusyChange,
   onClose,
   type,
@@ -124,7 +124,6 @@ function TextualFields({
       archived={archived}
       form={form}
       onClose={onClose}
-      readOnly={readOnly}
       type={type}
     >
       {archived && type === 'secret' ? (
@@ -136,7 +135,7 @@ function TextualFields({
           id={`${id}-content`}
           invalid={Boolean(form.invalid.content)}
           onChange={handleContent}
-          readOnly={readOnly}
+          readOnly={form.readOnly}
           type={type}
           value={content}
         />

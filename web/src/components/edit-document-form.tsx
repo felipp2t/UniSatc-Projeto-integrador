@@ -14,7 +14,7 @@ import { DESCRIPTION_MAX, isDescriptionInvalid } from '@/lib/item-validation'
 
 export function EditDocumentForm({
   item,
-  readOnly = false,
+  readOnly,
   onBusyChange,
   onClose,
   workspaceId,
@@ -57,7 +57,6 @@ export function EditDocumentForm({
         archived={archived}
         form={form}
         onClose={onClose}
-        readOnly={readOnly}
         type={item.type}
       >
         <Field aria-invalid={descriptionInvalid || undefined}>
@@ -74,7 +73,7 @@ export function EditDocumentForm({
             maxLength={DESCRIPTION_MAX}
             name='description'
             onValueChange={handleDescription}
-            readOnly={readOnly}
+            readOnly={form.readOnly}
             value={description}
           />
           {descriptionInvalid ? (
@@ -88,7 +87,7 @@ export function EditDocumentForm({
           ) : null}
         </Field>
       </EditFormShell>
-      {archived || readOnly ? null : (
+      {form.readOnly ? null : (
         <ReplaceAttachmentField
           disabled={update.isPending}
           itemId={item.id}

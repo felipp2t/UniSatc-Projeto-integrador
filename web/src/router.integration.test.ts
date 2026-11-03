@@ -55,7 +55,6 @@ function createApplicationRouter(
   const history = createMemoryHistory({ initialEntries: [initialEntry] })
   const router = createRouter({
     context: {
-      permissionChecker: { can: () => true },
       queryClient: createQueryClient(),
       session,
     },
@@ -178,10 +177,10 @@ function createPermissionRouter(checker: PermissionChecker) {
     component: () => null,
   })
   const protectedRoute = createRoute({
-    beforeLoad: ({ context, matches }) =>
+    beforeLoad: ({ matches }) =>
       enforceRoutePermission(
         matches as Parameters<typeof enforceRoutePermission>[0],
-        context.permissionChecker
+        checker
       ),
     component: () => null,
     getParentRoute: () => rootRoute,
@@ -201,7 +200,6 @@ function createPermissionRouter(checker: PermissionChecker) {
 
   const router = createRouter({
     context: {
-      permissionChecker: checker,
       queryClient: createQueryClient(),
       session: createSession('authenticated'),
     },

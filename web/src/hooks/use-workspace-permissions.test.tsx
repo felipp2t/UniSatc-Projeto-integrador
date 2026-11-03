@@ -6,7 +6,7 @@ import { createElement, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { workspaceApi } from '@/api/endpoints'
 import { ApiError } from '@/api/errors'
-import { workspacePermissionQueryKey } from '@/auth/permissions'
+import { workspacePermissionQueryKey } from '@/api/workspace-keys'
 import { useWorkspacePermissions } from './use-workspace-permissions'
 import '@/test/dom-setup'
 

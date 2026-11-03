@@ -26,7 +26,8 @@ import {
   InlineCodeSeparator,
   InlineCodeText,
 } from '@/components/inline-code'
-import { type CopyKind, ItemListCard } from '@/components/item-list-card'
+import type { CopyKind } from '@/components/item-actions'
+import { ItemListCard } from '@/components/item-list-card'
 import { NotFoundPage } from '@/components/not-found-page'
 import {
   DropdownMenu,

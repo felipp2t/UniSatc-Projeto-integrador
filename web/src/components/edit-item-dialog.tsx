@@ -23,12 +23,12 @@ function isTextual(type: ItemResponse['type']): type is TextualItemType {
 
 export function EditItemDialog({
   itemId,
-  readOnly = false,
+  readOnly,
   onClose,
   workspaceId,
 }: {
   itemId: string
-  readOnly?: boolean
+  readOnly: boolean
   onClose: () => void
   workspaceId: string
 }) {
