@@ -1,6 +1,7 @@
 import { vi } from 'vitest'
 
 export const workspaceApiMocks = {
+  backup: vi.fn(),
   changeMemberRole: vi.fn(),
   list: vi.fn(),
   listMembers: vi.fn(),

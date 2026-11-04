@@ -36,6 +36,7 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
     ...actual,
     workspaceApi: {
       ...actual.workspaceApi,
+      backup: shared.workspaceApiMocks.backup,
       list: shared.workspaceApiMocks.list,
       listMembers: shared.workspaceApiMocks.listMembers,
       listRoles: shared.workspaceApiMocks.listRoles,
@@ -50,6 +51,103 @@ afterEach(() => vi.restoreAllMocks())
 const generalPath = '/configuracoes-workspace/geral'
 
 describe('workspace general settings', () => {
+  it('allows only the owner to access the backup action', async () => {
+    await renderWorkspaceSettings('member-2', generalPath)
+
+    await screen.findByRole('textbox', { name: 'Nome do workspace' })
+    expect(screen.queryByRole('button', { name: 'Baixar backup' })).toBeNull()
+    expect(workspaceApiMocks.backup).not.toHaveBeenCalled()
+  })
+
+  it('starts one backup at a time and downloads the completed ZIP', async () => {
+    const user = userEvent.setup()
+    let resolveBackup: ((result: { data: Blob }) => void) | undefined
+    workspaceApiMocks.backup.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveBackup = resolve
+      })
+    )
+    const createObjectURL = vi.fn(() => 'blob:backup')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL,
+      revokeObjectURL,
+    })
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined)
+    await renderWorkspaceSettings(ownerId, generalPath)
+
+    const backupButton = await screen.findByRole('button', {
+      name: 'Baixar backup',
+    })
+    await user.click(backupButton)
+    expect(
+      await screen.findByRole('button', { name: 'Gerando backup…' })
+    ).toBeDisabled()
+    expect(
+      screen.getByText(
+        'A geração do backup está em andamento. Aguarde antes de sair desta página.'
+      )
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Gerando backup…' }))
+    expect(workspaceApiMocks.backup).toHaveBeenCalledTimes(1)
+
+    resolveBackup?.({
+      data: new Blob(['zip content'], { type: 'application/zip' }),
+    })
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce())
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(click).toHaveBeenCalledOnce()
+    expect(document.querySelector('a[download="vaulty-backup.zip"]')).toBeNull()
+    expect(
+      await screen.findByRole('button', { name: 'Baixar backup' })
+    ).toBeEnabled()
+    vi.unstubAllGlobals()
+  })
+
+  it('does not download a failed backup and permits retry', async () => {
+    const user = userEvent.setup()
+    workspaceApiMocks.backup
+      .mockRejectedValueOnce(new Error('incomplete response'))
+      .mockResolvedValueOnce({ data: new Blob(['complete']) })
+    const createObjectURL = vi.fn(() => 'blob:backup')
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL: vi.fn() })
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined)
+    await renderWorkspaceSettings(ownerId, generalPath)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Baixar backup' })
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível concluir o backup. Tente novamente.'
+    )
+    expect(createObjectURL).not.toHaveBeenCalled()
+    expect(click).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Baixar backup' }))
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce())
+    expect(workspaceApiMocks.backup).toHaveBeenCalledTimes(2)
+    expect(click).toHaveBeenCalledOnce()
+    vi.unstubAllGlobals()
+  })
+
+  it('hides the backup action when confirming member permissions fails', async () => {
+    workspaceApiMocks.listMembers.mockRejectedValueOnce(
+      new Error('Members request failed')
+    )
+    await renderWorkspaceSettings(ownerId, generalPath)
+
+    await screen.findByText(
+      'Não foi possível confirmar a permissão de edição. Os campos estão em modo de leitura.'
+    )
+    expect(screen.queryByRole('button', { name: 'Baixar backup' })).toBeNull()
+    expect(workspaceApiMocks.backup).not.toHaveBeenCalled()
+  })
+
   it('shows workspace name and description as read-only to members', async () => {
     await renderWorkspaceSettings('member-2', generalPath)
 
