@@ -1,8 +1,9 @@
-import { FloppyDiskIcon } from '@phosphor-icons/react'
+import { ArchiveIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useForm, useSelector } from '@tanstack/react-form'
 import { createFileRoute } from '@tanstack/react-router'
-import { useCallback, useId } from 'react'
+import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
+import { workspaceApi } from '@/api/endpoints'
 import type { WorkspaceResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -61,6 +62,29 @@ function WorkspaceGeneralSettingsPage() {
     user?.id,
     user?.systemAdmin
   )
+  const [backupPending, setBackupPending] = useState(false)
+  const [backupError, setBackupError] = useState(false)
+  const [backupComplete, setBackupComplete] = useState(false)
+  const generateBackup = useCallback(async () => {
+    if (!workspace?.id || backupPending) return
+    setBackupPending(true)
+    setBackupError(false)
+    setBackupComplete(false)
+    try {
+      const { data } = await workspaceApi.backup()
+      const url = URL.createObjectURL(data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'vaulty-backup.zip'
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 30_000)
+      setBackupComplete(true)
+    } catch {
+      setBackupError(true)
+    } finally {
+      setBackupPending(false)
+    }
+  }, [backupPending, workspace?.id])
   const retryWorkspace = useCallback(async () => {
     await workspaceQuery.refetch()
   }, [workspaceQuery.refetch])
@@ -116,6 +140,47 @@ function WorkspaceGeneralSettingsPage() {
           key={workspace.id}
           workspace={workspace}
         />
+        {/* O backup é um dump do banco inteiro, com todos os workspaces; só o administrador geral pode gerá-lo. */}
+        {user?.systemAdmin && !members.isError ? (
+          <section
+            aria-labelledby='workspace-backup-title'
+            className='space-y-3 border-border border-t pt-5'
+          >
+            <div className='space-y-1'>
+              <h3 className='font-semibold text-sm' id='workspace-backup-title'>
+                Backup do sistema
+              </h3>
+              <p className='text-muted-foreground text-sm'>
+                Gere um arquivo ZIP com os dados e anexos de todos os workspaces
+                para guardar onde preferir.
+              </p>
+            </div>
+            <Button
+              disabled={backupPending}
+              onClick={generateBackup}
+              type='button'
+            >
+              <ArchiveIcon aria-hidden='true' size={16} />
+              {backupPending ? 'Gerando backup…' : 'Baixar backup'}
+            </Button>
+            <p
+              aria-live='polite'
+              className='text-muted-foreground text-sm'
+              role='status'
+            >
+              {backupPending
+                ? 'A geração do backup está em andamento. Aguarde antes de sair desta página.'
+                : backupComplete
+                  ? 'Backup concluído. O download foi iniciado.'
+                  : null}
+            </p>
+            {backupError ? (
+              <p className='text-destructive text-sm' role='alert'>
+                Não foi possível concluir o backup. Tente novamente.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
       </section>
     </WorkspaceSettingsLayout>
   )

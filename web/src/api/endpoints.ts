@@ -76,6 +76,10 @@ export const workspaceApi = {
     apiClient.get<ActivityPageResponse>(`/workspaces/${workspaceId}/activity`, {
       params: filters,
     }),
+  backup: () =>
+    apiClient.post<Blob>('/workspaces/backup', undefined, {
+      responseType: 'blob',
+    }),
   changeMemberRole: async (
     workspaceId: string,
     memberId: string,
@@ -200,9 +204,10 @@ export const inviteApi = {
 }
 
 export const notificationsApi = {
-  list: (page = 0, size = 10) =>
+  list: (page = 0, size = 10, signal?: AbortSignal) =>
     apiClient.get<NotificationPageResponse>('/notifications', {
       params: { page, size },
+      signal,
     }),
   markAllRead: () => apiClient.patch<void>('/notifications/read'),
   markRead: (notificationId: string) =>

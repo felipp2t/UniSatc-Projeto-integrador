@@ -39,10 +39,10 @@ export const members = [
   },
 ]
 
-function createSession(userId: string): SessionService {
+function createSession(userId: string, systemAdmin: boolean): SessionService {
   return createSessionStub({
     status: 'authenticated',
-    user: { email: 'user@example.com', id: userId, name: 'User' },
+    user: { email: 'user@example.com', id: userId, name: 'User', systemAdmin },
   })
 }
 
@@ -83,14 +83,15 @@ export function setupWorkspaceSettingsMocks() {
 
 export async function renderWorkspaceSettings(
   userId: string,
-  initialPath = '/configuracoes-workspace'
+  initialPath = '/configuracoes-workspace',
+  { systemAdmin = false } = {}
 ) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
     },
   })
-  const session = createSession(userId)
+  const session = createSession(userId, systemAdmin)
   const router = createRouter({
     context: {
       queryClient,

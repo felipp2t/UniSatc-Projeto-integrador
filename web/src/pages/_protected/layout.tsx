@@ -18,6 +18,7 @@ import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { selectAdminWorkspace } from '@/hooks/use-admin-workspace-selection'
 import { workspacesQuery } from '@/hooks/use-current-workspace'
+import { useNotificationToast } from '@/hooks/use-notification-toast'
 import { workspacePermissionsQuery } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute('/_protected')({
@@ -57,6 +58,7 @@ export const Route = createFileRoute('/_protected')({
 function ProtectedLayout() {
   const { session } = Route.useRouteContext()
   const navigate = useNavigate()
+  useNotificationToast()
 
   const handleLogout = useCallback(async () => {
     await session.logout()

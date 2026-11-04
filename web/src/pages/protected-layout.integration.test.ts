@@ -26,6 +26,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   }
 })
 
+vi.mock('@/hooks/use-notification-toast', () => ({
+  useNotificationToast: vi.fn(),
+}))
+
 vi.mock('@/components/header', () => ({
   Header: (props: {
     onLogout?: () => Promise<void>

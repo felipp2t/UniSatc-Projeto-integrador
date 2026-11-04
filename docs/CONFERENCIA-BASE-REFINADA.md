@@ -10,15 +10,15 @@
 |---|---|---|
 | RF01-CA01 — Entrada só por convite | Presente por inspeção | Cadastro público não existe; `POST /auth/register` exige convite pendente por e-mail e token. `AuthService.register`. |
 | RF02-CA01 — Credenciais inválidas | Implementado nesta entrega; execução pendente | Ambos os ramos de `AuthService.login` lançam `E-mail ou senha inválidos`; regressão em `AuthLoginIntegrationTest`. Não executado nesta rodada. |
-| RF03-CA01 — Renovação válida | Base de backend presente; FE pendente | Refresh rotativo em `AuthService.refreshToken`; renovação automática da sessão depende da interface em #145. |
-| RF03-CA02 — Sessão expirada ou invalidada | Base de backend presente; FE pendente | Refresh ausente/inválido responde `401`; redirecionamento ao login e tratamento de falha temporária de rede pertencem a #145. |
+| RF03-CA01 — Renovação válida | Base de backend presente; FE verificado — #145 | Refresh rotativo em `AuthService.refreshToken`; renovação automática coberta por `api.test.ts` e `session.integration.test.ts`, executados nesta conferência. |
+| RF03-CA02 — Sessão expirada ou invalidada | Base de backend presente; FE verificado — #145 | Refresh rejeitado com `401` encerra a sessão; falha transitória mantém a sessão. Regressões em `api.test.ts` e `session.integration.test.ts` passaram nesta conferência. |
 | RF03-CA03 — Prazo de renovação | Presente por inspeção | `jwt.refresh-token-expiration-ms=604800000` (7 dias); access token configurado para `900000` (15 minutos). A rotação emite novo prazo. |
 | RF04-CA01 — Alcance do logout | Presente por inspeção | `AuthService.logout` remove apenas o refresh token apresentado; demais sessões não são apagadas. |
 | RF04-CA02 — Renovação e acesso residual | Presente por inspeção | Refresh usado no logout deixa de poder renovar; o access token stateless pode permanecer válido por até 15 minutos. Não há revogação imediata do token já emitido. |
 | RF05-CA01 — Autenticação e senha atual | Presente por inspeção | `PATCH /me/password` exige autenticação e valida a senha atual em `CredentialService`. |
 | RF05-CA02 — Confirmação | Presente por inspeção | Confirmação deve ser igual à nova senha; divergência rejeitada por `CredentialService`. |
 | RF05-CA03 — Sessões e links após troca | Base de backend presente | `CredentialService` invalida refresh tokens e tokens de recuperação; access tokens já emitidos podem durar até 15 minutos. |
-| RF05-CA04 — Conclusão na interface | Pendente — #145 | Confirmar a troca na interface e encaminhar o usuário ao login não é comportamento do backend. |
+| RF05-CA04 — Conclusão na interface | Implementado e verificado no FE — #145 | Após o PATCH bem-sucedido, a página limpa a sessão local, confirma a troca e navega a `/login` substituindo o histórico. Regressões em `change-password-form.test.tsx` e `configuracoes.test.tsx` verificam sucesso e preservação de campos/sessão nas falhas. |
 | RF06-CA01 — E-mail fixo | Presente por inspeção | `UpdateProfileRequest` contém apenas `name`; o endpoint de perfil não permite alterar e-mail. |
 | RF07-CA01 — Dados do perfil | Presente por inspeção | `UserResponse` contém `id`, `name` e `email`; não inclui hash de senha nem tokens. |
 | RF10-CA01 — Conta existente | Presente por inspeção | `InviteService` rejeita e-mail já associado a conta. |
@@ -53,3 +53,7 @@
 - Visibilidade dos membros: `server/src/main/java/com/vaulty/api/service/WorkspaceMemberService.java`, `WorkspaceMemberResponse.java` e `WorkspaceMapper.java`.
 - Regressões disponíveis, não executadas nesta rodada: `server/src/test/java/com/vaulty/api/auth/AuthLoginIntegrationTest.java` e `server/src/test/java/com/vaulty/api/workspace/WorkspaceMemberIntegrationTest.java`.
 - Critérios refinados: [issue #144](https://github.com/felipp2t/UniSatc-Projeto-integrador/issues/144) e `docs/REQUISITOS.md`.
+
+## Conferência frontend — issue #145
+
+Foram executados 95 testes em sete arquivos de autenticação/sessão e configurações, todos aprovados. Após a última asserção, os dois arquivos de testes alterados foram repetidos: 11 testes aprovados. Ultracite, `tsc -b` e `vite build` passaram. Como o wrapper `pnpm` ficou sem resposta nesta máquina, foram usados os executáveis já instalados em `web/node_modules/.bin`, com esse diretório no `PATH`. Esta conferência não reexecutou os testes de backend nem validou manualmente múltiplos dispositivos. Mantém-se o prazo residual de até 15 minutos dos acessos já emitidos.

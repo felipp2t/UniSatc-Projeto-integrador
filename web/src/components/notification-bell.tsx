@@ -25,7 +25,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { appToast } from '@/components/ui/toast'
 import { useNotificationRead } from '@/hooks/use-notification-read'
-import type { AppRoute } from '@/types/navigation'
+import { getNotificationHref } from '@/lib/notification-navigation'
 
 const PAGE_SIZE = 10
 
@@ -273,20 +273,6 @@ function NotificationRow({
 
 function isRead(notification: NotificationData) {
   return notification.readAt !== null
-}
-
-function getNotificationHref(
-  metadata: Record<string, unknown>
-): AppRoute | undefined {
-  switch (metadata.event) {
-    case 'PROFILE_UPDATED':
-    case 'PASSWORD_CHANGED':
-      return '/configuracoes'
-    case 'ACCESS_CHANGED':
-      return '/'
-    default:
-      return undefined
-  }
 }
 
 function formatRelativeTime(createdAt: string) {
