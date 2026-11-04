@@ -56,13 +56,17 @@ export function AdminInviteDialog({
           statusMessages: {
             403: 'Apenas o administrador geral pode executar esta ação.',
             404: 'Workspace não encontrado.',
-            409: 'Este e-mail já possui uma conta.',
+            409: 'Esta conta já pertence a um workspace.',
           },
         })
       )
     },
-    onSuccess: async () => {
-      appToast.success('Convite criado; e-mail encaminhado para envio')
+    onSuccess: async (response) => {
+      appToast.success(
+        response?.data?.addedExistingAccount
+          ? 'Conta existente adicionada ao workspace'
+          : 'Convite criado; e-mail encaminhado para envio'
+      )
       setOpen(false)
       reset()
       await queryClient.invalidateQueries({ queryKey: adminWorkspacesQueryKey })
@@ -125,8 +129,9 @@ export function AdminInviteDialog({
             Convidar para {workspaceName}
           </DialogTitle>
           <DialogDescription className='font-medium text-[10px]'>
-            Cada pessoa participa de um único workspace. Se já houver um convite
-            pendente para este e-mail, ele será substituído.
+            Cada pessoa participa de um único workspace. Uma conta existente e
+            sem workspace entra direto; para um e-mail novo, enviamos um
+            convite, que substitui qualquer convite pendente.
           </DialogDescription>
         </DialogHeader>
         <form

@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RouterContext } from '@/router-context'
@@ -17,7 +17,9 @@ import { createSessionStub } from '@/test/session-stub'
 const apiMocks = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
   listNotifications: vi.fn(),
+  listRoles: vi.fn(),
   listWorkspaces: vi.fn(),
+  removeMember: vi.fn(),
   revokeInvite: vi.fn(),
   updateWorkspace: vi.fn(),
 }))
@@ -36,6 +38,11 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
     notificationsApi: {
       ...actual.notificationsApi,
       list: apiMocks.listNotifications,
+    },
+    workspaceApi: {
+      ...actual.workspaceApi,
+      listRoles: apiMocks.listRoles,
+      removeMember: apiMocks.removeMember,
     },
   }
 })
@@ -126,6 +133,13 @@ beforeEach(() => {
     },
   })
   apiMocks.revokeInvite.mockResolvedValue(undefined)
+  apiMocks.removeMember.mockResolvedValue(undefined)
+  apiMocks.listRoles.mockResolvedValue({
+    data: [
+      { builtIn: true, id: 'role-1', memberCount: 1, name: 'Owner' },
+      { builtIn: true, id: 'role-2', memberCount: 0, name: 'Member' },
+    ],
+  })
 })
 
 afterEach(() => vi.restoreAllMocks())
@@ -155,7 +169,10 @@ describe('administração de workspaces', () => {
       'value',
       'Financeiro'
     )
-    expect(screen.getByText('Proprietário')).toBeTruthy()
+    expect(
+      screen.getByRole('combobox', { name: 'Papel de Líder Financeiro' })
+        .textContent
+    ).toContain('Proprietário')
     expect(screen.getByText('analista@example.com')).toBeTruthy()
     expect(
       screen.getByRole('button', { name: 'Convidar para Financeiro' })
@@ -176,6 +193,27 @@ describe('administração de workspaces', () => {
       expect(apiMocks.revokeInvite).toHaveBeenCalledWith(
         financeWorkspace.id,
         'b3d7c2a0-1111-4f6a-9d2e-123456789abc'
+      )
+    )
+  })
+
+  it('removes a member after confirmation', async () => {
+    const user = userEvent.setup()
+    await renderAt(`/administracao/${financeWorkspace.id}`)
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Remover Líder Financeiro do workspace',
+      })
+    )
+    const dialog = await screen.findByRole('dialog')
+    expect(apiMocks.removeMember).not.toHaveBeenCalled()
+    await user.click(within(dialog).getByRole('button', { name: 'Remover' }))
+
+    await waitFor(() =>
+      expect(apiMocks.removeMember).toHaveBeenCalledWith(
+        financeWorkspace.id,
+        'member-1'
       )
     )
   })

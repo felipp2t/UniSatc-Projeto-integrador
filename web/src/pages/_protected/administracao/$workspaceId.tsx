@@ -9,14 +9,16 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { adminWorkspaceQueryKey, adminWorkspacesQueryKey } from '@/api/admin'
-import { adminApi } from '@/api/endpoints'
+import { adminApi, workspaceApi } from '@/api/endpoints'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
 import type {
   AdminPendingInvite,
   AdminWorkspaceResponse,
   WorkspaceMemberDto,
 } from '@/api/types'
+import { workspaceRolesQueryKey } from '@/api/workspace-keys'
 import { AdminInviteDialog } from '@/components/admin-invite-dialog'
+import { AdminMemberRow } from '@/components/admin-member-row'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -27,7 +29,6 @@ import { LoadingState } from '@/components/ui/loading-state'
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -48,11 +49,6 @@ const nameSchema = z
   .trim()
   .min(3, 'O nome deve ter pelo menos 3 caracteres.')
   .max(100, 'O nome deve ter no máximo 100 caracteres.')
-
-const roleLabels: Record<string, string> = {
-  Member: 'Membro',
-  Owner: 'Proprietário',
-}
 
 function AdminWorkspacePage() {
   const isSystemAdmin = Route.useRouteContext().session.user?.systemAdmin
@@ -131,7 +127,7 @@ function WorkspaceSections({
         workspace={workspace}
         workspaceId={workspaceId}
       />
-      <MembersSection members={members} />
+      <MembersSection members={members} workspaceId={workspaceId} />
       <PendingInvitesSection workspace={workspace} workspaceId={workspaceId} />
     </>
   )
@@ -257,7 +253,18 @@ function WorkspaceSettingsForm({
   )
 }
 
-function MembersSection({ members }: { members: WorkspaceMemberDto[] }) {
+function MembersSection({
+  members,
+  workspaceId,
+}: {
+  members: WorkspaceMemberDto[]
+  workspaceId: string
+}) {
+  const roles = useQuery({
+    queryFn: async () => (await workspaceApi.listRoles(workspaceId)).data,
+    queryKey: workspaceRolesQueryKey(workspaceId),
+  })
+
   return (
     <section aria-labelledby='admin-workspace-members' className='space-y-4'>
       <h2
@@ -279,23 +286,19 @@ function MembersSection({ members }: { members: WorkspaceMemberDto[] }) {
               <TableHead>Nome</TableHead>
               <TableHead>E-mail</TableHead>
               <TableHead>Papel</TableHead>
+              <TableHead>
+                <span className='sr-only'>Ações</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {members.map((member) => (
-              <TableRow key={member.id}>
-                <TableCell>{member.name}</TableCell>
-                <TableCell>{member.email}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      member.roleName === 'Owner' ? 'default' : 'outline'
-                    }
-                  >
-                    {roleLabels[member.roleName ?? ''] ?? member.roleName}
-                  </Badge>
-                </TableCell>
-              </TableRow>
+              <AdminMemberRow
+                key={member.id}
+                member={member}
+                roles={roles.data ?? []}
+                workspaceId={workspaceId}
+              />
             ))}
           </TableBody>
         </Table>

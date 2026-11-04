@@ -647,7 +647,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Convida um e-mail para o workspace como proprietário ou membro */
+        /**
+         * Convida um e-mail para o workspace como proprietário ou membro
+         * @description Conta já existente e sem workspace entra direto, sem convite por e-mail.
+         */
         post: operations["invite_1"];
         delete?: never;
         options?: never;
@@ -1188,6 +1191,9 @@ export interface components {
             /** Format: email */
             email: string;
             owner?: boolean;
+        };
+        AdminInviteResponse: {
+            addedExistingAccount?: boolean;
         };
         UpdateProfileRequest: {
             name: string;
@@ -3673,7 +3679,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": components["schemas"]["AdminInviteResponse"];
+                };
             };
         };
     };

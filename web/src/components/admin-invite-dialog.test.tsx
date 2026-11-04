@@ -86,7 +86,26 @@ describe('AdminInviteDialog', () => {
     )
   })
 
-  it('explains when the email already has an account', async () => {
+  it('announces when an existing account joins directly', async () => {
+    invite.mockResolvedValue({ data: { addedExistingAccount: true } })
+    const { dialog, user } = await openDialog()
+
+    await user.type(
+      within(dialog).getByLabelText('E-mail'),
+      'removida@example.com'
+    )
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Criar convite' })
+    )
+
+    await waitFor(() =>
+      expect(success).toHaveBeenCalledWith(
+        'Conta existente adicionada ao workspace'
+      )
+    )
+  })
+
+  it('explains when the account already belongs to a workspace', async () => {
     invite.mockRejectedValue(new ApiError('Conflito', 409))
     const { dialog, user } = await openDialog()
 
@@ -99,7 +118,7 @@ describe('AdminInviteDialog', () => {
     )
 
     expect(
-      await within(dialog).findByText('Este e-mail já possui uma conta.')
+      await within(dialog).findByText('Esta conta já pertence a um workspace.')
     ).toBeTruthy()
   })
 })

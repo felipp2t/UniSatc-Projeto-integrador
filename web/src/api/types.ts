@@ -174,6 +174,7 @@ export interface NotificationPageResponse {
   unreadCount: number
 }
 export type AdminInviteRequest = components['schemas']['AdminInviteRequest']
+export type AdminInviteResponse = components['schemas']['AdminInviteResponse']
 export type AdminPendingInvite =
   components['schemas']['AdminPendingInviteResponse']
 export type AdminWorkspaceDetailResponse =

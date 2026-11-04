@@ -6,6 +6,7 @@ import type {
   ActivityFilters,
   ActivityPageResponse,
   AdminInviteRequest,
+  AdminInviteResponse,
   AdminWorkspaceDetailResponse,
   AdminWorkspaceResponse,
   AttachmentResponse,
@@ -169,7 +170,10 @@ export const adminApi = {
       `/admin/workspaces/${workspaceId}`
     ),
   invite: (workspaceId: string, request: AdminInviteRequest) =>
-    apiClient.post<void>(`/admin/workspaces/${workspaceId}/invites`, request),
+    apiClient.post<AdminInviteResponse>(
+      `/admin/workspaces/${workspaceId}/invites`,
+      request
+    ),
   listWorkspaces: () =>
     apiClient.get<AdminWorkspaceResponse[]>('/admin/workspaces'),
   revokeInvite: (workspaceId: string, inviteId: string) =>
