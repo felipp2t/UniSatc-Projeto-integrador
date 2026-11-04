@@ -44,7 +44,7 @@ export function getItemActions(
   const actions: { id: ItemAction; allowed: boolean }[] = [
     { allowed: !archived && checker.can('sharing', 'manage'), id: 'share' },
     { allowed: canRead && canUpdate && !archived, id: 'edit' },
-    { allowed: canRead && (!canUpdate || archived), id: 'view' },
+    { allowed: canRead, id: 'view' },
     { allowed: true, id: 'copyTitle' },
     {
       allowed: canRead && (item.type === 'text' || item.type === 'link'),
