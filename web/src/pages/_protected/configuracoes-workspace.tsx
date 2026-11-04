@@ -1,8 +1,4 @@
-import {
-  MagnifyingGlassIcon,
-  ShieldIcon,
-  TrashIcon,
-} from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, TrashIcon } from '@phosphor-icons/react'
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
@@ -35,7 +31,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { WorkspaceRolesSection } from '@/components/workspace-roles-section'
 import { WorkspaceSettingsLayout } from '@/components/workspace-settings-layout'
 import { useChangeMemberRole } from '@/hooks/use-change-member-role'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
@@ -139,139 +134,84 @@ function WorkspaceSettingsPage() {
     <WorkspaceSettingsLayout
       breadcrumbLabel='Configurações do workspace'
       canManageGroups={permissions.can('group', 'manage')}
+      canManageRoles={isOwner}
     >
       <section
         aria-label='Configurações do workspace'
         className='min-w-0 flex-1'
       >
         <Tabs defaultValue='members'>
-          <TabsList>
-            <TabsTrigger value='members'>Membros</TabsTrigger>
-            <WorkspaceRolesTabTrigger isOwner={isOwner} />
-          </TabsList>
-          <TabsContent className='mt-4' value='members'>
-            <Tabs defaultValue='members'>
-              <div className='flex flex-wrap items-center justify-between gap-3'>
-                <TabsList>
-                  <TabsTrigger value='members'>
-                    Membros ({members.isError ? 0 : (members.data?.length ?? 0)}
-                    )
-                  </TabsTrigger>
-                  {isOwner ? (
-                    <TabsTrigger value='invites'>Convites</TabsTrigger>
-                  ) : null}
-                </TabsList>
-                {isOwner ? <InviteMemberDialog /> : null}
-              </div>
-              <TabsContent className='mt-4 space-y-4' value='members'>
-                <div className='flex flex-col gap-2 md:flex-row'>
-                  <div className='relative flex-1'>
-                    <label className='sr-only' htmlFor='member-search'>
-                      Buscar membro por nome
-                    </label>
-                    <MagnifyingGlassIcon
-                      aria-hidden='true'
-                      className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground'
-                    />
-                    <Input
-                      className='pl-9'
-                      id='member-search'
-                      onValueChange={setSearch}
-                      placeholder='Buscar por nome'
-                      value={search}
-                    />
-                  </div>
-                  <Select onValueChange={setRoleFilter} value={roleFilter}>
-                    <SelectTrigger
-                      aria-label='Filtrar por cargo'
-                      className='w-full md:w-40'
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='all'>Todos os cargos</SelectItem>
-                      {roleNames.map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {role}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <MembersList
-                  currentUserRole={currentUserRole}
-                  filteredMembers={filteredMembers}
-                  isOwner={isOwner}
-                  isRemoving={memberRemoval.isPending}
-                  memberAccessDenied={memberAccessDenied}
-                  members={members}
-                  onChangeRole={roleChange.requestRoleChange}
-                  onRemove={memberRemoval.request}
-                  onRetry={retryMembers}
-                  roleSelectionDisabled={roleSelectionDisabled}
-                  roles={roles.data ?? []}
-                  rolesLoadError={rolesLoadError}
-                />
-              </TabsContent>
+          <div className='flex flex-wrap items-center justify-between gap-3'>
+            <TabsList>
+              <TabsTrigger value='members'>
+                Membros ({members.isError ? 0 : (members.data?.length ?? 0)})
+              </TabsTrigger>
               {isOwner ? (
-                <TabsContent className='mt-4' value='invites'>
-                  <PendingInvitesSection />
-                </TabsContent>
+                <TabsTrigger value='invites'>Convites</TabsTrigger>
               ) : null}
-            </Tabs>
+            </TabsList>
+            {isOwner ? <InviteMemberDialog /> : null}
+          </div>
+          <TabsContent className='mt-4 space-y-4' value='members'>
+            <div className='flex flex-col gap-2 md:flex-row'>
+              <div className='relative flex-1'>
+                <label className='sr-only' htmlFor='member-search'>
+                  Buscar membro por nome
+                </label>
+                <MagnifyingGlassIcon
+                  aria-hidden='true'
+                  className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground'
+                />
+                <Input
+                  className='pl-9'
+                  id='member-search'
+                  onValueChange={setSearch}
+                  placeholder='Buscar por nome'
+                  value={search}
+                />
+              </div>
+              <Select onValueChange={setRoleFilter} value={roleFilter}>
+                <SelectTrigger
+                  aria-label='Filtrar por cargo'
+                  className='w-full md:w-40'
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>Todos os cargos</SelectItem>
+                  {roleNames.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <MembersList
+              currentUserRole={currentUserRole}
+              filteredMembers={filteredMembers}
+              isOwner={isOwner}
+              isRemoving={memberRemoval.isPending}
+              memberAccessDenied={memberAccessDenied}
+              members={members}
+              onChangeRole={roleChange.requestRoleChange}
+              onRemove={memberRemoval.request}
+              onRetry={retryMembers}
+              roleSelectionDisabled={roleSelectionDisabled}
+              roles={roles.data ?? []}
+              rolesLoadError={rolesLoadError}
+            />
           </TabsContent>
-          <WorkspaceRolesTabContent
-            isOwner={isOwner}
-            onRetry={retryRoles}
-            roles={roles.data ?? []}
-            rolesError={roles.error}
-            rolesPending={roles.isPending}
-            workspaceId={workspaceId}
-          />
+          {isOwner ? (
+            <TabsContent className='mt-4' value='invites'>
+              <PendingInvitesSection />
+            </TabsContent>
+          ) : null}
         </Tabs>
       </section>
       <ChangeMemberRoleDialog roleChange={roleChange} />
       <RemoveMemberDialog removal={memberRemoval} />
     </WorkspaceSettingsLayout>
-  )
-}
-
-function WorkspaceRolesTabTrigger({ isOwner }: { isOwner: boolean }) {
-  if (!isOwner) return null
-  return (
-    <TabsTrigger className='gap-2' value='roles'>
-      <ShieldIcon aria-hidden='true' className='size-3.5 shrink-0' />
-      Cargos e permissões
-    </TabsTrigger>
-  )
-}
-
-function WorkspaceRolesTabContent({
-  isOwner,
-  onRetry,
-  roles,
-  rolesError,
-  rolesPending,
-  workspaceId,
-}: {
-  isOwner: boolean
-  onRetry: () => Promise<void>
-  roles: WorkspaceRoleResponse[]
-  rolesError: unknown
-  rolesPending: boolean
-  workspaceId: string | undefined
-}) {
-  if (!(isOwner && workspaceId)) return null
-  return (
-    <TabsContent className='mt-4' value='roles'>
-      <WorkspaceRolesSection
-        onRetry={onRetry}
-        roles={roles}
-        rolesError={rolesError}
-        rolesPending={rolesPending}
-        workspaceId={workspaceId}
-      />
-    </TabsContent>
   )
 }
 

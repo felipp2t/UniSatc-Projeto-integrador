@@ -132,6 +132,7 @@ function AccessGroupsPage() {
       breadcrumbLabel='Grupos'
       breadcrumbParentLabel='Configurações do Workspace'
       canManageGroups={permissions.can('group', 'manage')}
+      canManageRoles={permissions.isOwner}
     >
       <section
         aria-labelledby='access-groups-title'
