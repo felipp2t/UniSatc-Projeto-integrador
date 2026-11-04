@@ -1,6 +1,7 @@
 import type { QueryKey } from '@tanstack/react-query'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { notificationsApi } from '@/api/endpoints'
+import { notificationKeys } from '@/api/notification-keys'
 
 interface CachedNotification {
   id: string
@@ -13,8 +14,6 @@ interface CachedNotificationPage {
 }
 
 type NotificationSnapshot = [QueryKey, unknown][]
-
-const notificationQueryKey = ['notifications']
 
 function isNotificationPage(value: unknown): value is CachedNotificationPage {
   return (
@@ -46,7 +45,7 @@ function setNotificationPages(
   update: (page: CachedNotificationPage) => CachedNotificationPage
 ) {
   queryClient.setQueriesData<unknown>(
-    { queryKey: notificationQueryKey },
+    { queryKey: notificationKeys.all },
     (data: unknown) => (isNotificationPage(data) ? update(data) : data)
   )
 }
@@ -67,9 +66,9 @@ export function useNotificationRead() {
       }
     },
     onMutate: async (notificationId) => {
-      await queryClient.cancelQueries({ queryKey: notificationQueryKey })
+      await queryClient.cancelQueries({ queryKey: notificationKeys.all })
       const snapshots = queryClient.getQueriesData<unknown>({
-        queryKey: notificationQueryKey,
+        queryKey: notificationKeys.all,
       })
 
       if (containsUnreadNotification(snapshots, notificationId)) {
@@ -88,7 +87,7 @@ export function useNotificationRead() {
       return { snapshots }
     },
     onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: notificationQueryKey }),
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
   })
 
   const markAllRead = useMutation<
@@ -104,9 +103,9 @@ export function useNotificationRead() {
       }
     },
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: notificationQueryKey })
+      await queryClient.cancelQueries({ queryKey: notificationKeys.all })
       const snapshots = queryClient.getQueriesData<unknown>({
-        queryKey: notificationQueryKey,
+        queryKey: notificationKeys.all,
       })
 
       if (containsUnreadNotification(snapshots)) {
@@ -125,7 +124,7 @@ export function useNotificationRead() {
       return { snapshots }
     },
     onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: notificationQueryKey }),
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
   })
 
   return { markAllRead, markRead }
