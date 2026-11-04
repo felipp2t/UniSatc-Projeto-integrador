@@ -19,6 +19,7 @@ import type {
   InviteValidationResponse,
   ItemPageResponse,
   ItemResponse,
+  ItemSearchParams,
   LoginRequest,
   NotificationPageResponse,
   RegisterRequest,
@@ -344,6 +345,15 @@ export const itemsApi = {
     apiClient.get<SecretValueResponse>(
       `/workspaces/${workspaceId}/items/${itemId}/secret`
     ),
+  search: (
+    workspaceId: string,
+    params: ItemSearchParams,
+    signal?: AbortSignal
+  ) =>
+    apiClient.get<ItemPageResponse>(`/workspaces/${workspaceId}/items/search`, {
+      params,
+      signal,
+    }),
   update: (workspaceId: string, itemId: string, request: UpdateItemRequest) =>
     apiClient.put<ItemResponse>(
       `/workspaces/${workspaceId}/items/${itemId}`,
