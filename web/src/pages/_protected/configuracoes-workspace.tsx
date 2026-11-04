@@ -41,6 +41,7 @@ import { useChangeMemberRole } from '@/hooks/use-change-member-role'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useRemoveMember } from '@/hooks/use-remove-member'
 import { useWorkspaceMembers } from '@/hooks/use-workspace-members'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute('/_protected/configuracoes-workspace')({
   component: WorkspaceSettingsPage,
@@ -58,6 +59,7 @@ function WorkspaceSettingsPage() {
     workspaceId,
     session.user?.id
   )
+  const permissions = useWorkspacePermissions(workspaceId)
   const roles = useQuery({
     enabled: Boolean(workspaceId && isOwner),
     queryFn: async () => {
@@ -134,7 +136,10 @@ function WorkspaceSettingsPage() {
   }
 
   return (
-    <WorkspaceSettingsLayout breadcrumbLabel='Configurações do workspace'>
+    <WorkspaceSettingsLayout
+      breadcrumbLabel='Configurações do workspace'
+      canManageGroups={permissions.can('group', 'manage')}
+    >
       <section
         aria-label='Configurações do workspace'
         className='min-w-0 flex-1'

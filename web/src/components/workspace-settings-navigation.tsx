@@ -2,12 +2,25 @@ import { GearIcon, UsersThreeIcon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { Separator } from '@/components/ui/separator'
 
-const sections = [
-  { icon: UsersThreeIcon, label: 'Membros', to: '/configuracoes-workspace' },
-  { icon: GearIcon, label: 'Geral', to: '/configuracoes-workspace/geral' },
-] as const
+export function WorkspaceSettingsNavigation({
+  canManageGroups,
+}: {
+  canManageGroups: boolean
+}) {
+  const sections = [
+    { icon: UsersThreeIcon, label: 'Membros', to: '/configuracoes-workspace' },
+    { icon: GearIcon, label: 'Geral', to: '/configuracoes-workspace/geral' },
+    ...(canManageGroups
+      ? [
+          {
+            icon: UsersThreeIcon,
+            label: 'Grupos',
+            to: '/configuracoes-workspace/grupos',
+          },
+        ]
+      : []),
+  ] as const
 
-export function WorkspaceSettingsNavigation() {
   return (
     <>
       <nav
