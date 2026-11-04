@@ -84,6 +84,12 @@ export interface ItemPageResponse {
   totalItems: number
   totalPages: number
 }
+export interface ItemSearchParams {
+  includeArchived: boolean
+  page: number
+  q: string
+  size: number
+}
 export interface CollectionPathEntry {
   id: string
   name: string

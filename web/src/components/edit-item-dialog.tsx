@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { itemsApi } from '@/api/endpoints'
+import { isForbiddenOrNotFound } from '@/api/http-status'
 import { getLoadItemError } from '@/api/item-errors'
 import { itemKeys } from '@/api/item-keys'
 import type { ItemResponse } from '@/api/types'
 import { EditDocumentForm } from '@/components/edit-document-form'
 import type { FormProps } from '@/components/edit-item-form-shell'
 import { EditTextualForm } from '@/components/edit-textual-form'
+import { ItemAttachmentDialog } from '@/components/item-attachment-dialog'
 import {
   Dialog,
   DialogContent,
@@ -24,11 +26,15 @@ function isTextual(type: ItemResponse['type']): type is TextualItemType {
 export function EditItemDialog({
   itemId,
   readOnly,
+  unavailableOnAccessError = false,
+  showAttachmentPreview = false,
   onClose,
   workspaceId,
 }: {
   itemId: string
   readOnly: boolean
+  unavailableOnAccessError?: boolean
+  showAttachmentPreview?: boolean
   onClose: () => void
   workspaceId: string
 }) {
@@ -52,18 +58,29 @@ export function EditItemDialog({
   if (item.isError) {
     body = (
       <p className='text-destructive text-sm' role='alert'>
-        {getLoadItemError(item.error)}
+        {unavailableOnAccessError && isForbiddenOrNotFound(item.error)
+          ? 'Item indisponível'
+          : getLoadItemError(item.error)}
       </p>
     )
   } else if (item.data) {
     body = (
-      <EditItemForm
-        item={item.data}
-        onBusyChange={setBusy}
-        onClose={onClose}
-        readOnly={readOnly}
-        workspaceId={workspaceId}
-      />
+      <>
+        <EditItemForm
+          item={item.data}
+          onBusyChange={setBusy}
+          onClose={onClose}
+          readOnly={readOnly}
+          workspaceId={workspaceId}
+        />
+        {showAttachmentPreview &&
+        readOnly &&
+        (item.data.type === 'file' || item.data.type === 'image') ? (
+          <div className='mt-4'>
+            <ItemAttachmentDialog item={item.data} workspaceId={workspaceId} />
+          </div>
+        ) : null}
+      </>
     )
   }
 
