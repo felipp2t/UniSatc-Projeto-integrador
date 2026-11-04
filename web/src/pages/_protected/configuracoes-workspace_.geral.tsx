@@ -16,6 +16,7 @@ import { WorkspaceSettingsLayout } from '@/components/workspace-settings-layout'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useUpdateWorkspace } from '@/hooks/use-update-workspace'
 import { useWorkspaceMembers } from '@/hooks/use-workspace-members'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute(
   '/_protected/configuracoes-workspace_/geral'
@@ -58,6 +59,7 @@ function WorkspaceGeneralSettingsPage() {
   const workspace = workspaceQuery.data
   const userId = Route.useRouteContext().session.user?.id
   const { isOwner, members } = useWorkspaceMembers(workspace?.id, userId)
+  const permissions = useWorkspacePermissions(workspace?.id)
   const [backupPending, setBackupPending] = useState(false)
   const [backupError, setBackupError] = useState(false)
   const [backupComplete, setBackupComplete] = useState(false)
@@ -114,6 +116,7 @@ function WorkspaceGeneralSettingsPage() {
     <WorkspaceSettingsLayout
       breadcrumbLabel='Geral'
       breadcrumbParentLabel='Configurações do Workspace'
+      canManageGroups={permissions.can('group', 'manage')}
     >
       <section
         aria-labelledby='workspace-general-title'
