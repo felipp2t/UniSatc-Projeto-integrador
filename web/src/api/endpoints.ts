@@ -71,6 +71,10 @@ export const workspaceApi = {
     apiClient.get<ActivityPageResponse>(`/workspaces/${workspaceId}/activity`, {
       params: filters,
     }),
+  backup: () =>
+    apiClient.post<Blob>('/workspaces/backup', undefined, {
+      responseType: 'blob',
+    }),
   changeMemberRole: async (
     workspaceId: string,
     memberId: string,
