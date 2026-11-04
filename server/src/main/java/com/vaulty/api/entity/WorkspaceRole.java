@@ -27,6 +27,8 @@ public class WorkspaceRole {
 
     public static final String OWNER_ROLE_NAME = "Owner";
 
+    public static final String MEMBER_ROLE_NAME = "Member";
+
     @Id
     @GeneratedValue
     private UUID id;
@@ -46,10 +48,16 @@ public class WorkspaceRole {
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 
-    public static WorkspaceRole owner(Workspace workspace) {
-        WorkspaceRole role = new WorkspaceRole();
-        role.setWorkspace(workspace);
-        role.setName(OWNER_ROLE_NAME);
-        return role;
+    public static boolean isProtectedName(String name) {
+        return OWNER_ROLE_NAME.equals(name) || MEMBER_ROLE_NAME.equals(name);
     }
+
+    public boolean isOwnerRole() {
+        return OWNER_ROLE_NAME.equals(name);
+    }
+
+    public boolean isProtected() {
+        return isProtectedName(name);
+    }
+
 }

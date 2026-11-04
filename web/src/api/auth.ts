@@ -22,6 +22,8 @@ export const AUTH_ENDPOINTS_WITHOUT_REFRESH = [
   '/auth/refresh',
   '/auth/register',
   '/auth/reset-password',
+  '/invites/decline',
+  '/invites/validate',
 ] as const
 
 const AUTH_URL_SUFFIX_SEPARATOR = /[?#]/

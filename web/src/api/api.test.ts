@@ -74,12 +74,18 @@ describe('endpoint helpers', () => {
 
     const loginRequest = { email: 'user@example.com', password: 'password' }
     const inviteRequest = { email: 'invite@example.com' }
+    const validationRequest = {
+      email: 'invite@example.com',
+      token: 'invite-token',
+    }
 
     try {
       await authApi.login(loginRequest)
       await userApi.getMe()
       await workspaceApi.list()
       await inviteApi.create(inviteRequest)
+      await inviteApi.validate(validationRequest)
+      await inviteApi.decline(validationRequest)
     } finally {
       apiClient.defaults.adapter = previousAdapter
     }
@@ -108,7 +114,84 @@ describe('endpoint helpers', () => {
         url: '/invites',
       })
     )
+    expect(adapter).toHaveBeenNthCalledWith(
+      5,
+      expect.objectContaining({
+        data: JSON.stringify(validationRequest),
+        method: 'post',
+        url: '/invites/validate',
+      })
+    )
+    expect(adapter).toHaveBeenNthCalledWith(
+      6,
+      expect.objectContaining({
+        data: JSON.stringify(validationRequest),
+        method: 'post',
+        url: '/invites/decline',
+      })
+    )
   })
+
+  it('normalizes workspace member DTOs with optional email at the API boundary', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      data: [
+        {
+          id: 'membership-1',
+          name: 'Ana Owner',
+          roleId: 'role-owner',
+          roleName: 'owner',
+          userId: 'user-1',
+        },
+        {
+          email: 'bia@example.com',
+          id: 'membership-2',
+          name: 'Bia Member',
+          roleId: 'role-member',
+          roleName: 'member',
+          userId: 'user-2',
+        },
+      ],
+    } as never)
+
+    const { data } = await workspaceApi.listMembers('workspace-1')
+
+    expect(data).toEqual([
+      {
+        email: undefined,
+        id: 'membership-1',
+        name: 'Ana Owner',
+        roleId: 'role-owner',
+        roleName: 'owner',
+        userId: 'user-1',
+      },
+      {
+        email: 'bia@example.com',
+        id: 'membership-2',
+        name: 'Bia Member',
+        roleId: 'role-member',
+        roleName: 'member',
+        userId: 'user-2',
+      },
+    ])
+  })
+
+  it.each(['missing', 'empty'])(
+    'rejects workspace member DTOs with a %s required user ID',
+    async (userIdState) => {
+      const member = {
+        id: 'membership-1',
+        name: 'Ana Owner',
+        roleId: 'role-owner',
+        roleName: 'owner',
+        ...(userIdState === 'empty' ? { userId: '' } : {}),
+      }
+      vi.spyOn(apiClient, 'get').mockResolvedValue({ data: [member] } as never)
+
+      await expect(workspaceApi.listMembers('workspace-1')).rejects.toThrow(
+        'A resposta da API contém membros inválidos.'
+      )
+    }
+  )
 })
 
 describe('auth interceptor contract', () => {
@@ -117,6 +200,8 @@ describe('auth interceptor contract', () => {
     expect(shouldSkipAuthRefresh('/auth/refresh')).toBe(true)
     expect(shouldSkipAuthRefresh('/auth/login?source=invite')).toBe(true)
     expect(shouldSkipAuthRefresh('/auth/refresh#session')).toBe(true)
+    expect(shouldSkipAuthRefresh('/invites/validate')).toBe(true)
+    expect(shouldSkipAuthRefresh('/invites/decline')).toBe(true)
     expect(shouldSkipAuthRefresh('/me')).toBe(false)
   })
 
@@ -161,6 +246,57 @@ describe('auth interceptor contract', () => {
 
     await expect(client.get('/me')).resolves.toMatchObject({ status: 200 })
     expect(refresh).toHaveBeenCalledOnce()
+    client.interceptors.response.eject(interceptorId)
+  })
+
+  it('does not refresh or expire the session for an incorrect current password response', async () => {
+    const client = axios.create()
+    const onSessionExpired = vi.fn()
+    const refresh = vi.fn().mockResolvedValue(true)
+    const config = {
+      headers: {},
+      method: 'patch',
+      url: '/me/password',
+    } as InternalAxiosRequestConfig
+    const adapter = vi.fn().mockRejectedValue(
+      new axios.AxiosError(
+        'Request failed',
+        'ERR_BAD_REQUEST',
+        config,
+        undefined,
+        {
+          config,
+          data: { message: 'Senha atual incorreta', status: 400 },
+          headers: {},
+          status: 400,
+          statusText: 'Bad Request',
+        }
+      )
+    )
+
+    client.defaults.adapter = adapter
+    client.interceptors.response.use(undefined, (error) =>
+      Promise.reject(toApiError(error))
+    )
+    const interceptorId = installAuthInterceptor(client, {
+      onSessionExpired,
+      refresh,
+    })
+
+    await expect(
+      client.patch('/me/password', {
+        confirmPassword: 'new-password',
+        currentPassword: 'wrong-password',
+        newPassword: 'new-password',
+      })
+    ).rejects.toMatchObject({
+      message: 'Senha atual incorreta',
+      status: 400,
+    })
+
+    expect(adapter).toHaveBeenCalledOnce()
+    expect(refresh).not.toHaveBeenCalled()
+    expect(onSessionExpired).not.toHaveBeenCalled()
     client.interceptors.response.eject(interceptorId)
   })
 

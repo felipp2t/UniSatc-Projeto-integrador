@@ -1,0 +1,114 @@
+package com.vaulty.api.controller.docs;
+
+import com.vaulty.api.dto.item.AttachmentResponse;
+import com.vaulty.api.dto.item.CreateItemRequest;
+import com.vaulty.api.dto.item.ItemPageResponse;
+import com.vaulty.api.dto.item.ItemResponse;
+import com.vaulty.api.dto.item.SecretValueResponse;
+import com.vaulty.api.dto.item.UpdateItemMetadataRequest;
+import com.vaulty.api.dto.item.UpdateItemRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
+
+@Tag(name = "Items")
+public interface WorkspaceItemControllerDocs {
+
+    @Operation(summary = "Cria um item de arquivo com um anexo")
+    @ApiResponses({@ApiResponse(responseCode = "201"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
+        @ApiResponse(responseCode = "409")})
+    ResponseEntity<AttachmentResponse> createAttachment(@Parameter(hidden = true) UUID userId,
+                                                         UUID workspaceId, String title, String description,
+                                                         UUID collectionId, MultipartFile file);
+
+    @Operation(summary = "Substitui o arquivo anexado a um item")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
+    ResponseEntity<AttachmentResponse> replaceAttachment(@Parameter(hidden = true) UUID userId,
+                                                         UUID workspaceId, UUID itemId, MultipartFile file);
+
+    @Operation(summary = "Atualiza o título e a descrição de um item com anexo")
+    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
+        @ApiResponse(responseCode = "409")})
+    ResponseEntity<Void> updateAttachmentMetadata(@Parameter(hidden = true) UUID userId,
+                                                  UUID workspaceId, UUID itemId,
+                                                  UpdateItemMetadataRequest request);
+
+    @Operation(summary = "Arquiva um item")
+    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404"), @ApiResponse(responseCode = "409")})
+    ResponseEntity<Void> archive(@Parameter(hidden = true) UUID userId, UUID workspaceId, UUID itemId);
+
+    @Operation(summary = "Atualiza título e conteúdo de um item de texto, link ou segredo")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
+        @ApiResponse(responseCode = "409")})
+    ResponseEntity<ItemResponse> update(@Parameter(hidden = true) UUID userId,
+                                        UUID workspaceId, UUID itemId, UpdateItemRequest request);
+
+    @Operation(summary = "Baixa ou visualiza um anexo autorizado")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404")})
+    ResponseEntity<byte[]> downloadAttachment(@Parameter(hidden = true) UUID userId,
+                                              UUID workspaceId, UUID itemId, boolean download);
+
+    @Operation(summary = "Cria um item de texto, link ou segredo")
+    @ApiResponses({@ApiResponse(responseCode = "201"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404"),
+        @ApiResponse(responseCode = "409")})
+    ResponseEntity<ItemResponse> create(@Parameter(hidden = true) UUID userId,
+                                        UUID workspaceId, CreateItemRequest request);
+
+    @Operation(summary = "Lista os itens ativos (ou, com archived=true, os arquivados) da raiz ou de uma pasta")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
+    ResponseEntity<ItemPageResponse> list(@Parameter(hidden = true) UUID userId,
+                                          UUID workspaceId, UUID collectionId, boolean archived,
+                                          int page, int size);
+
+    @Operation(summary = "Busca itens por todas as palavras do título, ignorando caixa e acentos; inclui arquivados quando solicitado")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "400"),
+        @ApiResponse(responseCode = "403"), @ApiResponse(responseCode = "404")})
+    ResponseEntity<ItemPageResponse> search(@Parameter(hidden = true) UUID userId,
+                                            UUID workspaceId, String q,
+                                            @Parameter(description = "Inclui itens arquivados nos resultados")
+                                            boolean includeArchived,
+                                            int page, int size);
+
+    @Operation(summary = "Consulta um item de texto, link ou metadados de segredo")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404")})
+    ResponseEntity<ItemResponse> get(@Parameter(hidden = true) UUID userId,
+                                     UUID workspaceId, UUID itemId);
+
+    @Operation(summary = "Restaura um item arquivado")
+    @ApiResponses({@ApiResponse(responseCode = "204"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404"), @ApiResponse(responseCode = "409")})
+    ResponseEntity<Void> restore(@Parameter(hidden = true) UUID userId,
+                                 UUID workspaceId, UUID itemId);
+
+    @Operation(summary = "Revela o valor de um segredo autorizado")
+    @ApiResponses({@ApiResponse(responseCode = "200"), @ApiResponse(responseCode = "403"),
+        @ApiResponse(responseCode = "404")})
+    ResponseEntity<SecretValueResponse> reveal(@Parameter(hidden = true) UUID userId,
+                                               UUID workspaceId, UUID itemId);
+
+    @Operation(summary = "Exclui definitivamente um item arquivado",
+            description = "Exige confirmação explícita com confirm=true. Para segredos, exige também secret:read e secret:delete.")
+    @ApiResponses({@ApiResponse(responseCode = "204", description = "Item excluído"),
+        @ApiResponse(responseCode = "400", description = "Confirmação ausente ou inválida"),
+        @ApiResponse(responseCode = "403", description = "Permissão insuficiente"),
+        @ApiResponse(responseCode = "404", description = "Item indisponível"),
+        @ApiResponse(responseCode = "409", description = "Item não está arquivado")})
+    ResponseEntity<Void> delete(@Parameter(hidden = true) UUID userId,
+                                UUID workspaceId, UUID itemId,
+                                @Parameter(description = "Confirma a exclusão definitiva", example = "true")
+                                boolean confirm);
+}

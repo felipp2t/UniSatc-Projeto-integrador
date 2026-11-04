@@ -1,4 +1,4 @@
-import { CaretRightIcon, DotsThreeIcon } from '@phosphor-icons/react'
+import { DotsThreeIcon } from '@phosphor-icons/react'
 import { cn } from 'cn'
 import { Slot } from 'radix-ui'
 import type { ComponentProps, ReactNode } from 'react'
@@ -11,7 +11,7 @@ export function BreadcrumbList({ className, ...props }: ComponentProps<'ol'>) {
   return (
     <ol
       className={cn(
-        'flex flex-wrap items-center gap-1.5 break-words font-mono text-muted-foreground text-xs sm:gap-2.5',
+        'flex flex-wrap items-center gap-1.5 break-words font-bold font-mono text-muted-foreground text-xs uppercase',
         className
       )}
       {...props}
@@ -50,7 +50,7 @@ export function BreadcrumbPage({
   return (
     <span
       aria-current='page'
-      className={cn('font-normal text-foreground', className)}
+      className={cn('font-bold text-emerald-700 dark:text-primary', className)}
       {...props}
     />
   )
@@ -64,11 +64,14 @@ export function BreadcrumbSeparator({
   return (
     <li
       aria-hidden='true'
-      className={cn('[&>svg]:size-3.5', className)}
+      className={cn(
+        'px-1 font-bold font-mono text-[#2f2f2f] text-xs uppercase',
+        className
+      )}
       role='presentation'
       {...props}
     >
-      {children ?? <CaretRightIcon />}
+      {children ?? '/'}
     </li>
   )
 }

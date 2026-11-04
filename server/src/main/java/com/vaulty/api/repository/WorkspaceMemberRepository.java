@@ -2,12 +2,58 @@ package com.vaulty.api.repository;
 
 import com.vaulty.api.entity.WorkspaceMember;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember, UUID> {
+
+    @Query("""
+            select member from WorkspaceMember member join fetch member.role
+            where member.id = :membershipId and member.user.id = :userId
+            """)
+    Optional<WorkspaceMember> findByIdAndUserId(
+            @Param("membershipId") UUID membershipId, @Param("userId") UUID userId);
+
+    @Query("""
+            select member from WorkspaceMember member join fetch member.role
+            where member.workspace.id = :workspaceId and member.user.id = :userId
+            """)
+    Optional<WorkspaceMember> findByWorkspaceIdAndUserId(
+            @Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId);
+
+    Optional<WorkspaceMember> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
+
+    boolean existsByRoleId(UUID roleId);
+
+    @Query("""
+            select count(member) from WorkspaceMember member
+            where member.workspace.id = :workspaceId and member.role.id = :roleId
+            """)
+    long countByWorkspaceIdAndRoleId(
+            @Param("workspaceId") UUID workspaceId, @Param("roleId") UUID roleId);
+
+    @Query("select member from WorkspaceMember member join fetch member.user where member.workspace.id = :workspaceId and member.role.id = :roleId")
+    List<WorkspaceMember> findAllByWorkspaceIdAndRoleId(
+            @Param("workspaceId") UUID workspaceId, @Param("roleId") UUID roleId);
+
+    @Query("""
+            select member from WorkspaceMember member
+            where member.workspace.id = :workspaceId and member.role.name = :ownerRoleName
+            order by member.id
+            """)
+    List<WorkspaceMember> findOwners(
+            @Param("workspaceId") UUID workspaceId, @Param("ownerRoleName") String ownerRoleName);
+
+    @Query("""
+            select member from WorkspaceMember member
+            join fetch member.role
+            join fetch member.workspace
+            where member.user.id = :userId
+            """)
+    Optional<WorkspaceMember> findByUserId(@Param("userId") UUID userId);
 
     @Query("""
             select sibling

@@ -18,3 +18,8 @@ Thumbs.db
 
 # misc
 *.log
+
+# Documentos locais de apoio
+/Valty_Levantamento_Requisitos_ABNT 2.docx.pdf
+/REVIEW.md
+/PLANO-DE-ENTREGAS.md
