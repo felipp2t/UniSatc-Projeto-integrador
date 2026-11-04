@@ -1,6 +1,8 @@
 package com.vaulty.api.controller;
 
 import com.vaulty.api.service.WorkspaceSharingService;
+import com.vaulty.api.dto.sharing.CollectionSharingConfiguration;
+import com.vaulty.api.dto.sharing.ItemSharingConfiguration;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,20 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class WorkspaceSharingController {
     private final WorkspaceSharingService sharing;
+
+    @GetMapping("/collections/{collectionId}/configuration")
+    public ResponseEntity<CollectionSharingConfiguration> collectionConfiguration(
+            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
+            @PathVariable UUID collectionId) {
+        return ResponseEntity.ok(sharing.collectionConfiguration(userId, workspaceId, collectionId));
+    }
+
+    @GetMapping("/items/{itemId}/configuration")
+    public ResponseEntity<ItemSharingConfiguration> itemConfiguration(
+            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
+            @PathVariable UUID itemId) {
+        return ResponseEntity.ok(sharing.itemConfiguration(userId, workspaceId, itemId));
+    }
 
     @PutMapping("/collections/{collectionId}/groups/{groupId}")
     public ResponseEntity<Void> grantGroup(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
@@ -65,8 +81,9 @@ public class WorkspaceSharingController {
 
     @GetMapping("/items/{itemId}/origins")
     public ResponseEntity<List<String>> origins(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                                @PathVariable UUID itemId) {
-        return ResponseEntity.ok(sharing.origins(userId, workspaceId, itemId));
+                                                @PathVariable UUID itemId,
+                                                @RequestParam(required = false) UUID memberId) {
+        return ResponseEntity.ok(sharing.origins(userId, workspaceId, itemId, memberId));
     }
 
     @GetMapping("/collections/{collectionId}/origins")

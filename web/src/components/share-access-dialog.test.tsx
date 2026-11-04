@@ -2,13 +2,12 @@
 
 import { screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { accessGroupApi, sharingApi, workspaceApi } from '@/api/endpoints'
+import { sharingApi, workspaceApi } from '@/api/endpoints'
 import { renderWithProviders } from '@/test/render'
 import { ShareAccessDialog } from './share-access-dialog'
 
 vi.mock('@/api/endpoints', () => ({
-  accessGroupApi: { list: vi.fn() },
-  sharingApi: { origins: vi.fn() },
+  sharingApi: { collectionConfiguration: vi.fn(), origins: vi.fn() },
   workspaceApi: { permissions: vi.fn() },
 }))
 
@@ -23,8 +22,15 @@ function renderDialog(permissions: { resource: string; action: string }[]) {
       roleName: 'Member',
     },
   } as never)
+  vi.mocked(sharingApi.collectionConfiguration).mockResolvedValue({
+    data: {
+      grantedGroups: [],
+      groups: [],
+      inheritAccess: true,
+      publicGrant: false,
+    },
+  } as never)
   vi.mocked(sharingApi.origins).mockResolvedValue({ data: [] } as never)
-  vi.mocked(accessGroupApi.list).mockResolvedValue({ data: [] } as never)
   renderWithProviders(
     <ShareAccessDialog
       onClose={vi.fn()}
@@ -44,7 +50,7 @@ describe('sharing permission gates', () => {
       )
     ).toBeInTheDocument()
     expect(sharingApi.origins).not.toHaveBeenCalled()
-    expect(accessGroupApi.list).not.toHaveBeenCalled()
+    expect(sharingApi.collectionConfiguration).not.toHaveBeenCalled()
   })
 
   it('allows public sharing without requesting groups the member cannot manage', async () => {
@@ -52,8 +58,10 @@ describe('sharing permission gates', () => {
     expect(
       await screen.findByRole('button', { name: 'Conceder acesso a todos' })
     ).toBeEnabled()
+    await waitFor(() =>
+      expect(sharingApi.collectionConfiguration).toHaveBeenCalledOnce()
+    )
     await waitFor(() => expect(sharingApi.origins).toHaveBeenCalledOnce())
-    expect(accessGroupApi.list).not.toHaveBeenCalled()
     expect(screen.queryByText('Grupos de acesso')).toBeNull()
   })
 })
