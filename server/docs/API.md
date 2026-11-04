@@ -900,6 +900,12 @@ Cada equipe tem seu próprio workspace e cada pessoa pertence a um único worksp
 ([ADR 0002](../../docs/adr/0002-um-workspace-por-equipe.md)). As rotas abaixo exigem cookie
 `accessToken` de uma conta com `systemAdmin = true`; as demais contas recebem `403`.
 
+O administrador geral não é membro de nenhum workspace, mas age como dono em todas as rotas
+`/workspaces/{workspaceId}/...` (conteúdo, segredos, anexos, histórico, membros, papéis, grupos e
+compartilhamento), e `GET /workspaces` lista todos os workspaces. A sessão dele é renovável sem
+membership, e o papel é conferido no banco a cada requisição: se `systemAdmin` for retirado, o acesso
+cai na requisição seguinte e o refresh deixa de funcionar.
+
 **`GET /admin/workspaces`** lista todos os workspaces, do mais antigo ao mais novo, com `id`, `name`,
 `description`, `ownerName`, `ownerEmail` (nulos enquanto não houver proprietário), `memberCount`,
 `pendingInvites` (`id`, `email`, `owner`, `expiresAt`) e `createdAt`.

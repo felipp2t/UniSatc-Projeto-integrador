@@ -55,8 +55,10 @@ de redefinição de uso único.
    público, solicite a redefinição de senha desse e-mail para definir a primeira senha e então
    enviar o primeiro convite. A migration `V30` marca essa conta como administrador geral: ela
    cria workspaces (um por equipe), configura cada um e convida proprietários ou membros. No
-   frontend, a tela inicial dessa conta lista os workspaces; pela API, use as rotas `/admin/workspaces`. Cada pessoa pertence a
-   um único workspace; veja a [ADR 0002](../docs/adr/0002-um-workspace-por-equipe.md).
+   frontend, a tela inicial dessa conta lista os workspaces; pela API, use as rotas `/admin/workspaces`.
+   A `V31` tira o administrador geral do workspace seed: ele não é membro de nenhum workspace, mas
+   tem acesso de dono a todos os dados de todos eles. Cada pessoa pertence a um único workspace;
+   veja a [ADR 0002](../docs/adr/0002-um-workspace-por-equipe.md).
 
 A API sobe em `http://localhost:8080`.
 
