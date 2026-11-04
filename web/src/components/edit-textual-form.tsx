@@ -9,7 +9,9 @@ import {
   type FormProps,
 } from '@/components/edit-item-form-shell'
 import { ItemContentField } from '@/components/item-content-control'
+import { Button } from '@/components/ui/button'
 import { LoadingState } from '@/components/ui/loading-state'
+import { appToast } from '@/components/ui/toast'
 import { useEditForm } from '@/hooks/use-edit-form'
 import { useUpdateItem } from '@/hooks/use-item-mutations'
 import { isContentInvalid, type TextualItemType } from '@/lib/item-validation'
@@ -118,6 +120,14 @@ function TextualFields({
     },
     [clearInvalid]
   )
+  const copySecret = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(content)
+      appToast.success('Segredo copiado.')
+    } catch {
+      appToast.error('Não foi possível copiar o segredo.')
+    }
+  }, [content])
 
   return (
     <EditFormShell
@@ -140,6 +150,11 @@ function TextualFields({
           value={content}
         />
       )}
+      {type === 'secret' && !archived ? (
+        <Button onClick={copySecret} size='sm' type='button' variant='outline'>
+          Copiar segredo
+        </Button>
+      ) : null}
     </EditFormShell>
   )
 }
