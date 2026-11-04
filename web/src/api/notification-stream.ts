@@ -12,6 +12,7 @@ export function startNotificationStream(
   const controller = new AbortController()
   let source: EventSource | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
+  let resumeTimer: ReturnType<typeof setTimeout> | undefined
   let retryMs = INITIAL_RETRY_MS
   let running = false
   let requested = false
@@ -28,7 +29,26 @@ export function startNotificationStream(
   function stop() {
     controller.abort()
     clearTimeout(timer)
+    clearTimeout(resumeTimer)
     closeSource()
+    window.removeEventListener('focus', synchronizeOnResume)
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') synchronizeOnResume()
+  }
+
+  function synchronizeOnResume() {
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      timer = undefined
+    }
+    if (resumeTimer !== undefined) return
+    resumeTimer = setTimeout(() => {
+      resumeTimer = undefined
+      requestSync()
+    }, 0)
   }
 
   function retry() {
@@ -90,6 +110,8 @@ export function startNotificationStream(
     if (timer === undefined) drain()
   }
 
+  window.addEventListener('focus', synchronizeOnResume)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   requestSync()
   return stop
 }
