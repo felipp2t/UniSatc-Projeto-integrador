@@ -14,6 +14,7 @@ import type {
 } from '@/api/types'
 import { CreateRoleDialog } from '@/components/create-role-dialog'
 import { DeleteRoleDialog } from '@/components/delete-role-dialog'
+import { RenameRoleDialog } from '@/components/rename-role-dialog'
 import { RolePermissionsEditor } from '@/components/role-permissions-editor'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,7 +39,6 @@ import {
 interface WorkspaceRolesSectionProps {
   onDeleteRole?: (role: WorkspaceRoleResponse) => void
   onEditPermissions?: (role: WorkspaceRoleResponse) => void
-  onRenameRole?: (role: WorkspaceRoleResponse) => void
   onRetry: () => Promise<void>
   roles: WorkspaceRoleResponse[]
   rolesError: unknown
@@ -49,7 +49,6 @@ interface WorkspaceRolesSectionProps {
 export function WorkspaceRolesSection({
   onDeleteRole,
   onEditPermissions,
-  onRenameRole,
   onRetry,
   roles,
   rolesError,
@@ -59,6 +58,8 @@ export function WorkspaceRolesSection({
   const [editingRole, setEditingRole] = useState<WorkspaceRoleResponse | null>(
     null
   )
+  const [renamingRole, setRenamingRole] =
+    useState<WorkspaceRoleResponse | null>(null)
   const [permissionsReadOnly, setPermissionsReadOnly] = useState(false)
   const roleIds = roles.map((role) => role.id).join(',')
   const permissions = useQuery({
@@ -99,6 +100,9 @@ export function WorkspaceRolesSection({
   }, [])
   const handleEditorOpenChange = useCallback((open: boolean) => {
     if (!open) setEditingRole(null)
+  }, [])
+  const handleRenameOpenChange = useCallback((open: boolean) => {
+    if (!open) setRenamingRole(null)
   }, [])
 
   if (rolesPending) return <LoadingState label='Carregando cargos…' />
@@ -162,7 +166,7 @@ export function WorkspaceRolesSection({
               key={role.id}
               onDeleteRole={onDeleteRole}
               onEditPermissions={openPermissions}
-              onRenameRole={onRenameRole}
+              onRenameRole={setRenamingRole}
               onViewPermissions={viewPermissions}
               permissionsCount={permissions.data?.[role.id]?.length ?? 0}
               permissionsPending={permissions.isPending}
@@ -184,6 +188,15 @@ export function WorkspaceRolesSection({
           workspaceId={workspaceId}
         />
       ) : null}
+      {renamingRole ? (
+        <RenameRoleDialog
+          key={renamingRole.id}
+          onOpenChange={handleRenameOpenChange}
+          open
+          role={renamingRole}
+          workspaceId={workspaceId}
+        />
+      ) : null}
     </section>
   )
 }
@@ -200,7 +213,7 @@ function WorkspaceRoleRow({
 }: {
   onDeleteRole?: (role: WorkspaceRoleResponse) => void
   onEditPermissions?: (role: WorkspaceRoleResponse) => void
-  onRenameRole?: (role: WorkspaceRoleResponse) => void
+  onRenameRole: (role: WorkspaceRoleResponse) => void
   onViewPermissions: (role: WorkspaceRoleResponse) => void
   permissionsCount: number
   permissionsPending: boolean
@@ -209,7 +222,7 @@ function WorkspaceRoleRow({
 }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const handleRename = useCallback(
-    () => onRenameRole?.(role),
+    () => onRenameRole(role),
     [onRenameRole, role]
   )
   const handleEditPermissions = useCallback(
@@ -230,16 +243,24 @@ function WorkspaceRoleRow({
       <TableCell className='font-semibold'>
         <div className='flex items-center gap-1'>
           <span>{role.name}</span>
+          {role.builtIn ? (
+            <span className='sr-only' id={`rename-disabled-${role.id}`}>
+              Cargos iniciais não podem ser renomeados.
+            </span>
+          ) : null}
           <Button
+            aria-describedby={
+              role.builtIn ? `rename-disabled-${role.id}` : undefined
+            }
             aria-label={`Renomear cargo ${role.name}`}
             className='size-6 p-0'
-            disabled={!onRenameRole}
+            disabled={role.builtIn}
             onClick={handleRename}
             size='icon'
             title={
-              onRenameRole
-                ? `Renomear ${role.name}`
-                : 'A renomeação aguarda a API de cargos.'
+              role.builtIn
+                ? 'Cargos iniciais não podem ser renomeados.'
+                : `Renomear ${role.name}`
             }
             variant='ghost'
           >
