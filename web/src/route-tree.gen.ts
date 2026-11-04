@@ -22,6 +22,7 @@ import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/c
 import { Route as ProtectedConfiguracoesWorkspaceRouteImport } from './pages/_protected/configuracoes-workspace'
 import { Route as ProtectedAdministracaoWorkspaceIdRouteImport } from './pages/_protected/administracao/$workspaceId'
 import { Route as ProtectedConfiguracoesWorkspaceGeralRouteImport } from './pages/_protected/configuracoes-workspace_.geral'
+import { Route as ProtectedConfiguracoesWorkspaceGruposRouteImport } from './pages/_protected/configuracoes-workspace_.grupos'
 
 const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
   id: '/_protected',
@@ -90,6 +91,12 @@ const ProtectedConfiguracoesWorkspaceGeralRoute =
     path: '/configuracoes-workspace/geral',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
+const ProtectedConfiguracoesWorkspaceGruposRoute =
+  ProtectedConfiguracoesWorkspaceGruposRouteImport.update({
+    id: '/configuracoes-workspace_/grupos',
+    path: '/configuracoes-workspace/grupos',
+    getParentRoute: () => ProtectedLayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ProtectedIndexRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
   '/administracao/$workspaceId': typeof ProtectedAdministracaoWorkspaceIdRoute
   '/configuracoes-workspace/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
+  '/configuracoes-workspace/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
 }
 export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
@@ -118,6 +126,7 @@ export interface FileRoutesByTo {
   '/': typeof ProtectedIndexRoute
   '/administracao/$workspaceId': typeof ProtectedAdministracaoWorkspaceIdRoute
   '/configuracoes-workspace/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
+  '/configuracoes-workspace/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,6 +143,7 @@ export interface FileRoutesById {
   '/_protected/': typeof ProtectedIndexRoute
   '/_protected/administracao/$workspaceId': typeof ProtectedAdministracaoWorkspaceIdRoute
   '/_protected/configuracoes-workspace_/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
+  '/_protected/configuracoes-workspace_/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/configuracoes-workspace'
     | '/administracao/$workspaceId'
     | '/configuracoes-workspace/geral'
+    | '/configuracoes-workspace/grupos'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/cadastro'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/'
     | '/administracao/$workspaceId'
     | '/configuracoes-workspace/geral'
+    | '/configuracoes-workspace/grupos'
   id:
     | '__root__'
     | '/_protected'
@@ -179,6 +191,7 @@ export interface FileRouteTypes {
     | '/_protected/'
     | '/_protected/administracao/$workspaceId'
     | '/_protected/configuracoes-workspace_/geral'
+    | '/_protected/configuracoes-workspace_/grupos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -282,6 +295,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceGeralRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
+    '/_protected/configuracoes-workspace_/grupos': {
+      id: '/_protected/configuracoes-workspace_/grupos'
+      path: '/configuracoes-workspace/grupos'
+      fullPath: '/configuracoes-workspace/grupos'
+      preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceGruposRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
   }
 }
 
@@ -294,6 +314,7 @@ interface ProtectedLayoutRouteChildren {
   ProtectedIndexRoute: typeof ProtectedIndexRoute
   ProtectedAdministracaoWorkspaceIdRoute: typeof ProtectedAdministracaoWorkspaceIdRoute
   ProtectedConfiguracoesWorkspaceGeralRoute: typeof ProtectedConfiguracoesWorkspaceGeralRoute
+  ProtectedConfiguracoesWorkspaceGruposRoute: typeof ProtectedConfiguracoesWorkspaceGruposRoute
 }
 
 const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
@@ -307,6 +328,8 @@ const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
     ProtectedAdministracaoWorkspaceIdRoute,
   ProtectedConfiguracoesWorkspaceGeralRoute:
     ProtectedConfiguracoesWorkspaceGeralRoute,
+  ProtectedConfiguracoesWorkspaceGruposRoute:
+    ProtectedConfiguracoesWorkspaceGruposRoute,
 }
 
 const ProtectedLayoutRouteWithChildren = ProtectedLayoutRoute._addFileChildren(

@@ -21,6 +21,7 @@ import type {
 import { AdminWorkspacesHome } from '@/components/admin-workspaces-home'
 import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
+import { EditItemDialog } from '@/components/edit-item-dialog'
 import {
   InlineCodeContent,
   InlineCodeRoot,
@@ -59,6 +60,7 @@ import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 const searchSchema = z.object({
   archived: z.boolean().optional().catch(undefined),
   collectionId: z.guid().optional().catch(undefined),
+  itemId: z.guid().optional().catch(undefined),
 })
 const itemTypeOptions = [
   'all',
@@ -86,7 +88,7 @@ function HomePage() {
 }
 
 function WorkspaceHomePage() {
-  const { archived, collectionId } = Route.useSearch()
+  const { archived, collectionId, itemId } = Route.useSearch()
   const navigate = Route.useNavigate()
   const changeArchived = useCallback(
     (value: boolean) =>
@@ -108,7 +110,7 @@ function WorkspaceHomePage() {
   }
   if (!workspace?.id) {
     return (
-      <main className='container mx-auto px-8 py-12'>
+      <main className='container mx-auto px-4 py-8 md:px-8 md:py-12'>
         <EmptyState
           description='Você precisa estar vinculado a um workspace para consultar os itens.'
           title='Nenhum workspace disponível'
@@ -121,6 +123,7 @@ function WorkspaceHomePage() {
     <WorkspaceBrowser
       archived={Boolean(archived)}
       collectionId={collectionId}
+      itemId={itemId}
       // Remounting per folder prevents folder-scoped state and data from leaking.
       key={`${workspace.id}:${collectionId ?? 'root'}`}
       onArchivedChange={changeArchived}
@@ -133,16 +136,23 @@ function WorkspaceHomePage() {
 function WorkspaceBrowser({
   archived,
   collectionId,
+  itemId,
   onArchivedChange,
   workspaceId,
   workspaceName,
 }: {
   archived: boolean
   collectionId: string | undefined
+  itemId: string | undefined
   onArchivedChange: (archived: boolean) => void
   workspaceId: string
   workspaceName: string
 }) {
+  const navigate = Route.useNavigate()
+  const closeItem = useCallback(
+    () => navigate({ search: (prev) => ({ ...prev, itemId: undefined }) }),
+    [navigate]
+  )
   const queryClient = useQueryClient()
   const permissions = useWorkspacePermissions(workspaceId)
   const path = useCollectionPath(workspaceId, collectionId)
@@ -191,7 +201,7 @@ function WorkspaceBrowser({
   }
 
   return (
-    <main className='container mx-auto flex min-h-full flex-col gap-7 px-8 py-12'>
+    <main className='container mx-auto flex min-h-full flex-col gap-7 px-4 py-8 md:px-8 md:py-12'>
       <WorkspaceBreadcrumbs
         collectionId={collectionId}
         isLoading={path.isPending}
@@ -222,6 +232,17 @@ function WorkspaceBrowser({
           archived={archived}
           collectionId={collectionId}
           onArchivedChange={onArchivedChange}
+          workspaceId={workspaceId}
+        />
+      ) : null}
+      {itemId ? (
+        <EditItemDialog
+          itemId={itemId}
+          key={itemId}
+          onClose={closeItem}
+          readOnly
+          showAttachmentPreview
+          unavailableOnAccessError
           workspaceId={workspaceId}
         />
       ) : null}

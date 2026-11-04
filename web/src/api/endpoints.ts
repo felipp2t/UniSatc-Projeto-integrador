@@ -2,6 +2,7 @@ import type { ZodType } from 'zod'
 import { apiClient } from './client'
 import { permissionsSchema, workspacePermissionsSchema } from './permissions'
 import type {
+  AccessGroupMemberResponse,
   AccessGroupResponse,
   ActivityFilters,
   ActivityPageResponse,
@@ -14,6 +15,7 @@ import type {
   CollectionPageResponse,
   CollectionPathEntry,
   CollectionResponse,
+  CollectionSharingConfiguration,
   CreateCollectionRequest,
   CreateItemRequest,
   CreateWorkspaceRequest,
@@ -24,6 +26,8 @@ import type {
   InviteValidationResponse,
   ItemPageResponse,
   ItemResponse,
+  ItemSearchParams,
+  ItemSharingConfiguration,
   LoginRequest,
   NotificationPageResponse,
   RegisterRequest,
@@ -162,6 +166,8 @@ export const workspaceApi = {
       `/workspaces/${workspaceId}/members/${membershipId}`,
       { params: { confirmMemberId: membershipId } }
     ),
+  renameRole: (workspaceId: string, roleId: string, name: string) =>
+    apiClient.put<void>(`/workspaces/${workspaceId}/roles/${roleId}`, { name }),
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
 }
@@ -215,11 +221,46 @@ export const notificationsApi = {
 }
 
 export const accessGroupApi = {
+  addMember: (
+    workspaceId: string,
+    groupId: string,
+    workspaceMemberId: string
+  ) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/groups/${groupId}/members/${workspaceMemberId}`
+    ),
+  create: (workspaceId: string, name: string) =>
+    apiClient.post<AccessGroupResponse>(`/workspaces/${workspaceId}/groups`, {
+      name,
+    }),
+  delete: (workspaceId: string, groupId: string) =>
+    apiClient.delete<void>(`/workspaces/${workspaceId}/groups/${groupId}`),
   list: (workspaceId: string) =>
     apiClient.get<AccessGroupResponse[]>(`/workspaces/${workspaceId}/groups`),
+  listMembers: (workspaceId: string, groupId: string) =>
+    apiClient.get<AccessGroupMemberResponse[]>(
+      `/workspaces/${workspaceId}/groups/${groupId}/members`
+    ),
+  removeMember: (
+    workspaceId: string,
+    groupId: string,
+    workspaceMemberId: string
+  ) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/groups/${groupId}/members/${workspaceMemberId}`
+    ),
+  rename: (workspaceId: string, groupId: string, name: string) =>
+    apiClient.put<AccessGroupResponse>(
+      `/workspaces/${workspaceId}/groups/${groupId}`,
+      { name }
+    ),
 }
 
 export const sharingApi = {
+  collectionConfiguration: (workspaceId: string, collectionId: string) =>
+    apiClient.get<CollectionSharingConfiguration>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/configuration`
+    ),
   grantEveryone: (workspaceId: string, collectionId: string) =>
     apiClient.put<void>(
       `/workspaces/${workspaceId}/sharing/collections/${collectionId}/everyone`
@@ -232,13 +273,31 @@ export const sharingApi = {
     apiClient.put<void>(
       `/workspaces/${workspaceId}/sharing/items/${itemId}/members/${memberId}`
     ),
-  origins: (workspaceId: string, type: 'collection' | 'item', id: string) =>
+  itemConfiguration: (workspaceId: string, itemId: string) =>
+    apiClient.get<ItemSharingConfiguration>(
+      `/workspaces/${workspaceId}/sharing/items/${itemId}/configuration`
+    ),
+  origins: (
+    workspaceId: string,
+    type: 'collection' | 'item',
+    id: string,
+    memberId?: string
+  ) =>
     apiClient.get<string[]>(
-      `/workspaces/${workspaceId}/sharing/${type === 'collection' ? 'collections' : 'items'}/${id}/origins`
+      `/workspaces/${workspaceId}/sharing/${type === 'collection' ? 'collections' : 'items'}/${id}/origins`,
+      { params: memberId ? { memberId } : undefined }
     ),
   revokeEveryone: (workspaceId: string, collectionId: string) =>
     apiClient.delete<void>(
       `/workspaces/${workspaceId}/sharing/collections/${collectionId}/everyone`
+    ),
+  revokeGroup: (workspaceId: string, collectionId: string, groupId: string) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/sharing/collections/${collectionId}/groups/${groupId}`
+    ),
+  revokeMember: (workspaceId: string, itemId: string, memberId: string) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/sharing/items/${itemId}/members/${memberId}`
     ),
   setInheritance: (
     workspaceId: string,
@@ -374,6 +433,15 @@ export const itemsApi = {
     apiClient.get<SecretValueResponse>(
       `/workspaces/${workspaceId}/items/${itemId}/secret`
     ),
+  search: (
+    workspaceId: string,
+    params: ItemSearchParams,
+    signal?: AbortSignal
+  ) =>
+    apiClient.get<ItemPageResponse>(`/workspaces/${workspaceId}/items/search`, {
+      params,
+      signal,
+    }),
   update: (workspaceId: string, itemId: string, request: UpdateItemRequest) =>
     apiClient.put<ItemResponse>(
       `/workspaces/${workspaceId}/items/${itemId}`,

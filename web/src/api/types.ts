@@ -84,6 +84,12 @@ export interface ItemPageResponse {
   totalItems: number
   totalPages: number
 }
+export interface ItemSearchParams {
+  includeArchived: boolean
+  page: number
+  q: string
+  size: number
+}
 export interface CollectionPathEntry {
   id: string
   name: string
@@ -205,4 +211,24 @@ export type WorkspaceResponse = components['schemas']['WorkspaceResponse']
 export interface AccessGroupResponse {
   id: string
   name: string
+}
+export interface CollectionSharingConfiguration {
+  grantedGroups: AccessGroupResponse[]
+  groups: AccessGroupResponse[]
+  inheritAccess: boolean
+  publicGrant: boolean
+}
+export interface SharingMemberGrant {
+  id: string
+  name: string
+}
+export interface ItemSharingConfiguration {
+  eligibleMembers: SharingMemberGrant[]
+  grantedMembers: SharingMemberGrant[]
+}
+export interface AccessGroupMemberResponse {
+  email?: string
+  name: string
+  userId: string
+  workspaceMemberId: string
 }

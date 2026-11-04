@@ -1,15 +1,16 @@
 package com.vaulty.api.service;
 
+import com.vaulty.api.dto.notification.NotificationResourceReference;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.WorkspaceRepository;
+import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import jakarta.persistence.EntityManager;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class WorkspaceAccessNotifications {
@@ -51,11 +52,21 @@ public class WorkspaceAccessNotifications {
     }
 
     public void notifyChanged(Map<UUID, Set<String>> before, Map<UUID, Set<String>> after) {
-        notifyChanged(before, after, Set.of());
+        notifyChanged(before, after, Set.of(), null);
+    }
+
+    public void notifyChanged(Map<UUID, Set<String>> before, Map<UUID, Set<String>> after,
+            NotificationResourceReference reference) {
+        notifyChanged(before, after, Set.of(), reference);
     }
 
     public void notifyChanged(Map<UUID, Set<String>> before, Map<UUID, Set<String>> after,
             Collection<UUID> explicitlyAffected) {
+        notifyChanged(before, after, explicitlyAffected, null);
+    }
+
+    private void notifyChanged(Map<UUID, Set<String>> before, Map<UUID, Set<String>> after,
+            Collection<UUID> explicitlyAffected, NotificationResourceReference reference) {
         Set<UUID> affected = new HashSet<>();
         Set<UUID> users = new HashSet<>(before.keySet());
         users.addAll(after.keySet());
@@ -65,6 +76,6 @@ public class WorkspaceAccessNotifications {
             }
         }
         affected.addAll(explicitlyAffected);
-        notifications.accessChanged(affected);
+        notifications.accessChanged(affected, reference);
     }
 }

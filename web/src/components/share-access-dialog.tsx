@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import { useCallback, useState } from 'react'
-import { accessGroupApi, sharingApi, workspaceApi } from '@/api/endpoints'
-import type { AccessGroupResponse, WorkspaceMemberResponse } from '@/api/types'
+import { sharingApi } from '@/api/endpoints'
+import type { AccessGroupResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -118,21 +119,36 @@ function SharingConfiguration({
   const permissions = useWorkspacePermissions(workspaceId)
   const [selectedGroup, setSelectedGroup] = useState('')
   const [selectedMember, setSelectedMember] = useState('')
+  const [selectedOriginsMemberId, setSelectedOriginsMemberId] =
+    useState<string>()
   const [pendingAction, setPendingAction] = useState('')
-  const groups = useQuery({
-    enabled: target.kind === 'collection' && permissions.can('group', 'manage'),
-    queryFn: async () => (await accessGroupApi.list(workspaceId)).data,
-    queryKey: ['access-groups', workspaceId],
+  const collectionConfiguration = useQuery({
+    enabled:
+      target.kind === 'collection' && permissions.can('sharing', 'manage'),
+    queryFn: async () =>
+      (await sharingApi.collectionConfiguration(workspaceId, target.id)).data,
+    queryKey: ['sharing-configuration', workspaceId, 'collection', target.id],
   })
-  const members = useQuery({
-    enabled: target.kind === 'item',
-    queryFn: async () => (await workspaceApi.listMembers(workspaceId)).data,
-    queryKey: ['workspace-members', workspaceId],
+  const itemConfiguration = useQuery({
+    enabled: target.kind === 'item' && permissions.can('sharing', 'manage'),
+    queryFn: async () =>
+      (await sharingApi.itemConfiguration(workspaceId, target.id)).data,
+    queryKey: ['sharing-configuration', workspaceId, 'item', target.id],
   })
   const origins = useQuery({
     queryFn: async () =>
-      (await sharingApi.origins(workspaceId, target.kind, target.id)).data,
-    queryKey: sharingOriginsKey(workspaceId, target.kind, target.id),
+      (
+        await sharingApi.origins(
+          workspaceId,
+          target.kind,
+          target.id,
+          target.kind === 'item' ? selectedOriginsMemberId : undefined
+        )
+      ).data,
+    queryKey: [
+      ...sharingOriginsKey(workspaceId, target.kind, target.id),
+      selectedOriginsMemberId,
+    ],
   })
   const run = useCallback(
     async (action: string, operation: () => Promise<unknown>) => {
@@ -142,9 +158,19 @@ function SharingConfiguration({
         await queryClient.invalidateQueries({
           queryKey: sharingOriginsKey(workspaceId, target.kind, target.id),
         })
+        await queryClient.invalidateQueries({
+          queryKey: [
+            'sharing-configuration',
+            workspaceId,
+            target.kind,
+            target.id,
+          ],
+        })
         appToast.success('Compartilhamento atualizado.')
+        return true
       } catch {
         appToast.error('Não foi possível atualizar o compartilhamento.')
+        return false
       } finally {
         setPendingAction('')
       }
@@ -190,54 +216,126 @@ function SharingConfiguration({
     )
     setSelectedMember('')
   }, [run, selectedMember, target.id, workspaceId])
+  const handleRevokeGroup = useCallback(
+    (groupId: string) =>
+      run(`revoke-group-${groupId}`, () =>
+        sharingApi.revokeGroup(workspaceId, target.id, groupId)
+      ),
+    [run, target.id, workspaceId]
+  )
+  const handleRevokeMember = useCallback(
+    async (memberId: string) => {
+      const succeeded = await run(`revoke-member-${memberId}`, () =>
+        sharingApi.revokeMember(workspaceId, target.id, memberId)
+      )
+      if (succeeded) setSelectedOriginsMemberId(memberId)
+    },
+    [run, target.id, workspaceId]
+  )
+  const handleShowCurrentUserOrigins = useCallback(() => {
+    setSelectedOriginsMemberId(undefined)
+  }, [])
   const isPending = pendingAction.length > 0
+  const groups =
+    target.kind === 'collection'
+      ? (collectionConfiguration.data?.groups ?? [])
+      : []
+  const grantedGroups =
+    target.kind === 'collection'
+      ? (collectionConfiguration.data?.grantedGroups ?? [])
+      : []
+  const inheritAccess =
+    target.kind === 'collection'
+      ? (collectionConfiguration.data?.inheritAccess ?? true)
+      : true
+  const publicGrant =
+    target.kind === 'collection'
+      ? (collectionConfiguration.data?.publicGrant ?? false)
+      : false
+  const members =
+    target.kind === 'item'
+      ? (itemConfiguration.data?.eligibleMembers ?? [])
+      : []
+  const grantedMembers =
+    target.kind === 'item' ? (itemConfiguration.data?.grantedMembers ?? []) : []
+  const configurationError =
+    target.kind === 'collection'
+      ? collectionConfiguration.error
+      : itemConfiguration.error
+  const configurationFetching =
+    target.kind === 'collection'
+      ? collectionConfiguration.isFetching
+      : itemConfiguration.isFetching
+  const configurationLoaded =
+    target.kind === 'collection'
+      ? collectionConfiguration.isSuccess
+      : itemConfiguration.isSuccess
 
   return (
     <div className='space-y-5'>
-      <SharingControls
-        groups={groups.data ?? []}
-        inheritedPublicGrant={
-          origins.data?.includes('public:workspace-root') ?? false
-        }
-        isPending={isPending}
-        localPublicGrant={
-          origins.data?.includes(`public:collection:${target.id}`) ?? false
-        }
-        members={members.data ?? []}
-        onGrantEveryone={handleGrantEveryone}
-        onGrantGroup={handleGrantGroup}
-        onGrantMember={handleGrantMember}
-        onGroupChange={handleGroupChange}
-        onMemberChange={handleMemberChange}
-        onRevokeEveryone={handleRevokeEveryone}
-        onSetInheritance={handleSetInheritance}
-        selectedGroup={selectedGroup}
-        selectedMember={selectedMember}
-        target={target}
-      />
+      <SharingConfigurationGate
+        error={configurationError}
+        loaded={configurationLoaded}
+      >
+        <SharingControls
+          grantedGroups={grantedGroups}
+          grantedMembers={grantedMembers}
+          groups={groups}
+          inheritanceEnabled={inheritAccess}
+          isPending={isPending}
+          localPublicGrant={publicGrant}
+          members={members}
+          onGrantEveryone={handleGrantEveryone}
+          onGrantGroup={handleGrantGroup}
+          onGrantMember={handleGrantMember}
+          onGroupChange={handleGroupChange}
+          onMemberChange={handleMemberChange}
+          onRevokeEveryone={handleRevokeEveryone}
+          onRevokeGroup={handleRevokeGroup}
+          onRevokeMember={handleRevokeMember}
+          onSetInheritance={handleSetInheritance}
+          selectedGroup={selectedGroup}
+          selectedMember={selectedMember}
+          target={target}
+        />
+      </SharingConfigurationGate>
       <SharingOriginsState
-        error={
-          target.kind === 'collection'
-            ? (groups.error ?? origins.error)
-            : (members.error ?? origins.error)
-        }
-        groups={groups.data ?? []}
-        isPending={
-          (target.kind === 'collection'
-            ? groups.isFetching
-            : members.isPending) || origins.isPending
-        }
-        members={members.data ?? []}
+        error={origins.error}
+        groups={groups}
+        isPending={configurationFetching || origins.isPending}
+        members={members}
+        onShowCurrentUser={handleShowCurrentUserOrigins}
         origins={origins.data ?? []}
+        selectedMemberId={selectedOriginsMemberId}
         target={target}
       />
     </div>
   )
 }
 
+function SharingConfigurationGate({
+  children,
+  error,
+  loaded,
+}: {
+  children: ReactNode
+  error: Error | null
+  loaded: boolean
+}) {
+  if (error) return <ErrorState error={error} />
+  if (!loaded) {
+    return (
+      <LoadingState label='Carregando configurações de compartilhamento…' />
+    )
+  }
+  return children
+}
+
 function SharingControls({
   groups,
-  inheritedPublicGrant,
+  grantedGroups,
+  grantedMembers,
+  inheritanceEnabled,
   isPending,
   localPublicGrant,
   members,
@@ -247,22 +345,28 @@ function SharingControls({
   onGroupChange,
   onMemberChange,
   onRevokeEveryone,
+  onRevokeGroup,
+  onRevokeMember,
   onSetInheritance,
   selectedGroup,
   selectedMember,
   target,
 }: {
   groups: AccessGroupResponse[]
-  inheritedPublicGrant: boolean
+  grantedGroups: AccessGroupResponse[]
+  grantedMembers: { id: string; name: string }[]
+  inheritanceEnabled: boolean
   isPending: boolean
   localPublicGrant: boolean
-  members: WorkspaceMemberResponse[]
+  members: { id: string; name: string }[]
   onGrantEveryone: () => void
   onGrantGroup: () => void
   onGrantMember: () => void
   onGroupChange: (value: string) => void
   onMemberChange: (value: string) => void
   onRevokeEveryone: () => void
+  onRevokeGroup: (id: string) => void
+  onRevokeMember: (id: string) => void
   onSetInheritance: (enabled: boolean) => void
   selectedGroup: string
   selectedMember: string
@@ -271,14 +375,16 @@ function SharingControls({
   if (target.kind === 'collection') {
     return (
       <CollectionSharingControls
+        grantedGroups={grantedGroups}
         groups={groups}
-        inheritedPublicGrant={inheritedPublicGrant}
+        inheritanceEnabled={inheritanceEnabled}
         isPending={isPending}
         localPublicGrant={localPublicGrant}
         onGrantEveryone={onGrantEveryone}
         onGrantGroup={onGrantGroup}
         onGroupChange={onGroupChange}
         onRevokeEveryone={onRevokeEveryone}
+        onRevokeGroup={onRevokeGroup}
         onSetInheritance={onSetInheritance}
         selectedGroup={selectedGroup}
       />
@@ -286,10 +392,12 @@ function SharingControls({
   }
   return (
     <ItemSharingControls
+      grantedMembers={grantedMembers}
       isPending={isPending}
       members={members}
       onGrantMember={onGrantMember}
       onMemberChange={onMemberChange}
+      onRevokeMember={onRevokeMember}
       selectedMember={selectedMember}
     />
   )
@@ -301,13 +409,17 @@ function SharingOriginsState({
   isPending,
   members,
   origins,
+  onShowCurrentUser,
+  selectedMemberId,
   target,
 }: {
   error: Error | null
   groups: AccessGroupResponse[]
   isPending: boolean
-  members: WorkspaceMemberResponse[]
+  members: { id: string; name: string }[]
   origins: string[]
+  onShowCurrentUser: () => void
+  selectedMemberId?: string
   target: ShareTarget
 }) {
   if (error) return <ErrorState error={error} />
@@ -318,7 +430,9 @@ function SharingOriginsState({
     <SharingOrigins
       groups={groups}
       members={members}
+      onShowCurrentUser={onShowCurrentUser}
       origins={origins}
+      selectedMemberId={selectedMemberId}
       target={target}
     />
   )
@@ -326,24 +440,28 @@ function SharingOriginsState({
 
 function CollectionSharingControls({
   groups,
-  inheritedPublicGrant,
+  grantedGroups,
+  inheritanceEnabled,
   isPending,
   localPublicGrant,
   onGroupChange,
   onGrantEveryone,
   onGrantGroup,
   onRevokeEveryone,
+  onRevokeGroup,
   onSetInheritance,
   selectedGroup,
 }: {
   groups: AccessGroupResponse[]
-  inheritedPublicGrant: boolean
+  grantedGroups: AccessGroupResponse[]
+  inheritanceEnabled: boolean
   isPending: boolean
   localPublicGrant: boolean
   onGroupChange: (value: string) => void
   onGrantEveryone: () => void
   onGrantGroup: () => void
   onRevokeEveryone: () => void
+  onRevokeGroup: (id: string) => void
   onSetInheritance: (enabled: boolean) => void
   selectedGroup: string
 }) {
@@ -392,11 +510,9 @@ function CollectionSharingControls({
           Todos os membros
         </h3>
         <p className='text-muted-foreground text-sm'>
-          {inheritedPublicGrant
-            ? 'Todos os membros recebem acesso por uma origem acima desta pasta.'
-            : localPublicGrant
-              ? 'Todos os membros têm acesso concedido diretamente a esta pasta.'
-              : 'Conceda acesso a todos os membros do workspace.'}
+          {localPublicGrant
+            ? 'Todos os membros têm acesso concedido diretamente a esta pasta.'
+            : 'Conceda acesso a todos os membros do workspace.'}
         </p>
         {localPublicGrant ? (
           <Button
@@ -418,6 +534,35 @@ function CollectionSharingControls({
           </Button>
         )}
       </section>
+      {grantedGroups.length > 0 ? (
+        <section
+          aria-labelledby='share-existing-groups-heading'
+          className='space-y-2'
+        >
+          <h3
+            className='font-mono text-xs uppercase'
+            id='share-existing-groups-heading'
+          >
+            Grupos com acesso direto
+          </h3>
+          <ul className='space-y-1 text-sm'>
+            {grantedGroups.map((group) => (
+              <li
+                className='flex items-center justify-between gap-2'
+                key={group.id}
+              >
+                <span>{group.name}</span>
+                <SharingRevokeButton
+                  disabled={isPending}
+                  id={group.id}
+                  name={group.name}
+                  onRevoke={onRevokeGroup}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <section
         aria-labelledby='share-inheritance-heading'
         className='space-y-2'
@@ -429,12 +574,13 @@ function CollectionSharingControls({
           Herança de acesso
         </h3>
         <p className='text-muted-foreground text-sm'>
-          Interromper copia as concessões atuais do nível acima. Reativar mantém
-          concessões locais como acessos adicionais.
+          {inheritanceEnabled
+            ? 'A herança está ativa. Interromper copia as concessões atuais do nível acima.'
+            : 'A herança está interrompida. Reativar mantém concessões locais como acessos adicionais.'}
         </p>
         <div className='flex flex-wrap gap-2'>
           <Button
-            disabled={isPending}
+            disabled={isPending || !inheritanceEnabled}
             onClick={handleStopInheritance}
             size='sm'
             variant='outline'
@@ -442,7 +588,7 @@ function CollectionSharingControls({
             Interromper herança
           </Button>
           <Button
-            disabled={isPending}
+            disabled={isPending || inheritanceEnabled}
             onClick={handleResumeInheritance}
             size='sm'
             variant='outline'
@@ -456,16 +602,20 @@ function CollectionSharingControls({
 }
 
 function ItemSharingControls({
+  grantedMembers,
   isPending,
   members,
   onGrantMember,
   onMemberChange,
+  onRevokeMember,
   selectedMember,
 }: {
   isPending: boolean
-  members: WorkspaceMemberResponse[]
+  grantedMembers: { id: string; name: string }[]
+  members: { id: string; name: string }[]
   onGrantMember: () => void
   onMemberChange: (value: string) => void
+  onRevokeMember: (id: string) => void
   selectedMember: string
 }) {
   return (
@@ -482,7 +632,7 @@ function ItemSharingControls({
           <SelectContent>
             {members.map((member) => (
               <SelectItem key={member.id} value={member.id}>
-                {member.name} · {member.roleName}
+                {member.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -495,7 +645,56 @@ function ItemSharingControls({
       >
         Conceder acesso ao item
       </Button>
+      {grantedMembers.length > 0 ? (
+        <section
+          aria-label='Integrantes com acesso direto'
+          className='space-y-2'
+        >
+          <h4 className='font-mono text-xs uppercase'>Acesso direto</h4>
+          <ul className='space-y-1 text-sm'>
+            {grantedMembers.map((member) => (
+              <li
+                className='flex items-center justify-between gap-2'
+                key={member.id}
+              >
+                <span>{member.name}</span>
+                <SharingRevokeButton
+                  disabled={isPending}
+                  id={member.id}
+                  name={member.name}
+                  onRevoke={onRevokeMember}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </section>
+  )
+}
+
+function SharingRevokeButton({
+  disabled,
+  id,
+  name,
+  onRevoke,
+}: {
+  disabled: boolean
+  id: string
+  name: string
+  onRevoke: (id: string) => void
+}) {
+  const handleClick = useCallback(() => onRevoke(id), [id, onRevoke])
+  return (
+    <Button
+      aria-label={`Remover acesso de ${name}`}
+      disabled={disabled}
+      onClick={handleClick}
+      size='sm'
+      variant='outline'
+    >
+      Remover
+    </Button>
   )
 }
 
@@ -503,11 +702,15 @@ function SharingOrigins({
   groups,
   members,
   origins,
+  onShowCurrentUser,
+  selectedMemberId,
   target,
 }: {
   groups: AccessGroupResponse[]
-  members: WorkspaceMemberResponse[]
+  members: { id: string; name: string }[]
   origins: string[]
+  onShowCurrentUser: () => void
+  selectedMemberId?: string
   target: ShareTarget
 }) {
   const labels = origins.map((origin) => {
@@ -531,12 +734,22 @@ function SharingOrigins({
     }
     return 'Origem de acesso'
   })
+  const selectedMember = members.find(
+    (member) => member.id === selectedMemberId
+  )
 
   return (
     <section aria-labelledby='sharing-origins-heading' className='space-y-2'>
       <h3 className='font-mono text-xs uppercase' id='sharing-origins-heading'>
-        Origens de acesso aplicáveis à sua conta
+        {selectedMember
+          ? `Origens de acesso aplicáveis a ${selectedMember.name}`
+          : 'Origens de acesso aplicáveis à sua conta'}
       </h3>
+      {selectedMember ? (
+        <Button onClick={onShowCurrentUser} size='sm' variant='outline'>
+          Ver minhas origens
+        </Button>
+      ) : null}
       {labels.length === 0 ? (
         <p className='text-muted-foreground text-sm'>
           Nenhuma concessão aplicável foi identificada.

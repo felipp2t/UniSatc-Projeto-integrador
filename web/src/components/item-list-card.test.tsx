@@ -93,6 +93,7 @@ describe('ItemListCard', () => {
 
     expect(menuLabels()).toEqual([
       'Editar',
+      'Ver',
       'Copiar título',
       'Copiar conteúdo',
       'Arquivar',

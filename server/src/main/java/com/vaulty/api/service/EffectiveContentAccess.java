@@ -89,8 +89,10 @@ public class EffectiveContentAccess {
     }
 
     public boolean canReadCollection(UUID userId, Workspace workspace, UUID collectionId) {
+        if (collectionId != null && !exists("SELECT EXISTS(SELECT 1 FROM collection WHERE id=? AND workspace_id=?)",
+                collectionId, workspace.getId())) return false;
         if (hasGlobalAccess(userId, workspace)) return true;
-        if (!isMember(workspace.getId(), userId)) throw new ResourceNotFoundException("Workspace não encontrado");
+        if (!isMember(workspace.getId(), userId)) return false;
         if (collectionId == null) return true;
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 WITH RECURSIVE chain AS (
@@ -114,8 +116,15 @@ public class EffectiveContentAccess {
     }
 
     public boolean canReadItem(UUID userId, Workspace workspace, UUID itemId) {
+        return canReadItem(userId, workspace, itemId, true);
+    }
+
+    public boolean canReadItem(UUID userId, Workspace workspace, UUID itemId, boolean canReadSecrets) {
+        if (!Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM item WHERE id=? AND workspace_id=? AND (type <> 'secret' OR ?))",
+                Boolean.class, itemId, workspace.getId(), canReadSecrets))) return false;
         if (hasGlobalAccess(userId, workspace)) return true;
-        if (!isMember(workspace.getId(), userId)) throw new ResourceNotFoundException("Workspace não encontrado");
+        if (!isMember(workspace.getId(), userId)) return false;
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (
                     SELECT 1 FROM item i WHERE i.id = ? AND i.workspace_id = ? AND
@@ -140,16 +149,10 @@ public class EffectiveContentAccess {
     }
 
     public void requireCollection(UUID userId, Workspace workspace, UUID collectionId) {
-        if (collectionId != null && !Boolean.TRUE.equals(jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM collection WHERE id=? AND workspace_id=?)", Boolean.class,
-                collectionId, workspace.getId()))) throw new ResourceNotFoundException("Pasta não encontrada");
         if (!canReadCollection(userId, workspace, collectionId)) throw new ResourceNotFoundException("Pasta não encontrada");
     }
 
     public void requireItem(UUID userId, Workspace workspace, UUID itemId) {
-        if (!Boolean.TRUE.equals(jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM item WHERE id=? AND workspace_id=?)", Boolean.class,
-                itemId, workspace.getId()))) throw new ResourceNotFoundException("Item indisponível");
         if (!canReadItem(userId, workspace, itemId)) throw new ResourceNotFoundException("Item indisponível");
     }
 
@@ -206,5 +209,9 @@ public class EffectiveContentAccess {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 FROM workspace_member WHERE workspace_id = ? AND user_id = ?)",
                 Boolean.class, workspaceId, userId));
+    }
+
+    private boolean exists(String sql, Object... args) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(sql, Boolean.class, args));
     }
 }
