@@ -34,6 +34,7 @@ public class WorkspaceService {
     private final WorkspaceRoleRepository workspaceRoleRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final RolePermissionRepository rolePermissionRepository;
+    private final SystemAdminAuthorization systemAdminAuthorization;
     private final WorkspaceMapper workspaceMapper;
     private final ActivityLogService activityLogService;
     private final WorkspaceContentAuthorization authorization;
@@ -99,17 +100,17 @@ public class WorkspaceService {
 
     @Transactional(readOnly = true)
     public List<WorkspaceResponse> list(UUID userId) {
-        return workspaceRepository.findAllByMemberUserId(userId).stream()
+        List<Workspace> workspaces = systemAdminAuthorization.isSystemAdmin(userId)
+                ? workspaceRepository.findAllWithOwner()
+                : workspaceRepository.findAllByMemberUserId(userId);
+        return workspaces.stream()
                 .map(workspaceMapper::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public WorkspaceResponse get(UUID userId, UUID workspaceId) {
-        Workspace workspace = workspaceRepository.findByIdAndMemberUserId(workspaceId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-
-        return workspaceMapper.toResponse(workspace);
+        return workspaceMapper.toResponse(authorization.requireWorkspace(userId, workspaceId));
     }
 
     @Transactional

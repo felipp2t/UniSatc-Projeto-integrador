@@ -26,7 +26,7 @@ public interface WorkspaceCollectionRepository extends JpaRepository<WorkspaceCo
                 UNION SELECT child.id FROM collection child JOIN granted_collections parent ON child.parent_id=parent.id WHERE child.workspace_id=:workspaceId AND child.inherit_access=TRUE
             ) SELECT c.* FROM collection c JOIN workspace w ON w.id=c.workspace_id
             WHERE c.workspace_id=:workspaceId AND ((:parentId IS NULL AND c.parent_id IS NULL) OR c.parent_id=:parentId)
-              AND (w.owner_id=:userId OR c.id IN (SELECT id FROM granted_collections))
+              AND (w.owner_id=:userId OR EXISTS (SELECT 1 FROM "user" sa WHERE sa.id=:userId AND sa.system_admin) OR c.id IN (SELECT id FROM granted_collections))
             ORDER BY c.name ASC,c.id ASC
             """, countQuery = """
             WITH RECURSIVE granted_collections(id) AS (
@@ -36,7 +36,7 @@ public interface WorkspaceCollectionRepository extends JpaRepository<WorkspaceCo
                 UNION SELECT child.id FROM collection child JOIN granted_collections parent ON child.parent_id=parent.id WHERE child.workspace_id=:workspaceId AND child.inherit_access=TRUE
             ) SELECT count(*) FROM collection c JOIN workspace w ON w.id=c.workspace_id
             WHERE c.workspace_id=:workspaceId AND ((:parentId IS NULL AND c.parent_id IS NULL) OR c.parent_id=:parentId)
-              AND (w.owner_id=:userId OR c.id IN (SELECT id FROM granted_collections))
+              AND (w.owner_id=:userId OR EXISTS (SELECT 1 FROM "user" sa WHERE sa.id=:userId AND sa.system_admin) OR c.id IN (SELECT id FROM granted_collections))
             """, nativeQuery = true)
     Page<WorkspaceCollection> findAccessible(@Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId,
                                               @Param("parentId") UUID parentId, Pageable pageable);

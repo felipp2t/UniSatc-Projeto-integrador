@@ -74,7 +74,7 @@ public interface WorkspaceItemRepository extends JpaRepository<WorkspaceItem, UU
             WHERE item.workspace_id=:workspaceId AND (item.archived_at IS NOT NULL) = :archived
               AND ((:collectionId IS NULL AND item.collection_id IS NULL) OR item.collection_id=:collectionId)
               AND (:includeSecrets=TRUE OR item.type<>'secret')
-              AND (w.owner_id=:userId OR item.collection_id IS NULL OR item.collection_id IN (SELECT id FROM granted_collections)
+              AND (w.owner_id=:userId OR EXISTS (SELECT 1 FROM "user" sa WHERE sa.id=:userId AND sa.system_admin) OR item.collection_id IS NULL OR item.collection_id IN (SELECT id FROM granted_collections)
                    OR EXISTS (SELECT 1 FROM item_member_grant g JOIN workspace_member wm ON wm.id=g.workspace_member_id
                               WHERE g.item_id=item.id AND wm.user_id=:userId AND wm.workspace_id=:workspaceId))
             ORDER BY item.title ASC, item.id ASC
@@ -88,7 +88,7 @@ public interface WorkspaceItemRepository extends JpaRepository<WorkspaceItem, UU
             WHERE item.workspace_id=:workspaceId AND (item.archived_at IS NOT NULL) = :archived
               AND ((:collectionId IS NULL AND item.collection_id IS NULL) OR item.collection_id=:collectionId)
               AND (:includeSecrets=TRUE OR item.type<>'secret')
-              AND (w.owner_id=:userId OR item.collection_id IS NULL OR item.collection_id IN (SELECT id FROM granted_collections)
+              AND (w.owner_id=:userId OR EXISTS (SELECT 1 FROM "user" sa WHERE sa.id=:userId AND sa.system_admin) OR item.collection_id IS NULL OR item.collection_id IN (SELECT id FROM granted_collections)
                    OR EXISTS (SELECT 1 FROM item_member_grant g JOIN workspace_member wm ON wm.id=g.workspace_member_id WHERE g.item_id=item.id AND wm.user_id=:userId AND wm.workspace_id=:workspaceId))
             """, nativeQuery = true)
     Page<WorkspaceItem> listAccessible(@Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId,
@@ -124,7 +124,7 @@ public interface WorkspaceItemRepository extends JpaRepository<WorkspaceItem, UU
             WHERE item.workspace_id=:workspaceId AND (:includeArchived=TRUE OR item.archived_at IS NULL)
               AND (:includeSecrets=TRUE OR item.type<>'secret')
               AND item.title_search @@ plainto_tsquery('simple', normalize_content_name(:term))
-              AND (w.owner_id=:userId OR item.collection_id IS NULL OR item.collection_id IN (SELECT id FROM granted_collections)
+              AND (w.owner_id=:userId OR EXISTS (SELECT 1 FROM "user" sa WHERE sa.id=:userId AND sa.system_admin) OR item.collection_id IS NULL OR item.collection_id IN (SELECT id FROM granted_collections)
                    OR EXISTS (SELECT 1 FROM item_member_grant g JOIN workspace_member wm ON wm.id=g.workspace_member_id WHERE g.item_id=item.id AND wm.user_id=:userId AND wm.workspace_id=:workspaceId))
             ORDER BY item.title_key,item.id
             """, countQuery = """
@@ -136,7 +136,7 @@ public interface WorkspaceItemRepository extends JpaRepository<WorkspaceItem, UU
             ) SELECT count(*) FROM item JOIN workspace w ON w.id=item.workspace_id
             WHERE item.workspace_id=:workspaceId AND (:includeArchived=TRUE OR item.archived_at IS NULL) AND (:includeSecrets=TRUE OR item.type<>'secret')
               AND item.title_search @@ plainto_tsquery('simple', normalize_content_name(:term))
-              AND (w.owner_id=:userId OR item.collection_id IS NULL OR item.collection_id IN (SELECT id FROM granted_collections)
+              AND (w.owner_id=:userId OR EXISTS (SELECT 1 FROM "user" sa WHERE sa.id=:userId AND sa.system_admin) OR item.collection_id IS NULL OR item.collection_id IN (SELECT id FROM granted_collections)
                    OR EXISTS (SELECT 1 FROM item_member_grant g JOIN workspace_member wm ON wm.id=g.workspace_member_id WHERE g.item_id=item.id AND wm.user_id=:userId AND wm.workspace_id=:workspaceId))
             """, nativeQuery = true)
     Page<WorkspaceItem> searchAccessible(@Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId,

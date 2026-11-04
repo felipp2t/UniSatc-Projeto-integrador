@@ -36,6 +36,7 @@ public class WorkspaceMemberService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceAccessNotifications accessNotifications;
     private final NotificationService notificationService;
+    private final SystemAdminAuthorization systemAdminAuthorization;
 
     @Transactional
     public WorkspaceMemberResponse readmit(UUID userId, UUID workspaceId, ReadmitMemberRequest request) {
@@ -59,6 +60,13 @@ public class WorkspaceMemberService {
 
     @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> list(UUID userId, UUID workspaceId) {
+        if (systemAdminAuthorization.isSystemAdmin(userId)) {
+            authorization.requireWorkspace(userId, workspaceId);
+            return workspaceMemberRepository.findAllWithUserAndRole(workspaceId).stream()
+                    .map(member -> workspaceMapper.toResponse(member, true))
+                    .toList();
+        }
+
         var workspaceMembers = workspaceMemberRepository.findAllVisibleToMember(workspaceId, userId);
 
         if (workspaceMembers.isEmpty()) {

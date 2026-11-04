@@ -10,6 +10,7 @@ import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
+import com.vaulty.api.repository.WorkspaceRoleRepository;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -24,10 +25,15 @@ public class WorkspaceContentAuthorization {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository memberRepository;
     private final RolePermissionRepository permissionRepository;
+    private final WorkspaceRoleRepository roleRepository;
+    private final SystemAdminAuthorization systemAdminAuthorization;
 
+    // O administrador geral age como dono de todos os workspaces, mesmo sem ser membro deles.
     public Workspace requireWorkspace(UUID userId, UUID workspaceId) {
-        return workspaceRepository.findByIdAndMemberUserId(workspaceId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        var workspace = systemAdminAuthorization.isSystemAdmin(userId)
+                ? workspaceRepository.findById(workspaceId)
+                : workspaceRepository.findByIdAndMemberUserId(workspaceId, userId);
+        return workspace.orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
     }
 
     public void require(UUID userId, Workspace workspace, String resource, String action) {
@@ -37,7 +43,7 @@ public class WorkspaceContentAuthorization {
     }
 
     public boolean allows(UUID userId, Workspace workspace, String resource, String action) {
-        var role = requireMember(userId, workspace.getId()).getRole();
+        var role = effectiveRole(userId, workspace.getId());
         if (role.isOwnerRole()) {
             return true;
         }
@@ -45,9 +51,17 @@ public class WorkspaceContentAuthorization {
     }
 
     public boolean isOwner(UUID userId, Workspace workspace) {
+        if (systemAdminAuthorization.isSystemAdmin(userId)) {
+            return true;
+        }
         return memberRepository.findByWorkspaceIdAndUserId(workspace.getId(), userId)
                 .map(member -> member.getRole().isOwnerRole())
                 .orElse(false);
+    }
+
+    // Dono registrado do workspace ou administrador geral.
+    public boolean isPrincipalOwner(UUID userId, Workspace workspace) {
+        return workspace.isOwnedBy(userId) || systemAdminAuthorization.isSystemAdmin(userId);
     }
 
     public Workspace requireOwner(UUID userId, UUID workspaceId) {
@@ -70,15 +84,14 @@ public class WorkspaceContentAuthorization {
     public Workspace requireOwnerForUpdate(UUID userId, UUID workspaceId) {
         Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        var member = requireMember(userId, workspaceId);
-        if (!member.getRole().isOwnerRole()) {
+        if (!effectiveRole(userId, workspaceId).isOwnerRole()) {
             throw new ForbiddenException("Permissão insuficiente");
         }
         return workspace;
     }
 
     public WorkspacePermissionsResponse permissions(UUID userId, UUID workspaceId) {
-        var role = requireMember(userId, workspaceId).getRole();
+        var role = effectiveRole(userId, workspaceId);
         return new WorkspacePermissionsResponse(role.isOwnerRole(), role.getId().toString(),
                 role.getName(), rolePermissions(role));
     }
@@ -93,6 +106,14 @@ public class WorkspaceContentAuthorization {
                         : Stream.of(permission.getAction()))
                         .map(action -> new WorkspacePermission(permission.getResource(), action)))
                 .distinct().toList();
+    }
+
+    private WorkspaceRole effectiveRole(UUID userId, UUID workspaceId) {
+        if (systemAdminAuthorization.isSystemAdmin(userId)) {
+            return roleRepository.findByWorkspaceIdAndName(workspaceId, WorkspaceRole.OWNER_ROLE_NAME)
+                    .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        }
+        return requireMember(userId, workspaceId).getRole();
     }
 
     private WorkspaceMember requireMember(UUID userId, UUID workspaceId) {

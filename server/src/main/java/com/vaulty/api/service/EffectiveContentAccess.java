@@ -15,9 +15,11 @@ import java.util.UUID;
 public class EffectiveContentAccess {
 
     private final JdbcTemplate jdbc;
+    private final SystemAdminAuthorization systemAdminAuthorization;
 
-    public EffectiveContentAccess(JdbcTemplate jdbc) {
+    public EffectiveContentAccess(JdbcTemplate jdbc, SystemAdminAuthorization systemAdminAuthorization) {
         this.jdbc = jdbc;
+        this.systemAdminAuthorization = systemAdminAuthorization;
     }
 
     public Map<UUID, Set<String>> readableResourcesByMember(UUID workspaceId) {
@@ -87,7 +89,7 @@ public class EffectiveContentAccess {
     }
 
     public boolean canReadCollection(UUID userId, Workspace workspace, UUID collectionId) {
-        if (workspace.isOwnedBy(userId)) return true;
+        if (hasGlobalAccess(userId, workspace)) return true;
         if (!isMember(workspace.getId(), userId)) throw new ResourceNotFoundException("Workspace não encontrado");
         if (collectionId == null) return true;
         return Boolean.TRUE.equals(jdbc.queryForObject("""
@@ -112,7 +114,7 @@ public class EffectiveContentAccess {
     }
 
     public boolean canReadItem(UUID userId, Workspace workspace, UUID itemId) {
-        if (workspace.isOwnedBy(userId)) return true;
+        if (hasGlobalAccess(userId, workspace)) return true;
         if (!isMember(workspace.getId(), userId)) throw new ResourceNotFoundException("Workspace não encontrado");
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (
@@ -194,6 +196,10 @@ public class EffectiveContentAccess {
                     JOIN workspace_member wm ON wm.id=gm.workspace_member_id
                     WHERE wm.user_id=? AND wm.workspace_id=?
                 """, String.class, collectionId, workspaceId, workspaceId, userId, workspaceId);
+    }
+
+    private boolean hasGlobalAccess(UUID userId, Workspace workspace) {
+        return workspace.isOwnedBy(userId) || systemAdminAuthorization.isSystemAdmin(userId);
     }
 
     private boolean isMember(UUID workspaceId, UUID userId) {

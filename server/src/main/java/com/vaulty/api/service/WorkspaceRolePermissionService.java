@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkspaceRolePermissionService {
 
     private final WorkspaceService workspaceService;
+    private final WorkspaceContentAuthorization authorization;
     private final WorkspaceRoleRepository roleRepository;
     private final RolePermissionRepository permissionRepository;
     private final ActivityLogService activityLogService;
@@ -33,12 +34,14 @@ public class WorkspaceRolePermissionService {
 
     public WorkspaceRolePermissionService(
             WorkspaceService workspaceService,
+            WorkspaceContentAuthorization authorization,
             WorkspaceRoleRepository roleRepository,
             RolePermissionRepository permissionRepository,
             ActivityLogService activityLogService,
             WorkspaceMemberRepository workspaceMemberRepository,
             NotificationService notificationService) {
         this.workspaceService = workspaceService;
+        this.authorization = authorization;
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.activityLogService = activityLogService;
@@ -105,11 +108,7 @@ public class WorkspaceRolePermissionService {
     }
 
     private Workspace requireOwner(UUID userId, UUID workspaceId) {
-        Workspace workspace = workspaceService.requireOwner(userId);
-        if (!workspace.getId().equals(workspaceId)) {
-            throw new ResourceNotFoundException("Workspace não encontrado");
-        }
-        return workspace;
+        return authorization.requireOwner(userId, workspaceId);
     }
 
     private WorkspaceRole findRole(UUID roleId, UUID workspaceId) {

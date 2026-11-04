@@ -14,10 +14,14 @@ import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.UserInviteRepository;
+import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 class AdminWorkspaceIntegrationTest extends WorkspaceIntegrationSupport {
 
@@ -187,6 +191,73 @@ class AdminWorkspaceIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
+    void systemAdminWithoutMembershipReadsAndManagesAnyWorkspace() throws Exception {
+        UUID workspaceId = createWorkspace("Equipe Segura");
+        invite(workspaceId, "lider@example.com", true);
+        User leader = register("lider@example.com").getUser();
+        String secretId = objectMapper.readTree(mockMvc.perform(post("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(leader))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "type": "secret", "title": "Senha do banco", "value": "s3nh4-forte" }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+        jdbcTemplate.update("DELETE FROM workspace_member WHERE user_id = ?", admin().getId());
+
+        Cookie[] session = login("admin@gmail.com", "admin_pass");
+        Cookie access = session[0];
+
+        assertThat(session[1]).as("sessão renovável do administrador geral").isNotNull();
+        mockMvc.perform(get("/workspaces").cookie(access))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+        mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspaceId).cookie(access))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isOwner").value(true));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId).cookie(access))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].title").value("Senha do banco"));
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, secretId).cookie(access))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.value").value("s3nh4-forte"));
+        mockMvc.perform(get("/workspaces/{workspaceId}/members", workspaceId).cookie(access))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value("lider@example.com"));
+        mockMvc.perform(post("/workspaces/{workspaceId}/collections", workspaceId)
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "name": "Criada pelo admin" }
+                                """))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/auth/refresh").with(uniqueAddress()).cookie(session[1]))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void detachMigrationRemovesTheSystemAdminAndPromotesAnotherOwner() throws Exception {
+        UUID seedWorkspaceId = workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow().getId();
+        UUID emptyWorkspaceId = createWorkspace("Sem outro dono");
+        jdbcTemplate.update("UPDATE workspace SET owner_id = ? WHERE id = ?", admin().getId(), emptyWorkspaceId);
+        User coOwner = createUser("Segundo dono");
+        addMember(coOwner, seedWorkspaceId);
+        assignRole(coOwner, seedWorkspaceId, WorkspaceRole.OWNER_ROLE_NAME);
+
+        try (var sql = new ClassPathResource("db/migration/V31__detach_system_admin_from_workspaces.sql")
+                .getInputStream()) {
+            jdbcTemplate.execute(new String(sql.readAllBytes(), StandardCharsets.UTF_8));
+        }
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM workspace_member WHERE user_id = ?", Integer.class, admin().getId())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT owner_id FROM workspace WHERE id = ?", UUID.class, seedWorkspaceId)).isEqualTo(coOwner.getId());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT owner_id FROM workspace WHERE id = ?", UUID.class, emptyWorkspaceId)).isNull();
+    }
+
+    @Test
     void exposesTheSystemAdminFlagOnTheCurrentUser() throws Exception {
         mockMvc.perform(get("/me").cookie(authCookie(admin())))
                 .andExpect(status().isOk())
@@ -241,5 +312,24 @@ class AdminWorkspaceIntegrationTest extends WorkspaceIntegrationSupport {
 
     private User admin() {
         return userRepository.findByEmail("admin@gmail.com").orElseThrow();
+    }
+
+    private Cookie[] login(String email, String password) throws Exception {
+        var response = mockMvc.perform(post("/auth/login")
+                        .with(uniqueAddress())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "password": "%s" }
+                                """.formatted(email, password)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse();
+        return new Cookie[] {response.getCookie("accessToken"), response.getCookie("refreshToken")};
+    }
+
+    private RequestPostProcessor uniqueAddress() {
+        return request -> {
+            request.setRemoteAddr(UUID.randomUUID().toString());
+            return request;
+        };
     }
 }
