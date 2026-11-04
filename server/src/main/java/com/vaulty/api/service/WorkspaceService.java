@@ -42,15 +42,20 @@ public class WorkspaceService {
 
     @Transactional
     public WorkspaceMember addAsMember(User user, UserInvite invite) {
-        Workspace workspace = workspaceRepository.findByIdForUpdate(invite.getWorkspace().getId())
+        return addMember(user, invite.getWorkspace().getId(), invite.isOwnerInvite());
+    }
+
+    @Transactional
+    public WorkspaceMember addMember(User user, UUID workspaceId, boolean owner) {
+        Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        String roleName = invite.isOwnerInvite() ? WorkspaceRole.OWNER_ROLE_NAME : WorkspaceRole.MEMBER_ROLE_NAME;
+        String roleName = owner ? WorkspaceRole.OWNER_ROLE_NAME : WorkspaceRole.MEMBER_ROLE_NAME;
         WorkspaceRole role = workspaceRoleRepository
                 .findByWorkspaceIdAndName(workspace.getId(), roleName)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
 
         WorkspaceMember member = workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, role));
-        if (invite.isOwnerInvite() && workspace.getOwner() == null) {
+        if (owner && workspace.getOwner() == null) {
             workspace.setOwner(user);
             workspaceRepository.save(workspace);
         }

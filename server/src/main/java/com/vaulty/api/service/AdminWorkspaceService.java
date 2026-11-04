@@ -1,6 +1,7 @@
 package com.vaulty.api.service;
 
 import com.vaulty.api.dto.admin.AdminInviteRequest;
+import com.vaulty.api.dto.admin.AdminInviteResponse;
 import com.vaulty.api.dto.admin.AdminWorkspaceDetailResponse;
 import com.vaulty.api.dto.admin.AdminWorkspaceResponse;
 import com.vaulty.api.dto.workspace.CreateWorkspaceRequest;
@@ -10,13 +11,19 @@ import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.entity.Workspace;
+import com.vaulty.api.enums.ActivityAction;
+import com.vaulty.api.enums.ActivityActorContext;
+import com.vaulty.api.enums.ActivityResourceType;
+import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.UserInviteRepository;
+import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,6 +40,8 @@ public class AdminWorkspaceService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserInviteRepository userInviteRepository;
     private final WorkspaceMapper workspaceMapper;
+    private final UserRepository userRepository;
+    private final ActivityLogService activityLogService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -73,11 +82,27 @@ public class AdminWorkspaceService {
     }
 
     @Transactional
-    public void invite(UUID adminId, UUID workspaceId, AdminInviteRequest request) {
+    public AdminInviteResponse invite(UUID adminId, UUID workspaceId, AdminInviteRequest request) {
         systemAdminAuthorization.require(adminId);
         Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        inviteService.inviteToWorkspace(adminId, workspace, request.email(), request.owner());
+        User existing = userRepository.findByEmail(request.email()).orElse(null);
+        if (existing == null) {
+            inviteService.inviteToWorkspace(adminId, workspace, request.email(), request.owner());
+            return new AdminInviteResponse(false);
+        }
+
+        // Conta sem workspace (por exemplo, removida de outra equipe) entra direto, sem novo cadastro.
+        if (existing.isSystemAdmin() || workspaceMemberRepository.findByUserId(existing.getId()).isPresent()) {
+            throw new ConflictException("Esta conta já pertence a um workspace");
+        }
+        var member = workspaceService.addMember(existing, workspaceId, request.owner());
+        activityLogService.record(workspaceId, adminId, ActivityActorContext.USER,
+                ActivityAction.MEMBER_JOINED, ActivityResourceType.MEMBER, member.getId(),
+                Map.of("workspaceMemberId", member.getId(), "userId", existing.getId(),
+                        "name", existing.getName(), "email", existing.getEmail(),
+                        "role", member.getRole().getName()));
+        return new AdminInviteResponse(true);
     }
 
     @Transactional

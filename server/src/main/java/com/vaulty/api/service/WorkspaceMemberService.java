@@ -46,6 +46,9 @@ public class WorkspaceMemberService {
         if (workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, user.getId()).isPresent()) {
             throw new ConflictException("Conta já é membro do workspace");
         }
+        if (user.isSystemAdmin() || workspaceMemberRepository.findByUserId(user.getId()).isPresent()) {
+            throw new ConflictException("Esta conta já pertence a um workspace");
+        }
         var memberRole = workspaceRoleRepository.findByWorkspaceIdAndName(workspaceId, WorkspaceRole.MEMBER_ROLE_NAME)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
 

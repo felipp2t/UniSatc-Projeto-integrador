@@ -1,6 +1,7 @@
 package com.vaulty.api.controller;
 
 import com.vaulty.api.dto.admin.AdminInviteRequest;
+import com.vaulty.api.dto.admin.AdminInviteResponse;
 import com.vaulty.api.dto.admin.AdminWorkspaceDetailResponse;
 import com.vaulty.api.dto.admin.AdminWorkspaceResponse;
 import com.vaulty.api.dto.workspace.CreateWorkspaceRequest;
@@ -72,12 +73,13 @@ public class AdminWorkspaceController {
     }
 
     @PostMapping("/{workspaceId}/invites")
-    @Operation(summary = "Convida um e-mail para o workspace como proprietário ou membro")
-    public ResponseEntity<Void> invite(
+    @Operation(summary = "Convida um e-mail para o workspace como proprietário ou membro",
+            description = "Conta já existente e sem workspace entra direto, sem convite por e-mail.")
+    public ResponseEntity<AdminInviteResponse> invite(
             @AuthenticationPrincipal UUID adminId,
             @PathVariable UUID workspaceId,
             @Valid @RequestBody AdminInviteRequest request) {
-        adminWorkspaceService.invite(adminId, workspaceId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(adminWorkspaceService.invite(adminId, workspaceId, request));
     }
 }

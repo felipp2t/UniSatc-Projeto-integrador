@@ -1,6 +1,7 @@
 package com.vaulty.api.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -83,9 +84,10 @@ class AdminWorkspaceIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void rejectsInvitesForEmailsThatAlreadyHaveAnAccount() throws Exception {
+    void rejectsInvitesForAccountsThatAlreadyBelongToAWorkspace() throws Exception {
         UUID workspaceId = createWorkspace("Equipe Jurídica");
         User existing = createUser();
+        addMember(existing, workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow().getId());
 
         mockMvc.perform(post("/admin/workspaces/{workspaceId}/invites", workspaceId)
                         .cookie(authCookie(admin()))
@@ -94,6 +96,83 @@ class AdminWorkspaceIntegrationTest extends WorkspaceIntegrationSupport {
                                 { "email": "%s", "owner": false }
                                 """.formatted(existing.getEmail())))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void addsAnExistingAccountWithoutWorkspaceDirectlyWithTheChosenRole() throws Exception {
+        UUID workspaceId = createWorkspace("Equipe de Destino");
+        User removed = createUser("Pessoa removida");
+
+        mockMvc.perform(post("/admin/workspaces/{workspaceId}/invites", workspaceId)
+                        .cookie(authCookie(admin()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "email": "%s", "owner": true }
+                                """.formatted(removed.getEmail())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.addedExistingAccount").value(true));
+
+        WorkspaceMember membership = workspaceMemberRepository.findByUserId(removed.getId()).orElseThrow();
+        assertThat(membership.getWorkspace().getId()).isEqualTo(workspaceId);
+        assertThat(membership.getRole().getName()).isEqualTo(WorkspaceRole.OWNER_ROLE_NAME);
+        assertThat(workspaceRepository.findById(workspaceId).orElseThrow().getOwner().getId())
+                .isEqualTo(removed.getId());
+        assertThat(userInviteRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void systemAdminChangesRolesAndRemovesMembersOfAnyWorkspace() throws Exception {
+        UUID workspaceId = createWorkspace("Equipe Gerida");
+        User promoted = createUser("Futuro dono");
+        addMember(promoted, workspaceId);
+        WorkspaceMember member = workspaceMemberRepository.findByUserId(promoted.getId()).orElseThrow();
+        User removed = createUser("Membro removido");
+        addMember(removed, workspaceId);
+        WorkspaceMember removedMember = workspaceMemberRepository.findByUserId(removed.getId()).orElseThrow();
+        UUID ownerRoleId = workspaceRoleRepository
+                .findByWorkspaceIdAndName(workspaceId, WorkspaceRole.OWNER_ROLE_NAME).orElseThrow().getId();
+        detachAdminFromWorkspaces();
+        Cookie access = login("admin@gmail.com", "admin_pass")[0];
+
+        mockMvc.perform(put("/workspaces/{workspaceId}/members/{memberId}/role", workspaceId, member.getId())
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "roleId": "%s" }
+                                """.formatted(ownerRoleId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roleName").value(WorkspaceRole.OWNER_ROLE_NAME));
+        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{memberId}", workspaceId, removedMember.getId())
+                        .param("confirmMemberId", removedMember.getId().toString())
+                        .cookie(access))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{memberId}", workspaceId, member.getId())
+                        .param("confirmMemberId", member.getId().toString())
+                        .cookie(access))
+                .andExpect(status().isConflict());
+
+        assertThat(workspaceMemberRepository.findById(removedMember.getId())).isEmpty();
+        assertThat(userRepository.findById(removed.getId())).as("a conta continua existindo").isPresent();
+    }
+
+    @Test
+    void ownersCannotReadmitAccountsFromAnotherWorkspaceOrTheSystemAdmin() throws Exception {
+        UUID otherWorkspaceId = createWorkspace("Outra equipe");
+        User owner = createUser();
+        configureWorkspace(owner);
+        User otherMember = createUser();
+        addMember(otherMember, otherWorkspaceId);
+
+        for (String email : new String[] {otherMember.getEmail(), "admin@gmail.com"}) {
+            mockMvc.perform(post("/workspaces/{workspaceId}/members/readmit",
+                            workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow().getId())
+                            .cookie(authCookie(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    { "email": "%s" }
+                                    """.formatted(email)))
+                    .andExpect(status().isConflict());
+        }
     }
 
     @Test
@@ -312,6 +391,12 @@ class AdminWorkspaceIntegrationTest extends WorkspaceIntegrationSupport {
 
     private User admin() {
         return userRepository.findByEmail("admin@gmail.com").orElseThrow();
+    }
+
+    // O fixture recoloca o admin no workspace padrão; aqui ele fica como após a V31, sem vínculo.
+    private void detachAdminFromWorkspaces() {
+        workspaceMemberRepository.findByUserId(admin().getId()).ifPresent(workspaceMemberRepository::delete);
+        workspaceMemberRepository.flush();
     }
 
     private Cookie[] login(String email, String password) throws Exception {
