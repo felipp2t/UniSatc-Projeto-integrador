@@ -41,7 +41,7 @@ export function ItemActions({
 }) {
   const permissions = useWorkspacePermissions(workspaceId)
   const actions = getItemActions(item, permissions)
-  const [dialog, setDialog] = useState<'view' | 'delete' | 'share'>()
+  const [dialog, setDialog] = useState<'view' | 'edit' | 'delete' | 'share'>()
   const closeDialog = useCallback(() => setDialog(undefined), [])
   const archive = useArchiveItem()
   const restore = useRestoreItem()
@@ -80,7 +80,7 @@ export function ItemActions({
     copyContent: handleCopyContent,
     copyTitle: handleCopyTitle,
     delete: () => setDialog('delete'),
-    edit: () => setDialog('view'),
+    edit: () => setDialog('edit'),
     restore: runRestore,
     share: () => setDialog('share'),
     view: () => setDialog('view'),
@@ -106,12 +106,12 @@ export function ItemActions({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      {dialog === 'view' &&
-      (actions.includes('view') || actions.includes('edit')) ? (
+      {(dialog === 'view' && actions.includes('view')) ||
+      (dialog === 'edit' && actions.includes('edit')) ? (
         <EditItemDialog
           itemId={item.id}
           onClose={closeDialog}
-          readOnly={!actions.includes('edit')}
+          readOnly={dialog !== 'edit'}
           workspaceId={workspaceId}
         />
       ) : null}
