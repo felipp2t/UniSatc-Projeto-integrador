@@ -196,3 +196,9 @@ export interface AccessGroupResponse {
   id: string
   name: string
 }
+export interface AccessGroupMemberResponse {
+  email?: string
+  name: string
+  userId: string
+  workspaceMemberId: string
+}

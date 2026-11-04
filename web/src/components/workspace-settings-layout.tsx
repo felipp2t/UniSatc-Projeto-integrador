@@ -6,10 +6,12 @@ import { WorkspaceSettingsNavigation } from '@/components/workspace-settings-nav
 export function WorkspaceSettingsLayout({
   breadcrumbLabel,
   breadcrumbParentLabel,
+  canManageGroups,
   children,
 }: {
   breadcrumbLabel: string
   breadcrumbParentLabel?: string
+  canManageGroups: boolean
   children: ReactNode
 }) {
   return (
@@ -35,7 +37,7 @@ export function WorkspaceSettingsLayout({
         </div>
       </header>
       <div className='flex min-w-0 flex-col gap-8 md:flex-row'>
-        <WorkspaceSettingsNavigation />
+        <WorkspaceSettingsNavigation canManageGroups={canManageGroups} />
         {children}
       </div>
     </main>

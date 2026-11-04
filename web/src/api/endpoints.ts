@@ -2,6 +2,7 @@ import type { ZodType } from 'zod'
 import { apiClient } from './client'
 import { permissionsSchema, workspacePermissionsSchema } from './permissions'
 import type {
+  AccessGroupMemberResponse,
   AccessGroupResponse,
   ActivityFilters,
   ActivityPageResponse,
@@ -185,8 +186,39 @@ export const notificationsApi = {
 }
 
 export const accessGroupApi = {
+  addMember: (
+    workspaceId: string,
+    groupId: string,
+    workspaceMemberId: string
+  ) =>
+    apiClient.put<void>(
+      `/workspaces/${workspaceId}/groups/${groupId}/members/${workspaceMemberId}`
+    ),
+  create: (workspaceId: string, name: string) =>
+    apiClient.post<AccessGroupResponse>(`/workspaces/${workspaceId}/groups`, {
+      name,
+    }),
+  delete: (workspaceId: string, groupId: string) =>
+    apiClient.delete<void>(`/workspaces/${workspaceId}/groups/${groupId}`),
   list: (workspaceId: string) =>
     apiClient.get<AccessGroupResponse[]>(`/workspaces/${workspaceId}/groups`),
+  listMembers: (workspaceId: string, groupId: string) =>
+    apiClient.get<AccessGroupMemberResponse[]>(
+      `/workspaces/${workspaceId}/groups/${groupId}/members`
+    ),
+  removeMember: (
+    workspaceId: string,
+    groupId: string,
+    workspaceMemberId: string
+  ) =>
+    apiClient.delete<void>(
+      `/workspaces/${workspaceId}/groups/${groupId}/members/${workspaceMemberId}`
+    ),
+  rename: (workspaceId: string, groupId: string, name: string) =>
+    apiClient.put<AccessGroupResponse>(
+      `/workspaces/${workspaceId}/groups/${groupId}`,
+      { name }
+    ),
 }
 
 export const sharingApi = {

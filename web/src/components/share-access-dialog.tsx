@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { accessGroupApi, sharingApi, workspaceApi } from '@/api/endpoints'
 import type { AccessGroupResponse, WorkspaceMemberResponse } from '@/api/types'
+import { accessGroupsQueryKey } from '@/api/workspace-keys'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -122,7 +123,7 @@ function SharingConfiguration({
   const groups = useQuery({
     enabled: target.kind === 'collection' && permissions.can('group', 'manage'),
     queryFn: async () => (await accessGroupApi.list(workspaceId)).data,
-    queryKey: ['access-groups', workspaceId],
+    queryKey: accessGroupsQueryKey(workspaceId),
   })
   const members = useQuery({
     enabled: target.kind === 'item',
