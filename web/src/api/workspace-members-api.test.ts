@@ -22,6 +22,22 @@ const validMember = {
 afterEach(() => vi.clearAllMocks())
 
 describe('workspaceApi member contracts', () => {
+  it('requests a backup as a ZIP blob', async () => {
+    const backup = new Blob(['zip bytes'], { type: 'application/zip' })
+    apiMocks.post.mockResolvedValue({ data: backup })
+
+    await expect(workspaceApi.backup()).resolves.toEqual({
+      data: backup,
+    })
+    expect(apiMocks.post).toHaveBeenCalledWith(
+      '/workspaces/backup',
+      undefined,
+      {
+        responseType: 'blob',
+      }
+    )
+  })
+
   it('accepts optional emails and non-UUID string identifiers', async () => {
     const response = {
       data: [{ ...validMember, email: 'ana@example.com' }, validMember],
