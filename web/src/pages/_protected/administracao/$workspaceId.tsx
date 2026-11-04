@@ -1,6 +1,11 @@
-import { ArrowLeftIcon, FloppyDiskIcon, XIcon } from '@phosphor-icons/react'
+import {
+  ArrowLeftIcon,
+  FloppyDiskIcon,
+  FolderOpenIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { adminWorkspaceQueryKey, adminWorkspacesQueryKey } from '@/api/admin'
@@ -29,6 +34,7 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { appToast } from '@/components/ui/toast'
+import { selectAdminWorkspace } from '@/hooks/use-admin-workspace-selection'
 
 export const Route = createFileRoute('/_protected/administracao/$workspaceId')({
   component: AdminWorkspacePage,
@@ -114,9 +120,12 @@ function WorkspaceSections({
 }) {
   return (
     <>
-      <h1 className='font-mono font-semibold text-sm uppercase tracking-wide'>
-        {workspace.name}
-      </h1>
+      <div className='flex flex-wrap items-center justify-between gap-3'>
+        <h1 className='font-mono font-semibold text-sm uppercase tracking-wide'>
+          {workspace.name}
+        </h1>
+        <OpenWorkspaceContentButton workspaceId={workspaceId} />
+      </div>
       <WorkspaceSettingsForm
         key={workspace.name}
         workspace={workspace}
@@ -125,6 +134,21 @@ function WorkspaceSections({
       <MembersSection members={members} />
       <PendingInvitesSection workspace={workspace} workspaceId={workspaceId} />
     </>
+  )
+}
+
+function OpenWorkspaceContentButton({ workspaceId }: { workspaceId: string }) {
+  const navigate = useNavigate()
+  const openContent = useCallback(async () => {
+    selectAdminWorkspace(workspaceId)
+    await navigate({ search: {}, to: '/' })
+  }, [navigate, workspaceId])
+
+  return (
+    <Button onClick={openContent} size='sm' variant='outline'>
+      <FolderOpenIcon aria-hidden='true' size={16} />
+      Abrir conteúdo
+    </Button>
   )
 }
 

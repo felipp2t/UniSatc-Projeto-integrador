@@ -55,8 +55,12 @@ function hasWorkspaceChanges(
 function WorkspaceGeneralSettingsPage() {
   const workspaceQuery = useCurrentWorkspace()
   const workspace = workspaceQuery.data
-  const userId = Route.useRouteContext().session.user?.id
-  const { isOwner, members } = useWorkspaceMembers(workspace?.id, userId)
+  const { user } = Route.useRouteContext().session
+  const { isOwner, members } = useWorkspaceMembers(
+    workspace?.id,
+    user?.id,
+    user?.systemAdmin
+  )
   const retryWorkspace = useCallback(async () => {
     await workspaceQuery.refetch()
   }, [workspaceQuery.refetch])

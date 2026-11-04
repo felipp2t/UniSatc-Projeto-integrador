@@ -51,6 +51,7 @@ import {
   PaginationControls,
   WorkspaceCollections,
 } from '@/components/workspace-collections'
+import { useAdminWorkspaceSelection } from '@/hooks/use-admin-workspace-selection'
 import { useCollectionPath } from '@/hooks/use-collection-path'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
@@ -78,8 +79,9 @@ export const Route = createFileRoute('/_protected/')({
 
 function HomePage() {
   const isSystemAdmin = Route.useRouteContext().session.user?.systemAdmin
+  const selectedWorkspaceId = useAdminWorkspaceSelection()
 
-  if (isSystemAdmin) return <AdminWorkspacesHome />
+  if (isSystemAdmin && !selectedWorkspaceId) return <AdminWorkspacesHome />
   return <WorkspaceHomePage />
 }
 

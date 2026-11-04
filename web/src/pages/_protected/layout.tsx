@@ -10,11 +10,13 @@ import {
   enforceRoutePermission,
 } from '@/auth/permissions'
 import { sanitizeInternalRedirect } from '@/auth/redirect'
+import { AdminWorkspaceBanner } from '@/components/admin-workspace-banner'
 import { Header } from '@/components/header'
 import { NotFoundPage } from '@/components/not-found-page'
 import { OfflineBanner } from '@/components/offline-banner'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { selectAdminWorkspace } from '@/hooks/use-admin-workspace-selection'
 import { workspacesQuery } from '@/hooks/use-current-workspace'
 import { workspacePermissionsQuery } from '@/hooks/use-workspace-permissions'
 
@@ -58,6 +60,7 @@ function ProtectedLayout() {
 
   const handleLogout = useCallback(async () => {
     await session.logout()
+    selectAdminWorkspace(undefined)
     await navigate({
       replace: true,
       search: { redirect: undefined },
@@ -76,6 +79,7 @@ function ProtectedLayout() {
           userName={session.user?.name}
         />
         <OfflineBanner />
+        {session.user?.systemAdmin ? <AdminWorkspaceBanner /> : null}
         <div className='flex min-h-0 flex-1 overflow-hidden'>
           <ScrollArea className='flex-1'>
             <Outlet />

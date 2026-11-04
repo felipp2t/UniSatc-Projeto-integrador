@@ -56,8 +56,11 @@ function WorkspaceSettingsPage() {
   const workspaceId = currentWorkspace?.id
   const { currentUserRole, isOwner, members } = useWorkspaceMembers(
     workspaceId,
-    session.user?.id
+    session.user?.id,
+    session.user?.systemAdmin
   )
+  // Os convites do administrador geral ficam na página de administração do workspace.
+  const canManageInvites = isOwner && !session.user?.systemAdmin
   const roles = useQuery({
     enabled: Boolean(workspaceId && isOwner),
     queryFn: async () => {
@@ -152,11 +155,11 @@ function WorkspaceSettingsPage() {
                     Membros ({members.isError ? 0 : (members.data?.length ?? 0)}
                     )
                   </TabsTrigger>
-                  {isOwner ? (
+                  {canManageInvites ? (
                     <TabsTrigger value='invites'>Convites</TabsTrigger>
                   ) : null}
                 </TabsList>
-                {isOwner ? <InviteMemberDialog /> : null}
+                {canManageInvites ? <InviteMemberDialog /> : null}
               </div>
               <TabsContent className='mt-4 space-y-4' value='members'>
                 <div className='flex flex-col gap-2 md:flex-row'>
@@ -208,7 +211,7 @@ function WorkspaceSettingsPage() {
                   rolesLoadError={rolesLoadError}
                 />
               </TabsContent>
-              {isOwner ? (
+              {canManageInvites ? (
                 <TabsContent className='mt-4' value='invites'>
                   <PendingInvitesSection />
                 </TabsContent>

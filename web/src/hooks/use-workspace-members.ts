@@ -5,7 +5,8 @@ import { workspaceMembersQueryKey } from '@/api/workspace-keys'
 
 export function useWorkspaceMembers(
   workspaceId: string | undefined,
-  userId: string | undefined
+  userId: string | undefined,
+  systemAdmin = false
 ) {
   const members = useQuery({
     enabled: Boolean(workspaceId),
@@ -21,7 +22,8 @@ export function useWorkspaceMembers(
 
   return {
     currentUserRole,
-    isOwner: isOwnerRole(currentUserRole),
+    // O administrador geral administra qualquer workspace sem ser membro dele.
+    isOwner: systemAdmin || isOwnerRole(currentUserRole),
     members,
   }
 }
