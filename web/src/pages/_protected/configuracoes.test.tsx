@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
@@ -22,6 +22,7 @@ const apiMocks = vi.hoisted(() => ({
   inviteList: vi.fn(),
   updateProfile: vi.fn(),
 }))
+const toastMocks = vi.hoisted(() => ({ success: vi.fn() }))
 
 vi.mock('@/api/endpoints', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/endpoints')>()
@@ -34,6 +35,14 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       getMe: apiMocks.getMe,
       updateProfile: apiMocks.updateProfile,
     },
+  }
+})
+
+vi.mock('@/components/ui/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/ui/toast')>()
+  return {
+    ...actual,
+    appToast: { ...actual.appToast, success: toastMocks.success },
   }
 })
 
@@ -52,10 +61,11 @@ async function renderAccountSettings() {
       queries: { gcTime: Number.POSITIVE_INFINITY, retry: false },
     },
   })
+  const session = createSession()
   const router = createRouter({
     context: {
       queryClient,
-      session: createSession(),
+      session,
     } satisfies RouterContext,
     history: createMemoryHistory({ initialEntries: ['/configuracoes'] }),
     isServer: false,
@@ -68,9 +78,10 @@ async function renderAccountSettings() {
   }
   router.updateLatestLocation()
   await router.load({ sync: true })
-  return renderWithProviders(<RouterProvider router={router} />, {
+  const rendered = renderWithProviders(<RouterProvider router={router} />, {
     queryClient,
   })
+  return { ...rendered, router, session }
 }
 
 beforeEach(() => {
@@ -150,5 +161,98 @@ describe('account settings', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText('Internal detail')).not.toBeInTheDocument()
     expect(nameInput).toHaveValue('Nome atualizado')
+  })
+
+  it('clears the local session and replaces the settings route with login after changing the password', async () => {
+    apiMocks.changePassword.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    const { router, session } = await renderAccountSettings()
+
+    await user.type(screen.getByLabelText('Senha atual'), 'current-password')
+    await user.type(screen.getByLabelText('Nova senha'), 'new-password')
+    await user.type(
+      screen.getByLabelText('Confirmar nova senha'),
+      'new-password'
+    )
+    await user.click(screen.getByRole('button', { name: 'ALTERAR SENHA' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(apiMocks.changePassword).toHaveBeenCalledWith({
+      confirmPassword: 'new-password',
+      currentPassword: 'current-password',
+      newPassword: 'new-password',
+    })
+    expect(session.clearLocalSession).toHaveBeenCalledOnce()
+    expect(apiMocks.changePassword.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(session.clearLocalSession).mock.invocationCallOrder[0]
+    )
+    expect(toastMocks.success).toHaveBeenCalledWith(
+      'Senha alterada. Entre novamente com sua nova senha.'
+    )
+    expect(router.state.location.search).toEqual({ redirect: undefined })
+    expect(router.state.location.pathname).toBe('/login')
+    router.history.back()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+  })
+
+  it.each([
+    [new ApiError('Senha atual incorreta', 400), 'Senha atual incorreta'],
+    [
+      new ApiError('network failure', undefined, undefined, undefined, {
+        networkError: true,
+      }),
+      'Não foi possível alterar sua senha. Verifique sua conexão e tente novamente.',
+    ],
+  ])(
+    'keeps the session, password fields, and settings route after a failed password change (%s)',
+    async (error, message) => {
+      apiMocks.changePassword.mockRejectedValueOnce(error)
+      const user = userEvent.setup()
+      const { router, session } = await renderAccountSettings()
+      const passwordValues = [
+        ['Senha atual', 'current-password'],
+        ['Nova senha', 'new-password'],
+        ['Confirmar nova senha', 'new-password'],
+      ] as const
+
+      await user.type(screen.getByLabelText('Senha atual'), 'current-password')
+      await user.type(screen.getByLabelText('Nova senha'), 'new-password')
+      await user.type(
+        screen.getByLabelText('Confirmar nova senha'),
+        'new-password'
+      )
+      await user.click(screen.getByRole('button', { name: 'ALTERAR SENHA' }))
+
+      expect(await screen.findByText(message)).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/configuracoes')
+      expect(session.clearLocalSession).not.toHaveBeenCalled()
+      expect(toastMocks.success).not.toHaveBeenCalled()
+      for (const [label, value] of passwordValues) {
+        expect(screen.getByLabelText(label)).toHaveValue(value)
+      }
+    }
+  )
+
+  it('does not send a password change when confirmation differs and keeps both values', async () => {
+    const user = userEvent.setup()
+    const { router, session } = await renderAccountSettings()
+    await user.type(screen.getByLabelText('Senha atual'), 'current-password')
+    await user.type(screen.getByLabelText('Nova senha'), 'new-password')
+    await user.type(
+      screen.getByLabelText('Confirmar nova senha'),
+      'other-password'
+    )
+    await user.click(screen.getByRole('button', { name: 'ALTERAR SENHA' }))
+
+    expect(
+      await screen.findByText('As senhas não coincidem.')
+    ).toBeInTheDocument()
+    expect(apiMocks.changePassword).not.toHaveBeenCalled()
+    expect(session.clearLocalSession).not.toHaveBeenCalled()
+    expect(router.state.location.pathname).toBe('/configuracoes')
+    expect(screen.getByLabelText('Nova senha')).toHaveValue('new-password')
+    expect(screen.getByLabelText('Confirmar nova senha')).toHaveValue(
+      'other-password'
+    )
   })
 })

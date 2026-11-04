@@ -36,7 +36,11 @@ const SYMBOL_PATTERN = /[^a-zA-Z0-9]/
 const passwordInputClassName =
   'border border-border rounded-none focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-0'
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({
+  onSuccess,
+}: {
+  onSuccess?: () => Promise<void>
+}) {
   const formId = useId()
   const formRef = useRef<HTMLFormElement>(null)
   const [requestError, setRequestError] = useState<string>()
@@ -57,7 +61,10 @@ export function ChangePasswordForm() {
         setSuccess(true)
       } catch (error) {
         setRequestError(getPasswordChangeError(toApiError(error)))
+        return
       }
+
+      await onSuccess?.()
     },
     validationLogic: revalidateLogic({
       mode: 'submit',
@@ -165,8 +172,7 @@ export function ChangePasswordForm() {
             className='mt-4 text-muted-foreground text-xs'
             role='status'
           >
-            Senha alterada. Você e os outros dispositivos precisarão entrar
-            novamente quando as sessões expirarem.
+            Senha alterada. Redirecionando para o login…
           </p>
         ) : null}
 

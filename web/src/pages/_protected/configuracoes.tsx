@@ -1,6 +1,6 @@
 import { UserGearIcon, UserIcon } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { userApi } from '@/api/endpoints'
@@ -28,6 +28,7 @@ export const Route = createFileRoute('/_protected/configuracoes')({
 
 function AccountSettingsPage() {
   const { session } = Route.useRouteContext()
+  const navigate = useNavigate({ from: '/configuracoes' })
   const nameId = useId()
   const [name, setName] = useState<string>()
   const [nameError, setNameError] = useState<string>()
@@ -43,6 +44,15 @@ function AccountSettingsPage() {
   const retryProfile = useCallback(async () => {
     await profile.refetch()
   }, [profile.refetch])
+  const finishPasswordChange = useCallback(async () => {
+    session.clearLocalSession()
+    appToast.success('Senha alterada. Entre novamente com sua nova senha.')
+    await navigate({
+      replace: true,
+      search: { redirect: undefined },
+      to: '/login',
+    })
+  }, [navigate, session])
   const changeName = useCallback((value: string) => {
     setName(value)
     setNameError(undefined)
@@ -190,7 +200,7 @@ function AccountSettingsPage() {
               ) : null}
             </section>
             <Separator />
-            <ChangePasswordForm />
+            <ChangePasswordForm onSuccess={finishPasswordChange} />
           </div>
         </div>
       </div>
