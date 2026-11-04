@@ -6,3 +6,9 @@ export const workspaceRolesQueryKey = (workspaceId: string | undefined) =>
 
 export const workspacePermissionQueryKey = (workspaceId: string | undefined) =>
   ['workspace-permissions', workspaceId] as const
+export const accessGroupsQueryKey = (workspaceId: string | undefined) =>
+  ['workspace-access-groups', workspaceId] as const
+export const accessGroupMembersQueryKey = (
+  workspaceId: string | undefined,
+  groupId: string | undefined
+) => ['workspace-access-group-members', workspaceId, groupId] as const

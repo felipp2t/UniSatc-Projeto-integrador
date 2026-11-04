@@ -94,7 +94,7 @@ function ActivityHistoryPage() {
   }
   if (!workspace.data?.id) {
     return (
-      <main className='container mx-auto px-8 py-12'>
+      <main className='container mx-auto px-4 py-8 md:px-8 md:py-12'>
         <EmptyState
           description='Você precisa estar vinculado a um workspace para consultar o histórico.'
           title='Nenhum workspace disponível'
@@ -194,7 +194,7 @@ function ActivityHistory({ workspaceId }: { workspaceId: string }) {
   )
 
   return (
-    <main className='container mx-auto flex min-h-full flex-col gap-7 px-8 py-12'>
+    <main className='container mx-auto flex min-h-full flex-col gap-7 px-4 py-8 md:px-8 md:py-12'>
       <header className='flex flex-col gap-6 border-border border-b pb-6'>
         <AppBreadcrumb
           items={[{ label: 'Início', to: '/' }, { label: 'Atividades' }]}
@@ -208,7 +208,7 @@ function ActivityHistory({ workspaceId }: { workspaceId: string }) {
             <p className='mb-1 font-mono text-[10px] text-muted-foreground uppercase tracking-[0.18em]'>
               Workspace
             </p>
-            <h1 className='font-bold font-mono text-3xl uppercase tracking-tight'>
+            <h1 className='font-bold font-mono text-2xl uppercase tracking-tight md:text-3xl'>
               Histórico de atividades
             </h1>
           </div>
