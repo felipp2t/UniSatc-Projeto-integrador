@@ -49,7 +49,9 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
   }
 })
 
-vi.mock('@/hooks/use-notification-toast', () => ({ useNotificationToast: vi.fn() }))
+vi.mock('@/hooks/use-notification-toast', () => ({
+  useNotificationToast: vi.fn(),
+}))
 
 vi.mock('@/components/create-item-dialog', () => ({
   CreateItemDialog: ({ onItemCreated }: { onItemCreated: () => void }) =>

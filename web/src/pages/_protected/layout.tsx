@@ -16,8 +16,8 @@ import { OfflineBanner } from '@/components/offline-banner'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { workspacesQuery } from '@/hooks/use-current-workspace'
-import { workspacePermissionsQuery } from '@/hooks/use-workspace-permissions'
 import { useNotificationToast } from '@/hooks/use-notification-toast'
+import { workspacePermissionsQuery } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute('/_protected')({
   beforeLoad: async ({ context, location, matches }) => {

@@ -170,9 +170,10 @@ export const inviteApi = {
 }
 
 export const notificationsApi = {
-  list: (page = 0, size = 10) =>
+  list: (page = 0, size = 10, signal?: AbortSignal) =>
     apiClient.get<NotificationPageResponse>('/notifications', {
       params: { page, size },
+      signal,
     }),
   markAllRead: () => apiClient.patch<void>('/notifications/read'),
   markRead: (notificationId: string) =>
