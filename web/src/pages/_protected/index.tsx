@@ -98,7 +98,7 @@ function HomePage() {
   }
   if (!workspace?.id) {
     return (
-      <main className='container mx-auto px-8 py-12'>
+      <main className='container mx-auto px-4 py-8 md:px-8 md:py-12'>
         <EmptyState
           description='Você precisa estar vinculado a um workspace para consultar os itens.'
           title='Nenhum workspace disponível'
@@ -181,7 +181,7 @@ function WorkspaceBrowser({
   }
 
   return (
-    <main className='container mx-auto flex min-h-full flex-col gap-7 px-8 py-12'>
+    <main className='container mx-auto flex min-h-full flex-col gap-7 px-4 py-8 md:px-8 md:py-12'>
       <WorkspaceBreadcrumbs
         collectionId={collectionId}
         isLoading={path.isPending}
