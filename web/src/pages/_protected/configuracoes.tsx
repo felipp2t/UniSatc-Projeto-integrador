@@ -87,7 +87,7 @@ function AccountSettingsPage() {
   )
 
   return (
-    <main className='container mx-auto space-y-6 px-8 py-12'>
+    <main className='container mx-auto space-y-6 px-4 py-8 md:px-8 md:py-12'>
       <header className='flex flex-col gap-6'>
         <AppBreadcrumb
           items={[{ label: 'Início', to: '/' }, { label: 'Conta' }]}
@@ -97,7 +97,7 @@ function AccountSettingsPage() {
             aria-hidden='true'
             className='size-6 shrink-0 text-primary'
           />
-          <h1 className='font-bold font-mono text-3xl'>CONTA</h1>
+          <h1 className='font-bold font-mono text-2xl md:text-3xl'>CONTA</h1>
         </div>
       </header>
 
