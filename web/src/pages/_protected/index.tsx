@@ -20,6 +20,7 @@ import type {
 } from '@/api/types'
 import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
+import { EditItemDialog } from '@/components/edit-item-dialog'
 import {
   InlineCodeContent,
   InlineCodeRoot,
@@ -57,6 +58,7 @@ import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 const searchSchema = z.object({
   archived: z.boolean().optional().catch(undefined),
   collectionId: z.guid().optional().catch(undefined),
+  itemId: z.guid().optional().catch(undefined),
 })
 const itemTypeOptions = [
   'all',
@@ -76,7 +78,7 @@ export const Route = createFileRoute('/_protected/')({
 })
 
 function HomePage() {
-  const { archived, collectionId } = Route.useSearch()
+  const { archived, collectionId, itemId } = Route.useSearch()
   const navigate = Route.useNavigate()
   const changeArchived = useCallback(
     (value: boolean) =>
@@ -111,6 +113,7 @@ function HomePage() {
     <WorkspaceBrowser
       archived={Boolean(archived)}
       collectionId={collectionId}
+      itemId={itemId}
       // Remounting per folder prevents folder-scoped state and data from leaking.
       key={`${workspace.id}:${collectionId ?? 'root'}`}
       onArchivedChange={changeArchived}
@@ -123,16 +126,23 @@ function HomePage() {
 function WorkspaceBrowser({
   archived,
   collectionId,
+  itemId,
   onArchivedChange,
   workspaceId,
   workspaceName,
 }: {
   archived: boolean
   collectionId: string | undefined
+  itemId: string | undefined
   onArchivedChange: (archived: boolean) => void
   workspaceId: string
   workspaceName: string
 }) {
+  const navigate = Route.useNavigate()
+  const closeItem = useCallback(
+    () => navigate({ search: (prev) => ({ ...prev, itemId: undefined }) }),
+    [navigate]
+  )
   const queryClient = useQueryClient()
   const permissions = useWorkspacePermissions(workspaceId)
   const path = useCollectionPath(workspaceId, collectionId)
@@ -212,6 +222,17 @@ function WorkspaceBrowser({
           archived={archived}
           collectionId={collectionId}
           onArchivedChange={onArchivedChange}
+          workspaceId={workspaceId}
+        />
+      ) : null}
+      {itemId ? (
+        <EditItemDialog
+          itemId={itemId}
+          key={itemId}
+          onClose={closeItem}
+          readOnly
+          showAttachmentPreview
+          unavailableOnAccessError
           workspaceId={workspaceId}
         />
       ) : null}

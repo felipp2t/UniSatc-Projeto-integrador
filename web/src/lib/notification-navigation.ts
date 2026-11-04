@@ -1,15 +1,36 @@
 import type { AppRoute } from '@/types/navigation'
 
-export function getNotificationHref(
+export type NotificationDestination =
+  | { to: '/'; search?: { collectionId: string } | { itemId: string } }
+  | { to: '/configuracoes' }
+
+export function getNotificationDestination(
   metadata: Record<string, unknown>
-): AppRoute | undefined {
+): NotificationDestination | undefined {
   switch (metadata.event) {
     case 'PROFILE_UPDATED':
     case 'PASSWORD_CHANGED':
-      return '/configuracoes'
-    case 'ACCESS_CHANGED':
-      return '/'
+      return { to: '/configuracoes' }
     default:
-      return undefined
+      if (metadata.event !== 'ACCESS_CHANGED') return undefined
+      if (
+        typeof metadata.resourceId === 'string' &&
+        metadata.resourceType === 'collection'
+      ) {
+        return { search: { collectionId: metadata.resourceId }, to: '/' }
+      }
+      if (
+        typeof metadata.resourceId === 'string' &&
+        metadata.resourceType === 'item'
+      ) {
+        return { search: { itemId: metadata.resourceId }, to: '/' }
+      }
+      return { to: '/' }
   }
+}
+
+export function getNotificationHref(
+  metadata: Record<string, unknown>
+): AppRoute | undefined {
+  return getNotificationDestination(metadata)?.to
 }
