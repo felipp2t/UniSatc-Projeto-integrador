@@ -35,8 +35,9 @@ public class RefreshToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "workspace_member_id", nullable = false)
+    // Vazio apenas nas sessões do administrador geral, que não pertence a workspace.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "workspace_member_id")
     private WorkspaceMember workspaceMember;
 
     @Column(name = "expires_at", nullable = false)

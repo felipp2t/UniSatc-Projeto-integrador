@@ -1,6 +1,8 @@
 package com.vaulty.api.config;
 
+import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.WorkspaceMember;
+import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.service.JwtService;
 import jakarta.servlet.FilterChain;
@@ -25,17 +27,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final UserRepository userRepository;
 
     @Autowired
-    public JwtAuthenticationFilter(JwtService jwtService, WorkspaceMemberRepository workspaceMemberRepository) {
+    public JwtAuthenticationFilter(JwtService jwtService, WorkspaceMemberRepository workspaceMemberRepository,
+                                   UserRepository userRepository) {
         this.jwtService = jwtService;
         this.workspaceMemberRepository = workspaceMemberRepository;
+        this.userRepository = userRepository;
+    }
+
+    public JwtAuthenticationFilter(JwtService jwtService, WorkspaceMemberRepository workspaceMemberRepository) {
+        this(jwtService, workspaceMemberRepository, null);
     }
 
     // Permite construir o filtro em chamadas legadas; sem repositório, nenhum token autentica.
     public JwtAuthenticationFilter(JwtService jwtService) {
-        this.jwtService = jwtService;
-        this.workspaceMemberRepository = null;
+        this(jwtService, null, null);
     }
 
     @Override
@@ -79,9 +87,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 
+    // O administrador geral não pertence a workspace; o papel é conferido no banco a cada requisição.
     private void authenticateAccount(JwtService.AccessTokenClaims claims) {
+        boolean systemAdmin = userRepository != null && userRepository.findById(claims.userId())
+                .map(User::isSystemAdmin)
+                .orElse(false);
+        String authority = systemAdmin ? "SYSTEM_ADMIN" : "ACCOUNT_ONLY";
         var authentication = new UsernamePasswordAuthenticationToken(
-                claims.userId(), null, List.of(new SimpleGrantedAuthority("ACCOUNT_ONLY")));
+                claims.userId(), null, List.of(new SimpleGrantedAuthority(authority)));
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

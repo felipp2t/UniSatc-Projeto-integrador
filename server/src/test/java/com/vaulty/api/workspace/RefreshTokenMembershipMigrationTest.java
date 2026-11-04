@@ -81,8 +81,10 @@ class RefreshTokenMembershipMigrationTest {
         }
     }
 
+    // A V31 tira o administrador geral dos workspaces e libera sessões sem vínculo; este teste cobre a V20.
     private Flyway flyway(PostgreSQLContainer<?> postgres) {
-        return Flyway.configure().dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword()).load();
+        return Flyway.configure().dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .target("30").load();
     }
 
     private Connection connect(PostgreSQLContainer<?> postgres) throws SQLException {

@@ -101,7 +101,7 @@ public class SecurityConfig {
                         .requestMatchers("/notifications/**", "/me", "/me/**")
                         .authenticated()
                         .anyRequest()
-                        .hasAuthority("WORKSPACE_MEMBER"))
+                        .hasAnyAuthority("WORKSPACE_MEMBER", "SYSTEM_ADMIN"))
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(maintenanceGateFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

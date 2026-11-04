@@ -9,6 +9,7 @@ import com.vaulty.api.entity.PasswordResetToken;
 import com.vaulty.api.entity.RefreshToken;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.enums.ActivityAction;
 import com.vaulty.api.enums.ActivityActorContext;
 import com.vaulty.api.enums.ActivityResourceType;
@@ -132,8 +133,11 @@ public class AuthService {
         }
 
         UUID userId = refreshToken.getUser().getId();
-        UUID membershipId = refreshToken.getWorkspaceMember().getId();
-        if (workspaceMemberRepository.findByIdAndUserId(membershipId, userId).isEmpty()) {
+        boolean sessionStillValid = refreshToken.getWorkspaceMember() == null
+                ? refreshToken.getUser().isSystemAdmin()
+                : workspaceMemberRepository.findByIdAndUserId(refreshToken.getWorkspaceMember().getId(), userId)
+                        .isPresent();
+        if (!sessionStillValid) {
             throw new InvalidCredentialsException("Token de atualização inválido");
         }
         refreshTokenRepository.delete(refreshToken);
@@ -222,19 +226,27 @@ public class AuthService {
         var membership = workspaceMemberRepository.findByUserId(userId).orElse(null);
 
         if (membership == null) {
-            return new TokenPair(jwtService.generateAccountAccessToken(userId), null);
+            boolean systemAdmin = userRepository.findById(userId).map(User::isSystemAdmin).orElse(false);
+            if (!systemAdmin) {
+                return new TokenPair(jwtService.generateAccountAccessToken(userId), null);
+            }
+            // O administrador geral não pertence a workspace, mas mantém sessão renovável.
+            return new TokenPair(jwtService.generateAccountAccessToken(userId), saveRefreshToken(userId, null));
         }
 
+        String accessToken = jwtService.generateAccessToken(
+                userId, membership.getId(), membership.getRole().getName());
+
+        return new TokenPair(accessToken, saveRefreshToken(userId, membership));
+    }
+
+    private String saveRefreshToken(UUID userId, WorkspaceMember membership) {
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(UUID.randomUUID().toString());
         refreshToken.setUser(userRepository.getReferenceById(userId));
         refreshToken.setWorkspaceMember(membership);
         refreshToken.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(refreshTokenExpirationMs)));
         refreshTokenRepository.save(refreshToken);
-
-        String accessToken = jwtService.generateAccessToken(
-                userId, membership.getId(), membership.getRole().getName());
-
-        return new TokenPair(accessToken, refreshToken.getToken());
+        return refreshToken.getToken();
     }
 }
