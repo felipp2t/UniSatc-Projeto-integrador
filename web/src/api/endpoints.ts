@@ -158,6 +158,8 @@ export const workspaceApi = {
       `/workspaces/${workspaceId}/members/${membershipId}`,
       { params: { confirmMemberId: membershipId } }
     ),
+  renameRole: (workspaceId: string, roleId: string, name: string) =>
+    apiClient.put<void>(`/workspaces/${workspaceId}/roles/${roleId}`, { name }),
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
 }
