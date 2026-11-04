@@ -25,7 +25,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { appToast } from '@/components/ui/toast'
 import { useNotificationRead } from '@/hooks/use-notification-read'
-import { getNotificationHref } from '@/lib/notification-navigation'
+import { getNotificationDestination } from '@/lib/notification-navigation'
 
 const PAGE_SIZE = 10
 
@@ -239,9 +239,22 @@ function NotificationRow({
       </time>
     </NotificationRoot>
   )
-  const href = getNotificationHref(notification.metadata)
+  const destination = getNotificationDestination(notification.metadata)
 
-  if (!href) {
+  if (destination?.to === '/') {
+    return (
+      <Link
+        className='block rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
+        onClick={handleOpen}
+        search={destination.search}
+        to='/'
+      >
+        {content}
+      </Link>
+    )
+  }
+
+  if (!destination) {
     return (
       <div>
         {content}
@@ -264,7 +277,7 @@ function NotificationRow({
     <Link
       className='block rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
       onClick={handleOpen}
-      to={href}
+      to={destination.to}
     >
       {content}
     </Link>

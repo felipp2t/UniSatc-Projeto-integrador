@@ -1,9 +1,11 @@
 package com.vaulty.api.service;
 
 import com.vaulty.api.dto.notification.NotificationPageResponse;
+import com.vaulty.api.dto.notification.NotificationResourceReference;
 import com.vaulty.api.dto.notification.NotificationResponse;
 import com.vaulty.api.entity.Notification;
 import com.vaulty.api.entity.User;
+import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.enums.NotificationEvent;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.exception.TooManyRequestsException;
@@ -12,6 +14,7 @@ import com.vaulty.api.repository.NotificationRepository;
 import com.vaulty.api.repository.UserRepository;
 import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -33,14 +36,19 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final WorkspaceContentAuthorization authorization;
+    private final EffectiveContentAccess contentAccess;
     // O stream não sobrevive ao token de acesso que o abriu; a reconexão exige uma sessão válida.
     private final long streamTimeoutMs;
     private final Map<UUID, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     public NotificationService(NotificationRepository notificationRepository, UserRepository userRepository,
+                               WorkspaceContentAuthorization authorization, EffectiveContentAccess contentAccess,
                                @Value("${jwt.access-token-expiration-ms}") long streamTimeoutMs) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
+        this.authorization = authorization;
+        this.contentAccess = contentAccess;
         this.streamTimeoutMs = streamTimeoutMs;
     }
 
@@ -52,7 +60,8 @@ public class NotificationService {
         var notifications = unreadOnly
                 ? notificationRepository.findAllByRecipientIdAndReadAtIsNull(recipientId, pageable)
                 : notificationRepository.findAllByRecipientId(recipientId, pageable);
-        return NotificationPageResponse.from(notifications.map(NotificationResponse::from),
+        return NotificationPageResponse.from(notifications.map(notification ->
+                        NotificationResponse.from(notification, accessibleReference(recipientId, notification))),
                 notificationRepository.countByRecipientIdAndReadAtIsNull(recipientId));
     }
 
@@ -81,7 +90,12 @@ public class NotificationService {
     // Producers for future role, group, sharing, and inherited permission changes use only this fixed event.
     @Transactional
     public void accessChanged(Collection<UUID> affectedRecipients) {
-        affectedRecipients.stream().distinct().forEach(id -> publish(id, NotificationEvent.ACCESS_CHANGED));
+        accessChanged(affectedRecipients, null);
+    }
+
+    @Transactional
+    public void accessChanged(Collection<UUID> affectedRecipients, NotificationResourceReference reference) {
+        affectedRecipients.stream().distinct().forEach(id -> publish(id, NotificationEvent.ACCESS_CHANGED, reference));
     }
 
     public SseEmitter subscribe(UUID recipientId) {
@@ -105,12 +119,20 @@ public class NotificationService {
     }
 
     private void publish(UUID recipientId, NotificationEvent eventType) {
+        publish(recipientId, eventType, null);
+    }
+
+    private void publish(UUID recipientId, NotificationEvent eventType, NotificationResourceReference reference) {
         User recipient = userRepository.getReferenceById(recipientId);
         Notification notification = new Notification();
         notification.setRecipient(recipient);
         notification.setTitle(eventType.title());
         notification.setContent(eventType.content());
-        notification.setMetadata(Map.of("event", eventType.name()));
+        notification.setMetadata(reference == null || eventType != NotificationEvent.ACCESS_CHANGED
+                ? Map.of("event", eventType.name())
+                : Map.of("event", eventType.name(), "workspaceId", reference.workspaceId(),
+                        "resourceType", reference.type().name().toLowerCase(Locale.ROOT),
+                        "resourceId", reference.resourceId()));
         Notification saved = notificationRepository.save(notification);
         UUID notificationId = saved.getId();
 
@@ -170,4 +192,34 @@ public class NotificationService {
             throw new ValidationException("Página ou tamanho inválido");
         }
     }
+
+    private NotificationResourceReference accessibleReference(UUID recipientId, Notification notification) {
+        if (!NotificationEvent.ACCESS_CHANGED.name().equals(notification.getMetadata().get("event"))) {
+            return null;
+        }
+        try {
+            UUID workspaceId = UUID.fromString(String.valueOf(notification.getMetadata().get("workspaceId")));
+            UUID resourceId = UUID.fromString(String.valueOf(notification.getMetadata().get("resourceId")));
+            String resourceType = String.valueOf(notification.getMetadata().get("resourceType"));
+            Workspace workspace = authorization.findWorkspaceForMember(recipientId, workspaceId).orElse(null);
+            if (workspace == null) return null;
+            if ("collection".equals(resourceType)
+                    && authorization.allowsIfMember(recipientId, workspaceId, "collection", "read")
+                    && contentAccess.canReadCollection(recipientId, workspace, resourceId)) {
+                return new NotificationResourceReference(workspaceId,
+                        NotificationResourceReference.Type.COLLECTION, resourceId);
+            }
+            if ("item".equals(resourceType)
+                    && authorization.allowsIfMember(recipientId, workspaceId, "item", "read")
+                    && contentAccess.canReadItem(recipientId, workspace, resourceId,
+                            authorization.allowsIfMember(recipientId, workspaceId, "secret", "read"))) {
+                return new NotificationResourceReference(workspaceId,
+                        NotificationResourceReference.Type.ITEM, resourceId);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Malformed or legacy references stay generic; their ids and content are never returned.
+        }
+        return null;
+    }
+
 }

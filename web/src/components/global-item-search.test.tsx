@@ -74,7 +74,7 @@ async function openUnavailableResult(
   user: ReturnType<typeof userEvent.setup>
 ) {
   apiMocks.get.mockRejectedValueOnce(new ApiError('detalhe interno', status))
-  await user.click(screen.getByRole('button', { name: 'Close' }))
+  await user.click(screen.getByRole('button', { name: 'Fechar' }))
   await user.click(
     screen.getByRole('button', { name: 'Buscar itens no workspace' })
   )
@@ -301,7 +301,7 @@ describe('GlobalItemSearch', () => {
       'chave'
     )
     expect(await within(dialog).findByText('Projetos')).toBeInTheDocument()
-    await user.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Fechar' }))
 
     let resolveSearch: (value: ReturnType<typeof makePage>) => void = () =>
       undefined
@@ -370,9 +370,9 @@ describe('GlobalItemSearch', () => {
     ).toBeInTheDocument()
 
     await user.click(
-      within(attachmentDialog).getByRole('button', { name: 'Close' })
+      within(attachmentDialog).getByRole('button', { name: 'Fechar' })
     )
-    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: 'Fechar' }))
     apiMocks.get.mockRejectedValueOnce(new ApiError('forbidden', 403))
     await user.click(
       screen.getByRole('button', { name: 'Buscar itens no workspace' })

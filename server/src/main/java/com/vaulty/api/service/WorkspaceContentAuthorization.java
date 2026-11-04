@@ -11,6 +11,7 @@ import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,10 @@ public class WorkspaceContentAuthorization {
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
     }
 
+    public Optional<Workspace> findWorkspaceForMember(UUID userId, UUID workspaceId) {
+        return workspaceRepository.findByIdAndMemberUserId(workspaceId, userId);
+    }
+
     public void require(UUID userId, Workspace workspace, String resource, String action) {
         if (!allows(userId, workspace, resource, action)) {
             throw new ForbiddenException("Permissão insuficiente");
@@ -42,6 +47,13 @@ public class WorkspaceContentAuthorization {
             return true;
         }
         return permissionRepository.allows(role.getId(), resource, action);
+    }
+
+    public boolean allowsIfMember(UUID userId, UUID workspaceId, String resource, String action) {
+        return memberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
+                .map(member -> member.getRole().isOwnerRole()
+                        || permissionRepository.allows(member.getRole().getId(), resource, action))
+                .orElse(false);
     }
 
     public boolean isOwner(UUID userId, Workspace workspace) {

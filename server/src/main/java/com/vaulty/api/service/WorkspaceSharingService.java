@@ -1,9 +1,10 @@
 package com.vaulty.api.service;
 
-import com.vaulty.api.exception.ResourceNotFoundException;
+import com.vaulty.api.dto.notification.NotificationResourceReference;
 import com.vaulty.api.exception.ConflictException;
-import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.exception.ForbiddenException;
+import com.vaulty.api.exception.ResourceNotFoundException;
+import com.vaulty.api.repository.WorkspaceRoleRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +31,8 @@ public class WorkspaceSharingService {
             throw new ResourceNotFoundException("Grupo não encontrado");
         var before = accessNotifications.snapshot(workspace);
         if (jdbc.update("INSERT INTO collection_access_grant(collection_id,group_id,workspace_id) VALUES (?,?,?) ON CONFLICT DO NOTHING", collection, group, workspace) > 0)
-            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace),
+                    new NotificationResourceReference(workspace, NotificationResourceReference.Type.COLLECTION, collection));
     }
 
     @Transactional
@@ -39,7 +41,8 @@ public class WorkspaceSharingService {
         access.requireCollection(user, authorization.requireWorkspace(user, workspace), collection);
         var before = accessNotifications.snapshot(workspace);
         if (jdbc.update("DELETE FROM collection_access_grant WHERE collection_id=? AND group_id=?", collection, group) > 0)
-            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace),
+                    new NotificationResourceReference(workspace, NotificationResourceReference.Type.COLLECTION, collection));
     }
 
     @Transactional
@@ -48,7 +51,8 @@ public class WorkspaceSharingService {
         access.requireCollection(user, authorization.requireWorkspace(user, workspace), collection);
         var before = accessNotifications.snapshot(workspace);
         if (jdbc.update("INSERT INTO collection_public_grant(collection_id,workspace_id) VALUES (?,?) ON CONFLICT DO NOTHING", collection, workspace) > 0)
-            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace),
+                    new NotificationResourceReference(workspace, NotificationResourceReference.Type.COLLECTION, collection));
     }
 
     @Transactional
@@ -57,7 +61,8 @@ public class WorkspaceSharingService {
         access.requireCollection(user, authorization.requireWorkspace(user, workspace), collection);
         var before = accessNotifications.snapshot(workspace);
         if (jdbc.update("DELETE FROM collection_public_grant WHERE collection_id=?", collection) > 0)
-            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace),
+                    new NotificationResourceReference(workspace, NotificationResourceReference.Type.COLLECTION, collection));
     }
 
     @Transactional
@@ -90,7 +95,8 @@ public class WorkspaceSharingService {
             if (parentPublic) jdbc.update("INSERT INTO collection_public_grant(collection_id,workspace_id) VALUES (?,?) ON CONFLICT DO NOTHING", collection, workspace);
         }
         jdbc.update("UPDATE collection SET inherit_access=? WHERE id=?", enabled, collection);
-        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace),
+                new NotificationResourceReference(workspace, NotificationResourceReference.Type.COLLECTION, collection));
     }
 
     @Transactional
@@ -101,7 +107,8 @@ public class WorkspaceSharingService {
             throw new ResourceNotFoundException("Integrante não encontrado");
         var before = accessNotifications.snapshot(workspace);
         if (jdbc.update("INSERT INTO item_member_grant(item_id,workspace_member_id,workspace_id) VALUES (?,?,?) ON CONFLICT DO NOTHING", item, member, workspace) > 0)
-            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
+            accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace),
+                    new NotificationResourceReference(workspace, NotificationResourceReference.Type.ITEM, item));
     }
 
     @Transactional
@@ -110,7 +117,8 @@ public class WorkspaceSharingService {
         access.requireItem(user, authorization.requireWorkspace(user, workspace), item);
         var before = accessNotifications.snapshot(workspace);
         if (jdbc.update("DELETE FROM item_member_grant WHERE item_id=? AND workspace_member_id=?", item, member) > 0)
-        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace));
+        accessNotifications.notifyChanged(before, accessNotifications.snapshotAfterChange(workspace),
+                new NotificationResourceReference(workspace, NotificationResourceReference.Type.ITEM, item));
     }
 
     @Transactional(readOnly = true)
