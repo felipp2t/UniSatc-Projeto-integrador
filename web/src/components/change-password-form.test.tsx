@@ -14,6 +14,7 @@ interface PasswordValues {
 interface FormOptions {
   defaultValues: PasswordValues
   onSubmit: (event: { value: PasswordValues }) => Promise<void>
+  onSuccess?: () => Promise<void>
   validationLogic: ReturnType<typeof revalidateLogic>
   validators: { onDynamic: ZodType<PasswordValues, PasswordValues> }
 }
@@ -112,8 +113,8 @@ vi.mock('@/components/ui/secret-input', () => ({
 
 import { ChangePasswordForm } from './change-password-form'
 
-function renderForm() {
-  renderToString(createElement(ChangePasswordForm))
+function renderForm(onSuccess?: () => Promise<void>) {
+  renderToString(createElement(ChangePasswordForm, { onSuccess }))
   const options = captureFormOptions.mock.lastCall?.[0]
   if (!options) {
     throw new Error('The form options were not captured')
@@ -200,8 +201,28 @@ describe('change password form', () => {
     expect(stateSetters[1]).toHaveBeenLastCalledWith(true)
   })
 
+  it('calls onSuccess only after the password API succeeds and the form resets', async () => {
+    const onSuccess = vi.fn().mockResolvedValue(undefined)
+    const options = renderForm(onSuccess)
+    const value = {
+      confirmPassword: 'new-password',
+      currentPassword: 'current-password',
+      newPassword: 'new-password',
+    }
+    changePassword.mockImplementation(() => {
+      expect(onSuccess).not.toHaveBeenCalled()
+    })
+
+    await options.onSubmit({ value })
+
+    expect(changePassword).toHaveBeenCalledWith(value)
+    expect(reset).toHaveBeenCalledOnce()
+    expect(onSuccess).toHaveBeenCalledOnce()
+  })
+
   it('shows the API error and keeps values after a failed change', async () => {
-    const options = renderForm()
+    const onSuccess = vi.fn().mockResolvedValue(undefined)
+    const options = renderForm(onSuccess)
     const value = {
       confirmPassword: 'new-password',
       currentPassword: 'wrong-password',
@@ -214,5 +235,6 @@ describe('change password form', () => {
     expect(changePassword).toHaveBeenCalledWith(value)
     expect(reset).not.toHaveBeenCalled()
     expect(stateSetters[0]).toHaveBeenLastCalledWith('Senha atual incorreta')
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 })
