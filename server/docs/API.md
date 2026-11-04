@@ -927,8 +927,17 @@ workspace e responde `204`. Convite de outro workspace ou que não esteja penden
 **`POST /admin/workspaces/{workspaceId}/invites`** convida `{ "email": string, "owner": boolean }` e
 responde `201`. Com `owner: true`, a pessoa entra com o papel `Owner`; o primeiro proprietário a se
 cadastrar vira o `ownerId` do workspace. Com `owner: false`, entra como `Member`. O convite segue o
-mesmo fluxo de e-mail, validade e substituição de `POST /invites`. E-mail com conta existente
-responde `409`; workspace inexistente, `404`.
+mesmo fluxo de e-mail, validade e substituição de `POST /invites`. Se o e-mail já tem conta e ela
+não pertence a nenhum workspace (por exemplo, foi removida de outra equipe), a conta entra direto,
+sem convite, com o papel escolhido. A resposta é `{ "addedExistingAccount": boolean }`. Conta que já
+pertence a um workspace, ou do administrador geral, responde `409`; workspace inexistente, `404`.
+
+Para trocar o papel ou remover membros, o administrador geral usa as mesmas rotas dos donos
+(`PUT /workspaces/{workspaceId}/members/{memberId}/role` e
+`DELETE /workspaces/{workspaceId}/members/{membershipId}`), em qualquer workspace. Remover tira só o
+vínculo: a conta, o conteúdo e a autoria permanecem, e o último proprietário não pode ser removido.
+A readmissão de donos (`POST /workspaces/{workspaceId}/members/readmit`) recusa com `409` contas de
+outro workspace e o administrador geral.
 
 **`POST /workspaces/backup`** gera o backup do banco inteiro e por isso também é exclusivo do
 administrador geral (`403` para as demais contas). O `manifest.json` lista `workspaceIds`.
