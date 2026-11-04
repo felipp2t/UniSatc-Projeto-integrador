@@ -31,8 +31,10 @@ export function startNotificationStream(
     clearTimeout(timer)
     clearTimeout(resumeTimer)
     closeSource()
-    window.removeEventListener('focus', synchronizeOnResume)
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    if (typeof window !== 'undefined')
+      window.removeEventListener('focus', synchronizeOnResume)
+    if (typeof document !== 'undefined')
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
   }
 
   function handleVisibilityChange() {
@@ -110,8 +112,10 @@ export function startNotificationStream(
     if (timer === undefined) drain()
   }
 
-  window.addEventListener('focus', synchronizeOnResume)
-  document.addEventListener('visibilitychange', handleVisibilityChange)
+  if (typeof window !== 'undefined')
+    window.addEventListener('focus', synchronizeOnResume)
+  if (typeof document !== 'undefined')
+    document.addEventListener('visibilitychange', handleVisibilityChange)
   requestSync()
   return stop
 }
