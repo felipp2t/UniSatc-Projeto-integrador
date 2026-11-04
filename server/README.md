@@ -54,8 +54,8 @@ de redefinição de uso único.
    A migration `V2` também insere o usuário inicial `admin@gmail.com`. Como não existe cadastro
    público, solicite a redefinição de senha desse e-mail para definir a primeira senha e então
    enviar o primeiro convite. A migration `V30` marca essa conta como administrador geral: ela
-   cria workspaces (um por equipe) e convida proprietários ou membros para qualquer um deles pela
-   página **Administração** do frontend ou pelas rotas `/admin/workspaces`. Cada pessoa pertence a
+   cria workspaces (um por equipe), configura cada um e convida proprietários ou membros. No
+   frontend, a tela inicial dessa conta lista os workspaces; pela API, use as rotas `/admin/workspaces`. Cada pessoa pertence a
    um único workspace; veja a [ADR 0002](../docs/adr/0002-um-workspace-por-equipe.md).
 
 A API sobe em `http://localhost:8080`.

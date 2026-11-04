@@ -4,7 +4,7 @@
 
 A instalação passa a ter vários workspaces, um por equipe. As demais decisões da ADR 0001 (papéis, donos, permissões, compartilhamento e remoção) continuam valendo dentro de cada workspace.
 
-- **Administrador geral:** contas com `system_admin` (inicialmente só a conta seed `admin@gmail.com`, marcada pela migration `V30`) criam workspaces, consultam todos eles e convidam pessoas para qualquer workspace, escolhendo se entram como proprietárias ou como membros. O administrador geral continua dono do workspace original.
+- **Administrador geral:** contas com `system_admin` (inicialmente só a conta seed `admin@gmail.com`, marcada pela migration `V30`) criam workspaces, consultam todos eles e convidam pessoas para qualquer workspace, escolhendo se entram como proprietárias ou como membros. O administrador geral continua dono do workspace original. No frontend, a tela inicial dele lista os workspaces em vez do conteúdo; dali ele cria workspaces, edita nome e descrição, vê membros e convites pendentes, convida e revoga convites.
 - **Líderes:** donos de um workspace convidam pessoas somente para o próprio workspace e só veem e revogam os convites dele.
 - **Um workspace por pessoa:** cada conta pertence a um único workspace (`uq_workspace_member_user`). Por isso a sessão continua vinculada a uma única membership e não há troca de workspace. Um e-mail que já tem conta não pode ser convidado para outro workspace.
 - **Workspace sem dono:** um workspace recém-criado fica sem `owner_id` até o primeiro convidado como proprietário concluir o cadastro.

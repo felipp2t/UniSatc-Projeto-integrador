@@ -130,13 +130,17 @@ public class InviteService {
 
     @Transactional
     public void revoke(UUID ownerId, UUID inviteId) {
-        var workspace = workspaceService.requireOwner(ownerId);
+        revokeInWorkspace(ownerId, workspaceService.requireOwner(ownerId).getId(), inviteId);
+    }
+
+    @Transactional
+    public void revokeInWorkspace(UUID actorId, UUID workspaceId, UUID inviteId) {
         UserInvite invite = userInviteRepository.findByIdAndStatusForUpdate(inviteId, UserInviteStatus.PENDING)
-                .filter(pending -> pending.getWorkspace().getId().equals(workspace.getId()))
+                .filter(pending -> pending.getWorkspace().getId().equals(workspaceId))
                 .orElseThrow(() -> new ResourceNotFoundException("Convite indisponível"));
 
         invite.setStatus(UserInviteStatus.REVOKED);
-        activityLogService.record(workspace.getId(), ownerId, ActivityActorContext.USER,
+        activityLogService.record(workspaceId, actorId, ActivityActorContext.USER,
                 ActivityAction.MEMBER_INVITE_REVOKED, ActivityResourceType.MEMBER, invite.getId(),
                 Map.of("email", invite.getEmail()));
     }

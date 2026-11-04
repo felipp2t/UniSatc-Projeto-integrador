@@ -71,7 +71,6 @@ function ProtectedLayout() {
       <div className='relative z-10 flex h-full flex-col bg-background/80'>
         <Header
           accountTo='/configuracoes'
-          adminTo={session.user?.systemAdmin ? '/administracao' : undefined}
           onLogout={handleLogout}
           userEmail={session.user?.email}
           userName={session.user?.name}

@@ -266,6 +266,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/workspaces/{workspaceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalha um workspace com membros e convites pendentes */
+        get: operations["get_2"];
+        /** Altera o nome e a descrição de um workspace */
+        put: operations["update_2"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspaceId}/roles": {
         parameters: {
             query?: never;
@@ -631,6 +649,23 @@ export interface paths {
         put?: never;
         /** Convida um e-mail para o workspace como proprietário ou membro */
         post: operations["invite_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/workspaces/{workspaceId}/invites/{inviteId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoga um convite pendente do workspace */
+        post: operations["revokeInvite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1059,6 +1094,27 @@ export interface components {
             /** Format: uuid */
             parentId?: string;
         };
+        AdminPendingInviteResponse: {
+            /** Format: uuid */
+            id?: string;
+            email?: string;
+            owner?: boolean;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
+        AdminWorkspaceResponse: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            description?: string;
+            ownerName?: string;
+            ownerEmail?: string;
+            /** Format: int64 */
+            memberCount?: number;
+            pendingInvites?: components["schemas"]["AdminPendingInviteResponse"][];
+            /** Format: date-time */
+            createdAt?: string;
+        };
         ReadmitMemberRequest: {
             /** Format: email */
             email: string;
@@ -1127,27 +1183,6 @@ export interface components {
         CreateWorkspaceRequest: {
             name: string;
             description?: string;
-        };
-        AdminPendingInviteResponse: {
-            /** Format: uuid */
-            id?: string;
-            email?: string;
-            owner?: boolean;
-            /** Format: date-time */
-            expiresAt?: string;
-        };
-        AdminWorkspaceResponse: {
-            /** Format: uuid */
-            id?: string;
-            name?: string;
-            description?: string;
-            ownerName?: string;
-            ownerEmail?: string;
-            /** Format: int64 */
-            memberCount?: number;
-            pendingInvites?: components["schemas"]["AdminPendingInviteResponse"][];
-            /** Format: date-time */
-            createdAt?: string;
         };
         AdminInviteRequest: {
             /** Format: email */
@@ -1282,6 +1317,10 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             expiresAt?: string;
+        };
+        AdminWorkspaceDetailResponse: {
+            workspace?: components["schemas"]["AdminWorkspaceResponse"];
+            members?: components["schemas"]["WorkspaceMemberResponse"][];
         };
     };
     responses: never;
@@ -2464,6 +2503,54 @@ export interface operations {
             };
         };
     };
+    get_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminWorkspaceDetailResponse"];
+                };
+            };
+        };
+    };
+    update_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkspaceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminWorkspaceResponse"];
+                };
+            };
+        };
+    };
     list: {
         parameters: {
             query?: never;
@@ -3580,6 +3667,27 @@ export interface operations {
                 "application/json": components["schemas"]["AdminInviteRequest"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revokeInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspaceId: string;
+                inviteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {

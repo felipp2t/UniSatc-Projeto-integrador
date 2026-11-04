@@ -16,11 +16,11 @@ import { Route as LoginRouteImport } from './pages/login'
 import { Route as RedefinirSenhaRouteImport } from './pages/redefinir-senha'
 import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
 import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
-import { Route as ProtectedAdministracaoRouteImport } from './pages/_protected/administracao'
 import { Route as ProtectedAtividadesRouteImport } from './pages/_protected/atividades'
 import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
 import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
 import { Route as ProtectedConfiguracoesWorkspaceRouteImport } from './pages/_protected/configuracoes-workspace'
+import { Route as ProtectedAdministracaoWorkspaceIdRouteImport } from './pages/_protected/administracao/$workspaceId'
 import { Route as ProtectedConfiguracoesWorkspaceGeralRouteImport } from './pages/_protected/configuracoes-workspace_.geral'
 
 const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
@@ -57,11 +57,6 @@ const ProtectedSplatRoute = ProtectedSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
-const ProtectedAdministracaoRoute = ProtectedAdministracaoRouteImport.update({
-  id: '/administracao',
-  path: '/administracao',
-  getParentRoute: () => ProtectedLayoutRoute,
-} as any)
 const ProtectedAtividadesRoute = ProtectedAtividadesRouteImport.update({
   id: '/atividades',
   path: '/atividades',
@@ -83,6 +78,12 @@ const ProtectedConfiguracoesWorkspaceRoute =
     path: '/configuracoes-workspace',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
+const ProtectedAdministracaoWorkspaceIdRoute =
+  ProtectedAdministracaoWorkspaceIdRouteImport.update({
+    id: '/administracao/$workspaceId',
+    path: '/administracao/$workspaceId',
+    getParentRoute: () => ProtectedLayoutRoute,
+  } as any)
 const ProtectedConfiguracoesWorkspaceGeralRoute =
   ProtectedConfiguracoesWorkspaceGeralRouteImport.update({
     id: '/configuracoes-workspace_/geral',
@@ -97,11 +98,11 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
-  '/administracao': typeof ProtectedAdministracaoRoute
   '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
   '/configuracoes': typeof ProtectedConfiguracoesRoute
   '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
+  '/administracao/$workspaceId': typeof ProtectedAdministracaoWorkspaceIdRoute
   '/configuracoes-workspace/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
 }
 export interface FileRoutesByTo {
@@ -110,12 +111,12 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
-  '/administracao': typeof ProtectedAdministracaoRoute
   '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
   '/configuracoes': typeof ProtectedConfiguracoesRoute
   '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
   '/': typeof ProtectedIndexRoute
+  '/administracao/$workspaceId': typeof ProtectedAdministracaoWorkspaceIdRoute
   '/configuracoes-workspace/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
 }
 export interface FileRoutesById {
@@ -126,12 +127,12 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/_protected/$': typeof ProtectedSplatRoute
-  '/_protected/administracao': typeof ProtectedAdministracaoRoute
   '/_protected/atividades': typeof ProtectedAtividadesRoute
   '/_protected/components': typeof ProtectedComponentsRoute
   '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
   '/_protected/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
   '/_protected/': typeof ProtectedIndexRoute
+  '/_protected/administracao/$workspaceId': typeof ProtectedAdministracaoWorkspaceIdRoute
   '/_protected/configuracoes-workspace_/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
 }
 export interface FileRouteTypes {
@@ -143,11 +144,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/$'
-    | '/administracao'
     | '/atividades'
     | '/components'
     | '/configuracoes'
     | '/configuracoes-workspace'
+    | '/administracao/$workspaceId'
     | '/configuracoes-workspace/geral'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -156,12 +157,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/$'
-    | '/administracao'
     | '/atividades'
     | '/components'
     | '/configuracoes'
     | '/configuracoes-workspace'
     | '/'
+    | '/administracao/$workspaceId'
     | '/configuracoes-workspace/geral'
   id:
     | '__root__'
@@ -171,12 +172,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/_protected/$'
-    | '/_protected/administracao'
     | '/_protected/atividades'
     | '/_protected/components'
     | '/_protected/configuracoes'
     | '/_protected/configuracoes-workspace'
     | '/_protected/'
+    | '/_protected/administracao/$workspaceId'
     | '/_protected/configuracoes-workspace_/geral'
   fileRoutesById: FileRoutesById
 }
@@ -239,13 +240,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedSplatRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/administracao': {
-      id: '/_protected/administracao'
-      path: '/administracao'
-      fullPath: '/administracao'
-      preLoaderRoute: typeof ProtectedAdministracaoRouteImport
-      parentRoute: typeof ProtectedLayoutRoute
-    }
     '/_protected/atividades': {
       id: '/_protected/atividades'
       path: '/atividades'
@@ -274,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
+    '/_protected/administracao/$workspaceId': {
+      id: '/_protected/administracao/$workspaceId'
+      path: '/administracao/$workspaceId'
+      fullPath: '/administracao/$workspaceId'
+      preLoaderRoute: typeof ProtectedAdministracaoWorkspaceIdRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
     '/_protected/configuracoes-workspace_/geral': {
       id: '/_protected/configuracoes-workspace_/geral'
       path: '/configuracoes-workspace/geral'
@@ -286,23 +287,24 @@ declare module '@tanstack/react-router' {
 
 interface ProtectedLayoutRouteChildren {
   ProtectedSplatRoute: typeof ProtectedSplatRoute
-  ProtectedAdministracaoRoute: typeof ProtectedAdministracaoRoute
   ProtectedAtividadesRoute: typeof ProtectedAtividadesRoute
   ProtectedComponentsRoute: typeof ProtectedComponentsRoute
   ProtectedConfiguracoesRoute: typeof ProtectedConfiguracoesRoute
   ProtectedConfiguracoesWorkspaceRoute: typeof ProtectedConfiguracoesWorkspaceRoute
   ProtectedIndexRoute: typeof ProtectedIndexRoute
+  ProtectedAdministracaoWorkspaceIdRoute: typeof ProtectedAdministracaoWorkspaceIdRoute
   ProtectedConfiguracoesWorkspaceGeralRoute: typeof ProtectedConfiguracoesWorkspaceGeralRoute
 }
 
 const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
   ProtectedSplatRoute: ProtectedSplatRoute,
-  ProtectedAdministracaoRoute: ProtectedAdministracaoRoute,
   ProtectedAtividadesRoute: ProtectedAtividadesRoute,
   ProtectedComponentsRoute: ProtectedComponentsRoute,
   ProtectedConfiguracoesRoute: ProtectedConfiguracoesRoute,
   ProtectedConfiguracoesWorkspaceRoute: ProtectedConfiguracoesWorkspaceRoute,
   ProtectedIndexRoute: ProtectedIndexRoute,
+  ProtectedAdministracaoWorkspaceIdRoute:
+    ProtectedAdministracaoWorkspaceIdRoute,
   ProtectedConfiguracoesWorkspaceGeralRoute:
     ProtectedConfiguracoesWorkspaceGeralRoute,
 }

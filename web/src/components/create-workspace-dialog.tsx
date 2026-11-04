@@ -1,5 +1,6 @@
 import { PlusIcon } from '@phosphor-icons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { adminWorkspacesQueryKey } from '@/api/admin'
@@ -28,6 +29,7 @@ const nameSchema = z
 
 export function CreateWorkspaceDialog() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const nameId = useId()
   const descriptionId = useId()
   const [open, setOpen] = useState(false)
@@ -53,11 +55,17 @@ export function CreateWorkspaceDialog() {
         })
       )
     },
-    onSuccess: async () => {
-      appToast.success('Workspace criado')
+    onSuccess: async ({ data }) => {
+      appToast.success('Workspace criado; convide o líder da equipe')
       setOpen(false)
       reset()
       await queryClient.invalidateQueries({ queryKey: adminWorkspacesQueryKey })
+      if (data.id) {
+        await navigate({
+          params: { workspaceId: data.id },
+          to: '/administracao/$workspaceId',
+        })
+      }
     },
   })
   const submitting = createWorkspace.isPending

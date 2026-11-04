@@ -909,6 +909,15 @@ Cada equipe tem seu próprio workspace e cada pessoa pertence a um único worksp
 Os papéis `Owner` e `Member` são criados junto, com `Member` lendo itens e pastas, como na `V11`. O
 workspace nasce sem proprietário.
 
+**`GET /admin/workspaces/{workspaceId}`** responde `{ "workspace": <formato da listagem>, "members": [...] }`.
+Cada membro tem `id`, `userId`, `name`, `email`, `roleId` e `roleName`. Workspace inexistente responde `404`.
+
+**`PUT /admin/workspaces/{workspaceId}`** altera `{ "name": string, "description"?: string }` com as
+mesmas regras de `PUT /workspaces/{workspaceId}` e responde `200` com o formato da listagem.
+
+**`POST /admin/workspaces/{workspaceId}/invites/{inviteId}/revoke`** revoga um convite pendente do
+workspace e responde `204`. Convite de outro workspace ou que não esteja pendente responde `404`.
+
 **`POST /admin/workspaces/{workspaceId}/invites`** convida `{ "email": string, "owner": boolean }` e
 responde `201`. Com `owner: true`, a pessoa entra com o papel `Owner`; o primeiro proprietário a se
 cadastrar vira o `ownerId` do workspace. Com `owner: false`, entra como `Member`. O convite segue o
@@ -973,7 +982,10 @@ administrador geral (`403` para as demais contas). O `manifest.json` lista `work
 | — | GET | `/notifications/stream` | Cookie `accessToken` |
 | — | GET | `/admin/workspaces` | Cookie `accessToken` + administrador geral |
 | — | POST | `/admin/workspaces` | Cookie `accessToken` + administrador geral |
+| — | GET | `/admin/workspaces/{workspaceId}` | Cookie `accessToken` + administrador geral |
+| — | PUT | `/admin/workspaces/{workspaceId}` | Cookie `accessToken` + administrador geral |
 | — | POST | `/admin/workspaces/{workspaceId}/invites` | Cookie `accessToken` + administrador geral |
+| — | POST | `/admin/workspaces/{workspaceId}/invites/{inviteId}/revoke` | Cookie `accessToken` + administrador geral |
 | — | POST | `/workspaces/backup` | Cookie `accessToken` + administrador geral |
 
 **`DELETE /workspaces/{workspaceId}/members/{membershipId}?confirmMemberId={membershipId}`** — somente um

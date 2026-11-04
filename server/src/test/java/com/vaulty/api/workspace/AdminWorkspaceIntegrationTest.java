@@ -3,12 +3,14 @@ package com.vaulty.api.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
+import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.UserInviteRepository;
@@ -121,6 +123,67 @@ class AdminWorkspaceIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/workspaces/backup").cookie(authCookie(owner)))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(get("/admin/workspaces/{workspaceId}", UUID.randomUUID()).cookie(authCookie(owner)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void detailsAWorkspaceWithItsMembersAndPendingInvites() throws Exception {
+        UUID workspaceId = createWorkspace("Equipe de Dados");
+        invite(workspaceId, "lider@example.com", true);
+        register("lider@example.com");
+        invite(workspaceId, "analista@example.com", false);
+
+        mockMvc.perform(get("/admin/workspaces/{workspaceId}", workspaceId).cookie(authCookie(admin())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workspace.name").value("Equipe de Dados"))
+                .andExpect(jsonPath("$.workspace.ownerEmail").value("lider@example.com"))
+                .andExpect(jsonPath("$.members.length()").value(1))
+                .andExpect(jsonPath("$.members[0].email").value("lider@example.com"))
+                .andExpect(jsonPath("$.members[0].roleName").value(WorkspaceRole.OWNER_ROLE_NAME))
+                .andExpect(jsonPath("$.workspace.pendingInvites[0].email").value("analista@example.com"));
+    }
+
+    @Test
+    void updatesTheNameAndDescriptionOfAnyWorkspace() throws Exception {
+        UUID workspaceId = createWorkspace("Nome antigo");
+
+        mockMvc.perform(put("/admin/workspaces/{workspaceId}", workspaceId)
+                        .cookie(authCookie(admin()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "name": "  Nome novo  ", "description": "Equipe renomeada" }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Nome novo"))
+                .andExpect(jsonPath("$.description").value("Equipe renomeada"));
+    }
+
+    @Test
+    void revokesAPendingInviteOfTheWorkspace() throws Exception {
+        UUID workspaceId = createWorkspace("Equipe de Vendas");
+        invite(workspaceId, "vendedor@example.com", false);
+        UserInvite pending = userInviteRepository.findAll().get(0);
+
+        mockMvc.perform(post("/admin/workspaces/{workspaceId}/invites/{inviteId}/revoke", workspaceId, pending.getId())
+                        .cookie(authCookie(admin())))
+                .andExpect(status().isNoContent());
+
+        assertThat(userInviteRepository.findById(pending.getId()).orElseThrow().getStatus())
+                .isEqualTo(UserInviteStatus.REVOKED);
+    }
+
+    @Test
+    void doesNotRevokeAnInviteThroughAnotherWorkspace() throws Exception {
+        UUID workspaceId = createWorkspace("Equipe A");
+        UUID otherWorkspaceId = createWorkspace("Equipe B");
+        invite(workspaceId, "pessoa@example.com", false);
+        UserInvite pending = userInviteRepository.findAll().get(0);
+
+        mockMvc.perform(post("/admin/workspaces/{workspaceId}/invites/{inviteId}/revoke",
+                        otherWorkspaceId, pending.getId())
+                        .cookie(authCookie(admin())))
+                .andExpect(status().isNotFound());
     }
 
     @Test

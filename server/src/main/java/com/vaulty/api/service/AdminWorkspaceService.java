@@ -1,8 +1,12 @@
 package com.vaulty.api.service;
 
 import com.vaulty.api.dto.admin.AdminInviteRequest;
+import com.vaulty.api.dto.admin.AdminWorkspaceDetailResponse;
 import com.vaulty.api.dto.admin.AdminWorkspaceResponse;
 import com.vaulty.api.dto.workspace.CreateWorkspaceRequest;
+import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
+import com.vaulty.api.dto.workspace.WorkspaceMemberResponse;
+import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.entity.Workspace;
@@ -28,6 +32,7 @@ public class AdminWorkspaceService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserInviteRepository userInviteRepository;
+    private final WorkspaceMapper workspaceMapper;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -45,12 +50,40 @@ public class AdminWorkspaceService {
         return toResponse(workspace);
     }
 
+    @Transactional(readOnly = true)
+    public AdminWorkspaceDetailResponse get(UUID adminId, UUID workspaceId) {
+        systemAdminAuthorization.require(adminId);
+        Workspace workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        List<WorkspaceMemberResponse> members = workspaceMemberRepository.findAllWithUserAndRole(workspaceId)
+                .stream()
+                .map(member -> workspaceMapper.toResponse(member, true))
+                .toList();
+        return new AdminWorkspaceDetailResponse(toResponse(workspace), members);
+    }
+
+    @Transactional
+    public AdminWorkspaceResponse update(UUID adminId, UUID workspaceId, UpdateWorkspaceRequest request) {
+        systemAdminAuthorization.require(adminId);
+        Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        workspaceMapper.update(request, workspace);
+        workspaceRepository.saveAndFlush(workspace);
+        return toResponse(workspace);
+    }
+
     @Transactional
     public void invite(UUID adminId, UUID workspaceId, AdminInviteRequest request) {
         systemAdminAuthorization.require(adminId);
         Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
         inviteService.inviteToWorkspace(adminId, workspace, request.email(), request.owner());
+    }
+
+    @Transactional
+    public void revokeInvite(UUID adminId, UUID workspaceId, UUID inviteId) {
+        systemAdminAuthorization.require(adminId);
+        inviteService.revokeInWorkspace(adminId, workspaceId, inviteId);
     }
 
     private AdminWorkspaceResponse toResponse(Workspace workspace) {

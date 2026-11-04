@@ -18,6 +18,7 @@ import type {
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
+import { AdminWorkspacesHome } from '@/components/admin-workspaces-home'
 import { CreateCollectionButton } from '@/components/collection-management'
 import { CreateItemDialog } from '@/components/create-item-dialog'
 import {
@@ -76,6 +77,13 @@ export const Route = createFileRoute('/_protected/')({
 })
 
 function HomePage() {
+  const isSystemAdmin = Route.useRouteContext().session.user?.systemAdmin
+
+  if (isSystemAdmin) return <AdminWorkspacesHome />
+  return <WorkspaceHomePage />
+}
+
+function WorkspaceHomePage() {
   const { archived, collectionId } = Route.useSearch()
   const navigate = Route.useNavigate()
   const changeArchived = useCallback(
