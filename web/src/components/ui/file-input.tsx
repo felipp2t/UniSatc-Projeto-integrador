@@ -1,6 +1,15 @@
-import { CheckCircleIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import {
+  CheckCircleIcon,
+  UploadSimpleIcon,
+  WarningCircleIcon,
+} from '@phosphor-icons/react'
 import { cn } from 'cn'
 import { useCallback, useState } from 'react'
+
+import { ATTACHMENT_HINT } from '@/lib/item-validation'
+
+const BYTES_PER_KB = 1024
+const BYTES_PER_MB = BYTES_PER_KB * 1024
 
 interface FileInputProps {
   accept?: string
@@ -8,11 +17,19 @@ interface FileInputProps {
   'aria-invalid'?: boolean | 'false' | 'true'
   className?: string
   disabled?: boolean
+  hint?: string
   id?: string
   isInvalid?: boolean
+  name?: string
   onBlur?: () => void
   onChange?: (file: File) => void
   value?: File | null
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < BYTES_PER_MB)
+    return `${Math.max(1, Math.round(bytes / BYTES_PER_KB))} KB`
+  return `${(bytes / BYTES_PER_MB).toFixed(2)} MB`
 }
 
 export function FileInput({
@@ -23,12 +40,15 @@ export function FileInput({
   accept,
   className,
   disabled = false,
+  hint = ATTACHMENT_HINT,
   id,
+  name,
   'aria-describedby': ariaDescribedby,
   'aria-invalid': ariaInvalid,
 }: FileInputProps) {
   const [internalFile, setInternalFile] = useState<File | null>(null)
-  const file = value ?? internalFile
+  const [dragging, setDragging] = useState(false)
+  const file = value === undefined ? internalFile : value
   const selectFile = useCallback(
     (selectedFile: File | undefined) => {
       if (!selectedFile || disabled) return
@@ -40,6 +60,7 @@ export function FileInput({
   const handleDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault()
+      setDragging(false)
       selectFile(event.dataTransfer.files[0])
     },
     [selectFile]
@@ -47,57 +68,78 @@ export function FileInput({
   const handleDragOver = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault()
+      if (!disabled) setDragging(true)
     },
-    []
+    [disabled]
   )
+  const handleDragLeave = useCallback(() => setDragging(false), [])
   const handleInputChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) =>
       selectFile(event.target.files?.[0]),
     [selectFile]
   )
+  const StatusIcon = isInvalid ? WarningCircleIcon : CheckCircleIcon
+
   return (
     <div
       className={cn(
-        'relative flex min-h-40 flex-col items-center justify-center gap-2 border border-border border-dashed bg-outline p-4 text-center transition-colors hover:border-primary/60',
+        'relative flex min-h-32 flex-col items-center justify-center gap-1.5 border border-border border-dashed bg-outline p-4 text-center transition-colors focus-within:border-primary hover:border-primary/60',
+        dragging && 'border-primary bg-primary/5',
         isInvalid && 'border-destructive ring-2 ring-destructive/20',
         disabled && 'cursor-not-allowed opacity-50',
         className
       )}
+      onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       <input
         accept={accept}
         aria-describedby={ariaDescribedby}
-        aria-invalid={ariaInvalid ?? isInvalid}
+        aria-invalid={ariaInvalid ?? (isInvalid || undefined)}
         className='absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed'
         disabled={disabled}
         id={id}
+        name={name}
         onBlur={onBlur}
         onChange={handleInputChange}
         type='file'
       />
       {file ? (
         <>
-          <CheckCircleIcon aria-hidden='true' className='size-5 text-primary' />
-          <span className='font-mono font-semibold text-primary text-sm'>
+          <StatusIcon
+            aria-hidden='true'
+            className={cn(
+              'size-5',
+              isInvalid ? 'text-destructive' : 'text-primary'
+            )}
+          />
+          <span
+            className={cn(
+              'max-w-full break-all font-mono font-semibold text-sm',
+              isInvalid ? 'text-destructive' : 'text-primary'
+            )}
+          >
             {file.name}
           </span>
           <span className='font-mono text-muted-foreground text-xs'>
-            {(file.size / 1024 / 1024).toFixed(2)} MB · clique para alterar
+            {formatFileSize(file.size)} · clique ou arraste para alterar
           </span>
         </>
       ) : (
         <>
           <UploadSimpleIcon
             aria-hidden='true'
-            className='size-5 text-muted-foreground'
+            className={cn(
+              'size-5 text-muted-foreground',
+              dragging && 'text-primary'
+            )}
           />
           <span className='font-mono text-muted-foreground text-sm'>
-            ARRASTE OU CLIQUE PARA ENVIAR
+            {dragging ? 'SOLTE PARA ANEXAR' : 'ARRASTE OU CLIQUE PARA ENVIAR'}
           </span>
           <span className='font-mono text-muted-foreground text-xs'>
-            PDF, DOCX, TXT ou MD até 10MB
+            {hint}
           </span>
         </>
       )}

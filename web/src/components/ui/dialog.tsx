@@ -43,7 +43,7 @@ export function DialogContent({
         {!!showCloseButton && (
           <DialogPrimitive.Close asChild>
             <Button
-              aria-label='Close'
+              aria-label='Fechar'
               className='absolute top-3 right-3 size-7 text-muted-foreground hover:text-foreground'
               size='icon'
               variant='ghost'

@@ -1,6 +1,7 @@
 import { GearIcon, SignOutIcon, UserCircleIcon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
+import { GlobalItemSearch } from '@/components/global-item-search'
 import type { NotificationData } from '@/components/notification-bell'
 import { NotificationBell } from '@/components/notification-bell'
 import { Button } from '@/components/ui/button'
@@ -56,7 +57,9 @@ export function Header({
       setLogoutDialogOpen(false)
     } catch (error) {
       setLogoutError(
-        error instanceof Error ? error.message : 'Não foi possível sair.'
+        error instanceof Error && error.message
+          ? error.message
+          : 'Não foi possível sair.'
       )
     } finally {
       setLoggingOut(false)
@@ -68,7 +71,7 @@ export function Header({
 
   return (
     <header className={cnHeader(className)} {...props}>
-      <div className='mx-auto flex min-h-14 max-w-7xl items-center gap-4 px-6'>
+      <div className='container mx-auto flex min-h-14 items-center gap-4 px-4 md:px-8'>
         <Link
           className='shrink-0 font-bold font-mono text-lg text-primary tracking-widest'
           to='/'
@@ -79,6 +82,7 @@ export function Header({
         <div className='flex-1' />
 
         <div className='flex items-center gap-1'>
+          <GlobalItemSearch />
           <NotificationBell
             notifications={notifications}
             onMarkRead={onMarkNotificationRead}
@@ -154,7 +158,9 @@ export function Header({
             </DialogDescription>
           </DialogHeader>
           {logoutError ? (
-            <p className='text-destructive text-xs'>{logoutError}</p>
+            <p className='text-destructive text-xs' role='alert'>
+              {logoutError}
+            </p>
           ) : null}
           <DialogFooter>
             <Button

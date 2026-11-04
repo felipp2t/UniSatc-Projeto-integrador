@@ -1,16 +1,26 @@
 package com.vaulty.api.controller;
 
 import com.vaulty.api.controller.docs.WorkspaceMemberControllerDocs;
+import com.vaulty.api.dto.workspace.ChangeMemberRoleRequest;
+import com.vaulty.api.dto.workspace.ReadmitMemberRequest;
 import com.vaulty.api.dto.workspace.WorkspaceMemberResponse;
 import com.vaulty.api.service.WorkspaceMemberService;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @RequestMapping("/workspaces/{workspaceId}/members")
@@ -24,5 +34,29 @@ public class WorkspaceMemberController implements WorkspaceMemberControllerDocs 
     public List<WorkspaceMemberResponse> list(
             @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId) {
         return workspaceMemberService.list(userId, workspaceId);
+    }
+
+    @PostMapping("/readmit")
+    @Override
+    public ResponseEntity<WorkspaceMemberResponse> readmit(
+            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
+            @Valid @RequestBody ReadmitMemberRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(workspaceMemberService.readmit(userId, workspaceId, request));
+    }
+
+    @PutMapping("/{memberId}/role")
+    @Override
+    public WorkspaceMemberResponse changeRole(
+            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId, @PathVariable UUID memberId,
+            @Valid @RequestBody ChangeMemberRoleRequest request) {
+        return workspaceMemberService.changeRole(userId, workspaceId, memberId, request);
+    }
+
+    @DeleteMapping("/{membershipId}")
+    @Override
+    public ResponseEntity<Void> remove(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
+                                       @PathVariable UUID membershipId, @RequestParam UUID confirmMemberId) {
+        workspaceMemberService.remove(userId, workspaceId, membershipId, confirmMemberId);
+        return ResponseEntity.noContent().build();
     }
 }

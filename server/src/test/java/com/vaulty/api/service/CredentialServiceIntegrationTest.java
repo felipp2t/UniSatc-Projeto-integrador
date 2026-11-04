@@ -2,6 +2,9 @@ package com.vaulty.api.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.vaulty.api.PostgresIntegrationTest;
 import com.vaulty.api.dto.auth.ResetPasswordRequest;
@@ -9,38 +12,38 @@ import com.vaulty.api.dto.user.ChangePasswordRequest;
 import com.vaulty.api.entity.PasswordResetToken;
 import com.vaulty.api.entity.RefreshToken;
 import com.vaulty.api.entity.User;
+import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.exception.InvalidCredentialsException;
-import com.vaulty.api.repository.EmailOutboxRepository;
 import com.vaulty.api.repository.PasswordResetTokenRepository;
 import com.vaulty.api.repository.RefreshTokenRepository;
-import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
+import com.vaulty.api.repository.WorkspaceMemberRepository;
+import com.vaulty.api.repository.WorkspaceRepository;
+import com.vaulty.api.repository.WorkspaceRoleRepository;
+import com.vaulty.api.service.JwtService;
+import jakarta.servlet.http.Cookie;
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.MockMvc;
 
+@AutoConfigureMockMvc
 class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired private UserRepository userRepository;
+    @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
+    @Autowired private WorkspaceRepository workspaceRepository;
+    @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
-    @Autowired private UserInviteRepository userInviteRepository;
-    @Autowired private EmailOutboxRepository emailOutboxRepository;
     @Autowired private UserService userService;
     @Autowired private AuthService authService;
     @Autowired private PasswordEncoder passwordEncoder;
-
-    @BeforeEach
-    void cleanDatabase() {
-        emailOutboxRepository.deleteAll();
-        passwordResetTokenRepository.deleteAll();
-        refreshTokenRepository.deleteAll();
-        userInviteRepository.deleteAll();
-        userRepository.deleteAll();
-    }
+    @Autowired private JwtService jwtService;
+    @Autowired private MockMvc mockMvc;
 
     @Test
     void authenticatedChangeInvalidatesRefreshAndPendingRecoveryTokens() {
@@ -59,6 +62,35 @@ class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
         assertThatThrownBy(() -> authService.resetPassword(
                         new ResetPasswordRequest(reset.getToken(), "another-password", "another-password")))
                 .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    void wrongCurrentPasswordReturnsBadRequestWithoutChangingCredentials() throws Exception {
+        User user = createUser("old-password");
+        createResetToken(user, "pending-reset-token", OffsetDateTime.now().plusHours(1));
+        createRefreshToken(user, "active-refresh-token", OffsetDateTime.now().plusHours(1));
+
+        mockMvc.perform(patch("/me/password")
+                        .cookie(new Cookie("accessToken", jwtService.generateAccessToken(
+                                user.getId(), ensureMembership(user).getId(), null)))
+                        .contentType("application/json")
+                        .content("""
+                                {"currentPassword":"wrong-password","newPassword":"new-password","confirmPassword":"new-password"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Senha atual incorreta"))
+                .andExpect(jsonPath("$.path").value("/me/password"));
+
+        String passwordHash = userRepository.findById(user.getId()).orElseThrow().getPasswordHash();
+        assertThat(passwordEncoder.matches("old-password", passwordHash)).isTrue();
+        assertThat(passwordEncoder.matches("new-password", passwordHash)).isFalse();
+        assertThat(refreshTokenRepository.findAll())
+                .extracting(RefreshToken::getToken)
+                .containsExactly("active-refresh-token");
+        assertThat(passwordResetTokenRepository.findAll())
+                .extracting(PasswordResetToken::getToken)
+                .containsExactly("pending-reset-token");
     }
 
     @Test
@@ -97,7 +129,21 @@ class CredentialServiceIntegrationTest extends PostgresIntegrationTest {
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(token);
         refreshToken.setUser(user);
+        refreshToken.setWorkspaceMember(ensureMembership(user));
         refreshToken.setExpiresAt(expiresAt);
         refreshTokenRepository.save(refreshToken);
+    }
+
+    private WorkspaceMember ensureMembership(User user) {
+        return workspaceMemberRepository.findByUserId(user.getId()).orElseGet(() -> {
+            var workspace = workspaceRepository.findSingleton().orElseThrow();
+            var role = workspaceRoleRepository.findByWorkspaceIdAndName(
+                    workspace.getId(), com.vaulty.api.entity.WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
+            var membership = new WorkspaceMember();
+            membership.setUser(user);
+            membership.setWorkspace(workspace);
+            membership.setRole(role);
+            return workspaceMemberRepository.saveAndFlush(membership);
+        });
     }
 }

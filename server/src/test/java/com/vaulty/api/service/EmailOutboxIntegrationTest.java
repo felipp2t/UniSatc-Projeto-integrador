@@ -15,7 +15,6 @@ import com.vaulty.api.entity.EmailOutboxStatus;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.repository.EmailOutboxRepository;
 import com.vaulty.api.repository.PasswordResetTokenRepository;
-import com.vaulty.api.repository.RefreshTokenRepository;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
 import java.util.UUID;
@@ -32,7 +31,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired private UserRepository userRepository;
-    @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordResetTokenRepository passwordResetTokenRepository;
     @Autowired private UserInviteRepository userInviteRepository;
     @Autowired private EmailOutboxRepository emailOutboxRepository;
@@ -45,18 +43,13 @@ class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
     @MockBean private JavaMailSender mailSender;
 
     @BeforeEach
-    void cleanDatabase() {
+    void resetMailSender() {
         reset(mailSender);
-        emailOutboxRepository.deleteAll();
-        passwordResetTokenRepository.deleteAll();
-        refreshTokenRepository.deleteAll();
-        userInviteRepository.deleteAll();
-        userRepository.deleteAll();
     }
 
     @Test
     void persistsEmailWithInviteAndSendsOnlyThroughTheProcessor() {
-        User inviter = createUser();
+        User inviter = admin();
 
         inviteService.inviteUser(inviter.getId(), new InviteUserRequest("guest@example.com"));
 
@@ -83,7 +76,7 @@ class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void rollsBackInviteAndOutboxTogether() {
-        User inviter = createUser();
+        User inviter = admin();
 
         transactionTemplate.executeWithoutResult(status -> {
             inviteService.inviteUser(inviter.getId(), new InviteUserRequest("guest@example.com"));
@@ -97,7 +90,7 @@ class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void schedulesRetryWhenSmtpFails() {
-        User inviter = createUser();
+        User inviter = admin();
         inviteService.inviteUser(inviter.getId(), new InviteUserRequest("guest@example.com"));
         doThrow(new MailSendException("SMTP unavailable"))
                 .when(mailSender)
@@ -118,5 +111,9 @@ class EmailOutboxIntegrationTest extends PostgresIntegrationTest {
         user.setEmail(UUID.randomUUID() + "@example.com");
         user.setPasswordHash(passwordEncoder.encode("password123"));
         return userRepository.save(user);
+    }
+
+    private User admin() {
+        return userRepository.findByEmail("admin@gmail.com").orElseThrow();
     }
 }

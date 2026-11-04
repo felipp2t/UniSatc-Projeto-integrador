@@ -1,13 +1,19 @@
 package com.vaulty.api.controller;
 
 import com.vaulty.api.controller.docs.InviteControllerDocs;
+import com.vaulty.api.dto.invite.InviteResponse;
 import com.vaulty.api.dto.invite.InviteUserRequest;
+import com.vaulty.api.dto.invite.InviteValidationRequest;
+import com.vaulty.api.dto.invite.InviteValidationResponse;
 import com.vaulty.api.service.InviteService;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +29,12 @@ public class InviteController implements InviteControllerDocs {
         this.inviteService = inviteService;
     }
 
+    @GetMapping
+    @Override
+    public List<InviteResponse> list(@AuthenticationPrincipal UUID ownerId) {
+        return inviteService.listPending(ownerId);
+    }
+
     @PostMapping
     @Override
     public ResponseEntity<Void> invite(
@@ -32,5 +44,27 @@ public class InviteController implements InviteControllerDocs {
         inviteService.inviteUser(inviterId, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @PostMapping("/validate")
+    @Override
+    public ResponseEntity<InviteValidationResponse> validate(
+            @Valid @RequestBody InviteValidationRequest request) {
+        return ResponseEntity.ok(inviteService.validate(request));
+    }
+
+    @PostMapping("/decline")
+    @Override
+    public ResponseEntity<Void> decline(@Valid @RequestBody InviteValidationRequest request) {
+        inviteService.decline(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/revoke")
+    public ResponseEntity<Void> revoke(
+            @AuthenticationPrincipal UUID ownerId,
+            @PathVariable UUID id) {
+        inviteService.revoke(ownerId, id);
+        return ResponseEntity.noContent().build();
     }
 }

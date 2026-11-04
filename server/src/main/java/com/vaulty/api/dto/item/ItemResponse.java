@@ -1,0 +1,9 @@
+package com.vaulty.api.dto.item;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+public record ItemResponse(UUID id, String type, String title, UUID collectionId,
+                           String textContent, String linkUrl, String preview, String description,
+                           OffsetDateTime archivedAt) {
+}

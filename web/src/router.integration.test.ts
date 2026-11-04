@@ -8,11 +8,13 @@ import {
 } from '@tanstack/react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
+import { createQueryClient } from '@/api/query-client'
 import {
   enforceRoutePermission,
   type PermissionChecker,
 } from '@/auth/permissions'
 import type { SessionService, SessionStatus } from '@/auth/session'
+import { createSessionStub } from '@/test/session-stub'
 import { Route as ProtectedSplatRoute } from './pages/_protected/$'
 import { routeTree } from './route-tree.gen'
 import type { RouterContext } from './router-context'
@@ -32,19 +34,16 @@ function createSession(
   status: SessionStatus,
   initializeError?: ApiError
 ): SessionService {
-  return {
-    dispose: vi.fn(),
-    handleSessionExpired: vi.fn(),
+  return createSessionStub({
     initialize: vi.fn(() =>
       initializeError ? Promise.reject(initializeError) : Promise.resolve()
     ),
-    setNavigateToLogin: vi.fn(),
     status,
     user:
       status === 'authenticated'
         ? { email: 'user@example.com', id: 'user-id', name: 'User' }
         : undefined,
-  }
+  })
 }
 
 function createApplicationRouter(
@@ -56,7 +55,7 @@ function createApplicationRouter(
   const history = createMemoryHistory({ initialEntries: [initialEntry] })
   const router = createRouter({
     context: {
-      permissionChecker: { can: () => true },
+      queryClient: createQueryClient(),
       session,
     },
     history,
@@ -115,7 +114,8 @@ describe('application router guards', () => {
 
   it.each([
     '/login',
-    '/convite/invite-token',
+    '/cadastro',
+    '/cadastro?email=novo%40example.com&token=invite-token',
     '/esqueci-senha',
     '/redefinir-senha',
   ])(
@@ -128,7 +128,7 @@ describe('application router guards', () => {
 
       await loadRouter(router)
 
-      expect(router.state.location.pathname).toBe(initialEntry)
+      expect(router.state.location.pathname).toBe(initialEntry.split('?')[0])
     }
   )
 
@@ -177,10 +177,10 @@ function createPermissionRouter(checker: PermissionChecker) {
     component: () => null,
   })
   const protectedRoute = createRoute({
-    beforeLoad: ({ context, matches }) =>
+    beforeLoad: ({ matches }) =>
       enforceRoutePermission(
         matches as Parameters<typeof enforceRoutePermission>[0],
-        context.permissionChecker
+        checker
       ),
     component: () => null,
     getParentRoute: () => rootRoute,
@@ -200,7 +200,7 @@ function createPermissionRouter(checker: PermissionChecker) {
 
   const router = createRouter({
     context: {
-      permissionChecker: checker,
+      queryClient: createQueryClient(),
       session: createSession('authenticated'),
     },
     history: createMemoryHistory({ initialEntries: ['/restricted'] }),

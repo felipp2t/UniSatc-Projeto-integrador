@@ -1,4 +1,20 @@
 services:
+  storage:
+    image: dxflrs/garage:v2.5.0
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
+      GARAGE_DEFAULT_ACCESS_KEY: ${GARAGE_DEFAULT_ACCESS_KEY}
+      GARAGE_DEFAULT_SECRET_KEY: ${GARAGE_DEFAULT_SECRET_KEY}
+      GARAGE_DEFAULT_BUCKET: vaulty
+    ports:
+      - "127.0.0.1:3900:3900"
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - storage_metadata:/var/lib/garage/meta
+      - storage_data:/var/lib/garage/data
+    restart: unless-stopped
+
   postgres:
     image: postgres:17-alpine
     environment:
@@ -18,3 +34,5 @@ services:
 
 volumes:
   postgres_data:
+  storage_metadata:
+  storage_data:

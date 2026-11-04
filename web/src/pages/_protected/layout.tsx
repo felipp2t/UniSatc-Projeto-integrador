@@ -1,10 +1,23 @@
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
-import { enforceRoutePermission } from '@/auth/permissions'
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useNavigate,
+} from '@tanstack/react-router'
+import { useCallback } from 'react'
+import {
+  createPermissionChecker,
+  enforceRoutePermission,
+} from '@/auth/permissions'
 import { sanitizeInternalRedirect } from '@/auth/redirect'
 import { Header } from '@/components/header'
 import { NotFoundPage } from '@/components/not-found-page'
+import { OfflineBanner } from '@/components/offline-banner'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { workspacesQuery } from '@/hooks/use-current-workspace'
+import { useNotificationToast } from '@/hooks/use-notification-toast'
+import { workspacePermissionsQuery } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute('/_protected')({
   beforeLoad: async ({ context, location, matches }) => {
@@ -19,18 +32,52 @@ export const Route = createFileRoute('/_protected')({
       })
     }
 
-    enforceRoutePermission(matches, context.permissionChecker)
+    if (!matches.some((match) => match.staticData.permission)) return
+
+    const [workspace] =
+      await context.queryClient.ensureQueryData(workspacesQuery)
+    const workspaceId = workspace?.id
+    if (!workspaceId) {
+      enforceRoutePermission(matches, createPermissionChecker([]))
+      return
+    }
+    const permissions = await context.queryClient.fetchQuery(
+      workspacePermissionsQuery(workspaceId)
+    )
+    enforceRoutePermission(
+      matches,
+      createPermissionChecker(permissions.permissions, permissions.isOwner)
+    )
   },
   component: ProtectedLayout,
   notFoundComponent: NotFoundPage,
 })
 
 function ProtectedLayout() {
+  const { session } = Route.useRouteContext()
+  const navigate = useNavigate()
+  useNotificationToast()
+
+  const handleLogout = useCallback(async () => {
+    await session.logout()
+    await navigate({
+      replace: true,
+      search: { redirect: undefined },
+      to: '/login',
+    })
+  }, [navigate, session])
+
   return (
     <div className='relative h-svh'>
       <GridPattern />
       <div className='relative z-10 flex h-full flex-col bg-background/80'>
-        <Header />
+        <Header
+          accountTo='/configuracoes'
+          onLogout={handleLogout}
+          userEmail={session.user?.email}
+          userName={session.user?.name}
+        />
+        <OfflineBanner />
         <div className='flex min-h-0 flex-1 overflow-hidden'>
           <ScrollArea className='flex-1'>
             <Outlet />

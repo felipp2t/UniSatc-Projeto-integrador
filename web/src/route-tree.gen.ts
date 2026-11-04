@@ -10,16 +10,26 @@
 
 import { Route as rootRouteImport } from './pages/__root'
 import { Route as ProtectedLayoutRouteImport } from './pages/_protected/layout'
+import { Route as CadastroRouteImport } from './pages/cadastro'
 import { Route as EsqueciSenhaRouteImport } from './pages/esqueci-senha'
 import { Route as LoginRouteImport } from './pages/login'
 import { Route as RedefinirSenhaRouteImport } from './pages/redefinir-senha'
 import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
 import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
+import { Route as ProtectedAtividadesRouteImport } from './pages/_protected/atividades'
 import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
-import { Route as ConviteTokenRouteImport } from './pages/convite/$token'
+import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
+import { Route as ProtectedConfiguracoesWorkspaceRouteImport } from './pages/_protected/configuracoes-workspace'
+import { Route as ProtectedConfiguracoesWorkspaceGeralRouteImport } from './pages/_protected/configuracoes-workspace_.geral'
+import { Route as ProtectedConfiguracoesWorkspaceGruposRouteImport } from './pages/_protected/configuracoes-workspace_.grupos'
 
 const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
   id: '/_protected',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CadastroRoute = CadastroRouteImport.update({
+  id: '/cadastro',
+  path: '/cadastro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EsqueciSenhaRoute = EsqueciSenhaRouteImport.update({
@@ -47,83 +57,136 @@ const ProtectedSplatRoute = ProtectedSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
+const ProtectedAtividadesRoute = ProtectedAtividadesRouteImport.update({
+  id: '/atividades',
+  path: '/atividades',
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
 const ProtectedComponentsRoute = ProtectedComponentsRouteImport.update({
   id: '/components',
   path: '/components',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
-const ConviteTokenRoute = ConviteTokenRouteImport.update({
-  id: '/convite/$token',
-  path: '/convite/$token',
-  getParentRoute: () => rootRouteImport,
+const ProtectedConfiguracoesRoute = ProtectedConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
+  getParentRoute: () => ProtectedLayoutRoute,
 } as any)
+const ProtectedConfiguracoesWorkspaceRoute =
+  ProtectedConfiguracoesWorkspaceRouteImport.update({
+    id: '/configuracoes-workspace',
+    path: '/configuracoes-workspace',
+    getParentRoute: () => ProtectedLayoutRoute,
+  } as any)
+const ProtectedConfiguracoesWorkspaceGeralRoute =
+  ProtectedConfiguracoesWorkspaceGeralRouteImport.update({
+    id: '/configuracoes-workspace_/geral',
+    path: '/configuracoes-workspace/geral',
+    getParentRoute: () => ProtectedLayoutRoute,
+  } as any)
+const ProtectedConfiguracoesWorkspaceGruposRoute =
+  ProtectedConfiguracoesWorkspaceGruposRouteImport.update({
+    id: '/configuracoes-workspace_/grupos',
+    path: '/configuracoes-workspace/grupos',
+    getParentRoute: () => ProtectedLayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ProtectedIndexRoute
+  '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
+  '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
-  '/convite/$token': typeof ConviteTokenRoute
+  '/configuracoes': typeof ProtectedConfiguracoesRoute
+  '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
+  '/configuracoes-workspace/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
+  '/configuracoes-workspace/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
 }
 export interface FileRoutesByTo {
+  '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
+  '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
-  '/convite/$token': typeof ConviteTokenRoute
+  '/configuracoes': typeof ProtectedConfiguracoesRoute
+  '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
   '/': typeof ProtectedIndexRoute
+  '/configuracoes-workspace/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
+  '/configuracoes-workspace/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_protected': typeof ProtectedLayoutRouteWithChildren
+  '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/_protected/$': typeof ProtectedSplatRoute
+  '/_protected/atividades': typeof ProtectedAtividadesRoute
   '/_protected/components': typeof ProtectedComponentsRoute
-  '/convite/$token': typeof ConviteTokenRoute
+  '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
+  '/_protected/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
   '/_protected/': typeof ProtectedIndexRoute
+  '/_protected/configuracoes-workspace_/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
+  '/_protected/configuracoes-workspace_/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cadastro'
     | '/esqueci-senha'
     | '/login'
     | '/redefinir-senha'
     | '/$'
+    | '/atividades'
     | '/components'
-    | '/convite/$token'
+    | '/configuracoes'
+    | '/configuracoes-workspace'
+    | '/configuracoes-workspace/geral'
+    | '/configuracoes-workspace/grupos'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/cadastro'
     | '/esqueci-senha'
     | '/login'
     | '/redefinir-senha'
     | '/$'
+    | '/atividades'
     | '/components'
-    | '/convite/$token'
+    | '/configuracoes'
+    | '/configuracoes-workspace'
     | '/'
+    | '/configuracoes-workspace/geral'
+    | '/configuracoes-workspace/grupos'
   id:
     | '__root__'
     | '/_protected'
+    | '/cadastro'
     | '/esqueci-senha'
     | '/login'
     | '/redefinir-senha'
     | '/_protected/$'
+    | '/_protected/atividades'
     | '/_protected/components'
-    | '/convite/$token'
+    | '/_protected/configuracoes'
+    | '/_protected/configuracoes-workspace'
     | '/_protected/'
+    | '/_protected/configuracoes-workspace_/geral'
+    | '/_protected/configuracoes-workspace_/grupos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   ProtectedLayoutRoute: typeof ProtectedLayoutRouteWithChildren
+  CadastroRoute: typeof CadastroRoute
   EsqueciSenhaRoute: typeof EsqueciSenhaRoute
   LoginRoute: typeof LoginRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
-  ConviteTokenRoute: typeof ConviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -133,6 +196,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ProtectedLayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastro': {
+      id: '/cadastro'
+      path: '/cadastro'
+      fullPath: '/cadastro'
+      preLoaderRoute: typeof CadastroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/esqueci-senha': {
@@ -170,6 +240,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedSplatRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
+    '/_protected/atividades': {
+      id: '/_protected/atividades'
+      path: '/atividades'
+      fullPath: '/atividades'
+      preLoaderRoute: typeof ProtectedAtividadesRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
     '/_protected/components': {
       id: '/_protected/components'
       path: '/components'
@@ -177,26 +254,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedComponentsRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/convite/$token': {
-      id: '/convite/$token'
-      path: '/convite/$token'
-      fullPath: '/convite/$token'
-      preLoaderRoute: typeof ConviteTokenRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_protected/configuracoes': {
+      id: '/_protected/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ProtectedConfiguracoesRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
+    '/_protected/configuracoes-workspace': {
+      id: '/_protected/configuracoes-workspace'
+      path: '/configuracoes-workspace'
+      fullPath: '/configuracoes-workspace'
+      preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
+    '/_protected/configuracoes-workspace_/geral': {
+      id: '/_protected/configuracoes-workspace_/geral'
+      path: '/configuracoes-workspace/geral'
+      fullPath: '/configuracoes-workspace/geral'
+      preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceGeralRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
+    '/_protected/configuracoes-workspace_/grupos': {
+      id: '/_protected/configuracoes-workspace_/grupos'
+      path: '/configuracoes-workspace/grupos'
+      fullPath: '/configuracoes-workspace/grupos'
+      preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceGruposRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
     }
   }
 }
 
 interface ProtectedLayoutRouteChildren {
   ProtectedSplatRoute: typeof ProtectedSplatRoute
+  ProtectedAtividadesRoute: typeof ProtectedAtividadesRoute
   ProtectedComponentsRoute: typeof ProtectedComponentsRoute
+  ProtectedConfiguracoesRoute: typeof ProtectedConfiguracoesRoute
+  ProtectedConfiguracoesWorkspaceRoute: typeof ProtectedConfiguracoesWorkspaceRoute
   ProtectedIndexRoute: typeof ProtectedIndexRoute
+  ProtectedConfiguracoesWorkspaceGeralRoute: typeof ProtectedConfiguracoesWorkspaceGeralRoute
+  ProtectedConfiguracoesWorkspaceGruposRoute: typeof ProtectedConfiguracoesWorkspaceGruposRoute
 }
 
 const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
   ProtectedSplatRoute: ProtectedSplatRoute,
+  ProtectedAtividadesRoute: ProtectedAtividadesRoute,
   ProtectedComponentsRoute: ProtectedComponentsRoute,
+  ProtectedConfiguracoesRoute: ProtectedConfiguracoesRoute,
+  ProtectedConfiguracoesWorkspaceRoute: ProtectedConfiguracoesWorkspaceRoute,
   ProtectedIndexRoute: ProtectedIndexRoute,
+  ProtectedConfiguracoesWorkspaceGeralRoute:
+    ProtectedConfiguracoesWorkspaceGeralRoute,
+  ProtectedConfiguracoesWorkspaceGruposRoute:
+    ProtectedConfiguracoesWorkspaceGruposRoute,
 }
 
 const ProtectedLayoutRouteWithChildren = ProtectedLayoutRoute._addFileChildren(
@@ -205,10 +315,10 @@ const ProtectedLayoutRouteWithChildren = ProtectedLayoutRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   ProtectedLayoutRoute: ProtectedLayoutRouteWithChildren,
+  CadastroRoute: CadastroRoute,
   EsqueciSenhaRoute: EsqueciSenhaRoute,
   LoginRoute: LoginRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
-  ConviteTokenRoute: ConviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

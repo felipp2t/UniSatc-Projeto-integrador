@@ -6,6 +6,7 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import javax.crypto.SecretKey;
@@ -29,32 +30,91 @@ public class JwtService {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
     }
 
-    public String generateAccessToken(UUID userId) {
+    public String generateAccessToken(UUID userId, UUID membershipId, String role) {
+        return generateAccessToken(userId, membershipId, role, List.of());
+    }
+
+    public String generateAccessToken(UUID userId, UUID membershipId, String role, List<String> permissions) {
         Instant now = Instant.now();
 
+        var builder = Jwts.builder()
+                .subject(userId.toString())
+                .claim("membershipId", membershipId.toString())
+                .claim("permissions", permissions)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)));
+
+        if (role != null) {
+            builder.claim("role", role);
+        }
+
+        return builder.signWith(key).compact();
+    }
+
+    public String generateAccountAccessToken(UUID userId) {
+        Instant now = Instant.now();
         return Jwts.builder()
                 .subject(userId.toString())
+                .claim("accountOnly", true)
+                .claim("permissions", List.of())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)))
                 .signWith(key)
                 .compact();
     }
 
+    // Mantido para compatibilidade com chamadas legadas; tokens sem vínculo não autenticam.
+    public String generateAccessToken(UUID userId, String role) {
+        Instant now = Instant.now();
+        var builder = Jwts.builder()
+                .subject(userId.toString())
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(accessTokenExpirationMs)));
+        if (role != null) {
+            builder.claim("role", role);
+        }
+        return builder.signWith(key).compact();
+    }
+
     public int getAccessTokenExpirationSeconds() {
         return (int) (accessTokenExpirationMs / 1000);
     }
 
-    // vazio se o token for invalido, malformado ou expirado
-    public Optional<UUID> validateAndGetUserId(String token) {
+    public record AccessTokenClaims(
+            UUID userId, UUID membershipId, String role, List<String> permissions, boolean accountOnly) {
+        public AccessTokenClaims(UUID userId, UUID membershipId, String role) {
+            this(userId, membershipId, role, List.of(), false);
+        }
+
+        public AccessTokenClaims(UUID userId, UUID membershipId, String role, List<String> permissions) {
+            this(userId, membershipId, role, permissions, false);
+        }
+    }
+
+    // Tokens antigos sem role continuam autenticados, mas não recebem authorities.
+    public Optional<AccessTokenClaims> validateAccessToken(String token) {
         try {
-            String subject = Jwts.parser()
+            var claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token)
-                    .getPayload()
-                    .getSubject();
-
-            return Optional.of(UUID.fromString(subject));
+                    .getPayload();
+            String subject = claims.getSubject();
+            String membershipId = claims.get("membershipId", String.class);
+            String role = claims.get("role", String.class);
+            Boolean accountOnly = claims.get("accountOnly", Boolean.class);
+            Object rawPermissions = claims.get("permissions");
+            if (subject == null || (membershipId == null && !Boolean.TRUE.equals(accountOnly))
+                    || (membershipId != null && membershipId.isBlank())
+                    || (role != null && role.isBlank())) {
+                return Optional.empty();
+            }
+            List<String> permissions = rawPermissions instanceof List<?> values
+                    ? values.stream().filter(String.class::isInstance).map(String.class::cast).toList()
+                    : List.of();
+            return Optional.of(new AccessTokenClaims(
+                    UUID.fromString(subject), membershipId == null ? null : UUID.fromString(membershipId),
+                    role, permissions, Boolean.TRUE.equals(accountOnly)));
         } catch (JwtException | IllegalArgumentException ex) {
             return Optional.empty();
         }
