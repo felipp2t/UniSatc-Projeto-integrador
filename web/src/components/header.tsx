@@ -1,6 +1,7 @@
 import { GearIcon, SignOutIcon, UserCircleIcon } from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
+import { GlobalItemSearch } from '@/components/global-item-search'
 import type { NotificationData } from '@/components/notification-bell'
 import { NotificationBell } from '@/components/notification-bell'
 import { Button } from '@/components/ui/button'
@@ -81,6 +82,7 @@ export function Header({
         <div className='flex-1' />
 
         <div className='flex items-center gap-1'>
+          <GlobalItemSearch />
           <NotificationBell
             notifications={notifications}
             onMarkRead={onMarkNotificationRead}
