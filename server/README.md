@@ -53,7 +53,10 @@ de redefinição de uso único.
    Em um banco vazio, o Flyway cria as tabelas de autenticação, convite e recuperação de senha.
    A migration `V2` também insere o usuário inicial `admin@gmail.com`. Como não existe cadastro
    público, solicite a redefinição de senha desse e-mail para definir a primeira senha e então
-   enviar o primeiro convite.
+   enviar o primeiro convite. A migration `V30` marca essa conta como administrador geral: ela
+   cria workspaces (um por equipe) e convida proprietários ou membros para qualquer um deles pela
+   página **Administração** do frontend ou pelas rotas `/admin/workspaces`. Cada pessoa pertence a
+   um único workspace; veja a [ADR 0002](../docs/adr/0002-um-workspace-por-equipe.md).
 
 A API sobe em `http://localhost:8080`.
 

@@ -461,7 +461,7 @@ class NotificationServiceIntegrationTest extends PostgresIntegrationTest {
         user.setPasswordHash(passwordEncoder.encode("old-password"));
         userRepository.saveAndFlush(user);
 
-        var workspace = workspaceRepository.findSingleton().orElseThrow();
+        var workspace = workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow();
         var role = workspaceRoleRepository.findByWorkspaceIdAndName(
                 workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
         var membership = new WorkspaceMember();

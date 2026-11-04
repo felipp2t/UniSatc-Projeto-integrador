@@ -164,7 +164,7 @@ class PasswordRecoveryIntegrationTest extends PostgresIntegrationTest {
 
     private WorkspaceMember ensureMembership(User user) {
         return workspaceMemberRepository.findByUserId(user.getId()).orElseGet(() -> {
-            var workspace = workspaceRepository.findSingleton().orElseThrow();
+            var workspace = workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow();
             var role = workspaceRoleRepository.findByWorkspaceIdAndName(
                     workspace.getId(), com.vaulty.api.entity.WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
             var membership = new WorkspaceMember();

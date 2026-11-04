@@ -2,7 +2,9 @@ package com.vaulty.api.service;
 
 import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
+import com.vaulty.api.entity.RolePermission;
 import com.vaulty.api.entity.User;
+import com.vaulty.api.entity.UserInvite;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
@@ -11,6 +13,7 @@ import com.vaulty.api.enums.ActivityActorContext;
 import com.vaulty.api.enums.ActivityResourceType;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.mapper.WorkspaceMapper;
+import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.repository.WorkspaceRoleRepository;
@@ -30,23 +33,48 @@ public class WorkspaceService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceRoleRepository workspaceRoleRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final RolePermissionRepository rolePermissionRepository;
     private final WorkspaceMapper workspaceMapper;
     private final ActivityLogService activityLogService;
     private final WorkspaceContentAuthorization authorization;
     private final NotificationService notificationService;
 
     @Transactional
-    public WorkspaceMember addAsMember(User user) {
-        Workspace workspace = singleton();
-        workspace = workspaceRepository.findByIdForUpdate(workspace.getId())
+    public WorkspaceMember addAsMember(User user, UserInvite invite) {
+        Workspace workspace = workspaceRepository.findByIdForUpdate(invite.getWorkspace().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        WorkspaceRole memberRole = workspaceRoleRepository
-                .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
+        String roleName = invite.isOwnerInvite() ? WorkspaceRole.OWNER_ROLE_NAME : WorkspaceRole.MEMBER_ROLE_NAME;
+        WorkspaceRole role = workspaceRoleRepository
+                .findByWorkspaceIdAndName(workspace.getId(), roleName)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
 
-        WorkspaceMember member = workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
+        WorkspaceMember member = workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, role));
+        if (invite.isOwnerInvite() && workspace.getOwner() == null) {
+            workspace.setOwner(user);
+            workspaceRepository.save(workspace);
+        }
         notificationService.accessChanged(List.of(user.getId()));
         return member;
+    }
+
+    @Transactional
+    public Workspace createWithDefaultRoles(String name, String description) {
+        Workspace workspace = new Workspace();
+        workspace.setName(name);
+        workspace.setDescription(description);
+        workspace = workspaceRepository.saveAndFlush(workspace);
+
+        createRole(workspace, WorkspaceRole.OWNER_ROLE_NAME);
+        WorkspaceRole memberRole = createRole(workspace, WorkspaceRole.MEMBER_ROLE_NAME);
+        // Mesmas permissões iniciais que a migration V11 concede ao papel Member.
+        for (String resource : List.of("item", "collection")) {
+            RolePermission permission = new RolePermission();
+            permission.setRole(memberRole);
+            permission.setResource(resource);
+            permission.setAction("read");
+            rolePermissionRepository.save(permission);
+        }
+        return workspace;
     }
 
     public void lockWorkspace(UUID workspaceId) {
@@ -56,13 +84,9 @@ public class WorkspaceService {
 
     @Transactional(readOnly = true)
     public Workspace requireOwner(UUID userId) {
-        Workspace workspace = singleton();
-        return authorization.requireOwner(userId, workspace.getId());
-    }
-
-    @Transactional(readOnly = true)
-    public UUID singletonId() {
-        return singleton().getId();
+        WorkspaceMember membership = workspaceMemberRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        return authorization.requireOwner(userId, membership.getWorkspace().getId());
     }
 
     // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
@@ -111,8 +135,10 @@ public class WorkspaceService {
         return workspaceMapper.toResponse(workspace);
     }
 
-    private Workspace singleton() {
-        return workspaceRepository.findSingleton()
-                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+    private WorkspaceRole createRole(Workspace workspace, String name) {
+        WorkspaceRole role = new WorkspaceRole();
+        role.setWorkspace(workspace);
+        role.setName(name);
+        return workspaceRoleRepository.save(role);
     }
 }

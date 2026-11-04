@@ -91,7 +91,7 @@ class ExpiredAuthDataCleanupIntegrationTest extends PostgresIntegrationTest {
         value.setToken(token);
         value.setUser(user);
         var membership = workspaceMemberRepository.findByUserId(user.getId()).orElseGet(() -> {
-            var workspace = workspaceRepository.findSingleton().orElseThrow();
+            var workspace = workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow();
             var role = workspaceRoleRepository.findByWorkspaceIdAndName(
                     workspace.getId(), com.vaulty.api.entity.WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
             var created = new com.vaulty.api.entity.WorkspaceMember();
@@ -110,6 +110,7 @@ class ExpiredAuthDataCleanupIntegrationTest extends PostgresIntegrationTest {
         value.setEmail(email);
         value.setToken(UUID.randomUUID().toString());
         value.setInvitedBy(user);
+        value.setWorkspace(workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow());
         value.setExpiresAt(expiresAt);
         return userInviteRepository.save(value);
     }

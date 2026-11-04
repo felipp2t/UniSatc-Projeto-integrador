@@ -133,7 +133,7 @@ public class WorkspaceSharingService {
     public void setRoleSharingPermission(UUID user, UUID workspaceId, UUID roleId, boolean enabled) {
         accessNotifications.lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(user, workspaceId);
-        if (!workspace.getOwner().getId().equals(user))
+        if (!workspace.isOwnedBy(user))
             throw new ForbiddenException("Somente o dono pode alterar permissões de papéis");
         var role = roleRepository.findByIdAndWorkspaceIdForUpdate(roleId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Papel não encontrado"));

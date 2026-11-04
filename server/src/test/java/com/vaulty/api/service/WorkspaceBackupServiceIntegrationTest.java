@@ -145,7 +145,7 @@ class WorkspaceBackupServiceIntegrationTest extends PostgresIntegrationTest {
             assertThat(bundledAttachment).isEqualTo(attachment);
             JsonNode manifest = objectMapper.readTree(manifestBytes);
             assertThat(manifest.get("formatVersion").asInt()).isEqualTo(1);
-            assertThat(manifest.get("workspaceId").asText()).isEqualTo(workspace.getId().toString());
+            assertThat(manifest.at("/workspaceIds/0").asText()).isEqualTo(workspace.getId().toString());
             assertThat(manifest.at("/database/path").asText()).isEqualTo("database.dump");
             assertThat(manifest.at("/database/sizeBytes").asLong()).isEqualTo(dump.length);
             assertThat(manifest.at("/database/sha256").asText()).isEqualTo(sha256(dump));

@@ -87,7 +87,7 @@ public class EffectiveContentAccess {
     }
 
     public boolean canReadCollection(UUID userId, Workspace workspace, UUID collectionId) {
-        if (workspace.getOwner().getId().equals(userId)) return true;
+        if (workspace.isOwnedBy(userId)) return true;
         if (!isMember(workspace.getId(), userId)) throw new ResourceNotFoundException("Workspace não encontrado");
         if (collectionId == null) return true;
         return Boolean.TRUE.equals(jdbc.queryForObject("""
@@ -112,7 +112,7 @@ public class EffectiveContentAccess {
     }
 
     public boolean canReadItem(UUID userId, Workspace workspace, UUID itemId) {
-        if (workspace.getOwner().getId().equals(userId)) return true;
+        if (workspace.isOwnedBy(userId)) return true;
         if (!isMember(workspace.getId(), userId)) throw new ResourceNotFoundException("Workspace não encontrado");
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (

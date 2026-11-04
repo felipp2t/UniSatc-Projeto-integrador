@@ -52,7 +52,7 @@ abstract class WorkspaceIntegrationSupport extends PostgresIntegrationTest {
     }
 
     protected WorkspaceResponse configureWorkspace(User owner, String name) {
-        Workspace workspace = workspaceRepository.findSingleton().orElseThrow();
+        Workspace workspace = workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow();
         workspace.setOwner(owner);
         workspace.setName(name);
         workspaceRepository.saveAndFlush(workspace);

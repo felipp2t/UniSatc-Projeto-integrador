@@ -1,5 +1,6 @@
 package com.vaulty.api.repository;
 
+import com.vaulty.api.dto.admin.AdminPendingInviteResponse;
 import com.vaulty.api.dto.invite.InviteResponse;
 import com.vaulty.api.entity.UserInvite;
 import com.vaulty.api.entity.UserInviteStatus;
@@ -43,7 +44,8 @@ public interface UserInviteRepository extends JpaRepository<UserInvite, UUID> {
                 invite.id, invite.email, inviter.id, inviter.name, invite.createdAt, invite.expiresAt)
             from UserInvite invite
             join invite.invitedBy inviter
-            where invite.expiresAt > :now and invite.status = :status
+            where invite.workspace.id = :workspaceId
+              and invite.expiresAt > :now and invite.status = :status
               and not exists (
                   select registeredUser.id
                   from User registeredUser
@@ -51,6 +53,20 @@ public interface UserInviteRepository extends JpaRepository<UserInvite, UUID> {
             order by invite.createdAt desc, invite.id desc
             """)
     List<InviteResponse> findPendingUsable(
+            @Param("workspaceId") UUID workspaceId,
+            @Param("now") OffsetDateTime now,
+            @Param("status") UserInviteStatus status);
+
+    @Query("""
+            select new com.vaulty.api.dto.admin.AdminPendingInviteResponse(
+                invite.id, invite.email, invite.ownerInvite, invite.expiresAt)
+            from UserInvite invite
+            where invite.workspace.id = :workspaceId
+              and invite.expiresAt > :now and invite.status = :status
+            order by invite.createdAt, invite.id
+            """)
+    List<AdminPendingInviteResponse> findPendingByWorkspace(
+            @Param("workspaceId") UUID workspaceId,
             @Param("now") OffsetDateTime now,
             @Param("status") UserInviteStatus status);
 

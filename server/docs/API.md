@@ -58,7 +58,8 @@ Envia um convite por e-mail (JavaMail) para um endereço ainda não cadastrado, 
 para a tela de cadastro do frontend com `email` e `token` na query string.
 
 O que a função faz, em ordem:
-1. Confere que quem está chamando é o dono do workspace único (senão `403`).
+1. Confere que quem está chamando é dono do seu workspace (senão `403`); o convite fica vinculado a
+   esse workspace e a pessoa entra como `Member`.
 2. Confere que não existe usuário com esse `email` (senão `409`).
 3. Apaga qualquer convite anterior pendente para o mesmo `email` (reenviar substitui o convite
    antigo).
@@ -342,12 +343,13 @@ front-end assim que a sessão carrega).
 
 O que a função faz:
 1. Busca o usuário autenticado pelo `userId` do token.
-2. Devolve `id`, `name` e `email` (nunca a senha).
+2. Devolve `id`, `name`, `email`, `createdAt` e `systemAdmin` (nunca a senha). `systemAdmin` indica o
+   administrador geral, que acessa a página de administração.
 
 | | |
 |---|---|
 | Auth | Cookie `accessToken` |
-| Sucesso | `200`, `{ "id": string, "name": string, "email": string }` |
+| Sucesso | `200`, `{ "id": string, "name": string, "email": string, "createdAt": string, "systemAdmin": boolean }` |
 | `401` | não autenticado |
 
 ---
@@ -892,6 +894,30 @@ permitiria forjar `X-Forwarded-For` para escapar do limite.
 
 ---
 
+## Administração de workspaces (administrador geral)
+
+Cada equipe tem seu próprio workspace e cada pessoa pertence a um único workspace
+([ADR 0002](../../docs/adr/0002-um-workspace-por-equipe.md)). As rotas abaixo exigem cookie
+`accessToken` de uma conta com `systemAdmin = true`; as demais contas recebem `403`.
+
+**`GET /admin/workspaces`** lista todos os workspaces, do mais antigo ao mais novo, com `id`, `name`,
+`description`, `ownerName`, `ownerEmail` (nulos enquanto não houver proprietário), `memberCount`,
+`pendingInvites` (`id`, `email`, `owner`, `expiresAt`) e `createdAt`.
+
+**`POST /admin/workspaces`** cria um workspace com `{ "name": string, "description"?: string }`
+(nome de 3 a 100 caracteres, descrição até 2000) e responde `201` com o mesmo formato da listagem.
+Os papéis `Owner` e `Member` são criados junto, com `Member` lendo itens e pastas, como na `V11`. O
+workspace nasce sem proprietário.
+
+**`POST /admin/workspaces/{workspaceId}/invites`** convida `{ "email": string, "owner": boolean }` e
+responde `201`. Com `owner: true`, a pessoa entra com o papel `Owner`; o primeiro proprietário a se
+cadastrar vira o `ownerId` do workspace. Com `owner: false`, entra como `Member`. O convite segue o
+mesmo fluxo de e-mail, validade e substituição de `POST /invites`. E-mail com conta existente
+responde `409`; workspace inexistente, `404`.
+
+**`POST /workspaces/backup`** gera o backup do banco inteiro e por isso também é exclusivo do
+administrador geral (`403` para as demais contas). O `manifest.json` lista `workspaceIds`.
+
 ## Tabela-resumo
 
 | RF | Método | Rota | Auth |
@@ -945,6 +971,10 @@ permitiria forjar `X-Forwarded-For` para escapar do limite.
 | RF39 | PATCH | `/notifications/{notificationId}/read` | Cookie `accessToken` |
 | RF39 | PATCH | `/notifications/read` | Cookie `accessToken` |
 | — | GET | `/notifications/stream` | Cookie `accessToken` |
+| — | GET | `/admin/workspaces` | Cookie `accessToken` + administrador geral |
+| — | POST | `/admin/workspaces` | Cookie `accessToken` + administrador geral |
+| — | POST | `/admin/workspaces/{workspaceId}/invites` | Cookie `accessToken` + administrador geral |
+| — | POST | `/workspaces/backup` | Cookie `accessToken` + administrador geral |
 
 **`DELETE /workspaces/{workspaceId}/members/{membershipId}?confirmMemberId={membershipId}`** — somente um
 membro ativo com papel `Owner` pode remover um vínculo. A confirmação deve repetir o ID do vínculo no caminho; ausente ou

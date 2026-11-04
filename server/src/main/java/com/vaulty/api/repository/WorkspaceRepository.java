@@ -5,6 +5,7 @@ import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,7 +17,7 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, UUID> {
             select workspace
             from WorkspaceMember member
             join member.workspace workspace
-            join fetch workspace.owner
+            left join fetch workspace.owner
             where member.user.id = :userId
             order by workspace.createdAt desc
             """)
@@ -26,7 +27,7 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, UUID> {
             select workspace
             from WorkspaceMember member
             join member.workspace workspace
-            join fetch workspace.owner
+            left join fetch workspace.owner
             where member.user.id = :userId
               and workspace.id = :workspaceId
             """)
@@ -37,7 +38,10 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, UUID> {
     @Query("select workspace from Workspace workspace where workspace.id = :workspaceId")
     Optional<Workspace> findByIdForUpdate(@Param("workspaceId") UUID workspaceId);
 
-    @Query("select workspace from Workspace workspace join fetch workspace.owner")
-    Optional<Workspace> findSingleton();
+    @Query("select workspace from Workspace workspace left join fetch workspace.owner order by workspace.createdAt, workspace.id")
+    List<Workspace> findAllWithOwner();
+
+    @EntityGraph(attributePaths = "owner")
+    Optional<Workspace> findFirstByOrderByCreatedAtAscIdAsc();
 
 }

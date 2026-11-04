@@ -10,9 +10,12 @@ public record UserResponse(
 
         String email,
 
-        OffsetDateTime createdAt) {
+        OffsetDateTime createdAt,
+
+        boolean systemAdmin) {
 
     public static UserResponse from(User user) {
-        return new UserResponse(user.getId().toString(), user.getName(), user.getEmail(), user.getCreatedAt());
+        return new UserResponse(user.getId().toString(), user.getName(), user.getEmail(), user.getCreatedAt(),
+                user.isSystemAdmin());
     }
 }

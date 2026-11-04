@@ -1,9 +1,11 @@
 package com.vaulty.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceItemFile;
 import com.vaulty.api.exception.StorageUnavailableException;
 import com.vaulty.api.repository.WorkspaceItemFileRepository;
+import com.vaulty.api.repository.WorkspaceRepository;
 import com.vaulty.api.storage.ObjectStorage;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -26,17 +28,20 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class WorkspaceBackupService {
-    private final WorkspaceService workspaceService;
+    private final SystemAdminAuthorization systemAdminAuthorization;
+    private final WorkspaceRepository workspaceRepository;
     private final WorkspaceItemFileRepository fileRepository;
     private final ObjectProvider<ObjectStorage> storageProvider;
     private final MaintenanceGate gate;
     private final ObjectMapper objectMapper;
     private final Environment environment;
 
-    public WorkspaceBackupService(WorkspaceService workspaceService, WorkspaceItemFileRepository fileRepository,
+    public WorkspaceBackupService(SystemAdminAuthorization systemAdminAuthorization,
+            WorkspaceRepository workspaceRepository, WorkspaceItemFileRepository fileRepository,
             ObjectProvider<ObjectStorage> storageProvider, MaintenanceGate gate, ObjectMapper objectMapper,
             Environment environment) {
-        this.workspaceService = workspaceService;
+        this.systemAdminAuthorization = systemAdminAuthorization;
+        this.workspaceRepository = workspaceRepository;
         this.fileRepository = fileRepository;
         this.storageProvider = storageProvider;
         this.gate = gate;
@@ -44,8 +49,9 @@ public class WorkspaceBackupService {
         this.environment = environment;
     }
 
-    public BackupFile create(UUID ownerId) {
-        workspaceService.requireOwner(ownerId);
+    // O dump cobre o banco inteiro, com todos os workspaces; por isso só o administrador geral pode gerá-lo.
+    public BackupFile create(UUID userId) {
+        systemAdminAuthorization.require(userId);
         MaintenanceGate.Lease lease = gate.startBackup();
         Path directory = null;
         try {
@@ -79,7 +85,7 @@ public class WorkspaceBackupService {
                 manifest.put("createdAt", Instant.now().toString());
                 manifest.put("applicationVersion", WorkspaceBackupService.class.getPackage().getImplementationVersion() == null
                         ? "unknown" : WorkspaceBackupService.class.getPackage().getImplementationVersion());
-                manifest.put("workspaceId", workspaceService.singletonId());
+                manifest.put("workspaceIds", workspaceRepository.findAll().stream().map(Workspace::getId).toList());
                 manifest.put("database", Map.of("path", "database.dump", "sizeBytes", Files.size(dump),
                         "sha256", sha256(dump)));
                 manifest.put("attachments", inventory);

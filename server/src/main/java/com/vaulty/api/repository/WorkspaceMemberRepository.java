@@ -39,6 +39,8 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
     List<WorkspaceMember> findAllByWorkspaceIdAndRoleId(
             @Param("workspaceId") UUID workspaceId, @Param("roleId") UUID roleId);
 
+    long countByWorkspaceId(UUID workspaceId);
+
     @Query("""
             select member from WorkspaceMember member
             where member.workspace.id = :workspaceId and member.role.name = :ownerRoleName

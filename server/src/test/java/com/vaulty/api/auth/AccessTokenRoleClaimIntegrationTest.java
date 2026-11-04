@@ -220,6 +220,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
         invite.setEmail(email);
         invite.setToken(UUID.randomUUID().toString());
         invite.setInvitedBy(admin);
+        invite.setWorkspace(workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow());
         invite.setExpiresAt(OffsetDateTime.now().plusDays(7));
         return userInviteRepository.save(invite);
     }

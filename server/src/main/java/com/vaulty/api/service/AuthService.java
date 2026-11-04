@@ -172,7 +172,7 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         userRepository.save(user);
 
-        var member = workspaceService.addAsMember(user);
+        var member = workspaceService.addAsMember(user, invite);
 
         activityLogService.record(member.getWorkspace().getId(), user.getId(), ActivityActorContext.REGISTERED_USER,
                 ActivityAction.MEMBER_JOINED, ActivityResourceType.MEMBER, member.getId(),

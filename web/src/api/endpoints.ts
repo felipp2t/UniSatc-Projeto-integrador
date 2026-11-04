@@ -5,6 +5,8 @@ import type {
   AccessGroupResponse,
   ActivityFilters,
   ActivityPageResponse,
+  AdminInviteRequest,
+  AdminWorkspaceResponse,
   AttachmentResponse,
   ChangePasswordRequest,
   CollectionPageResponse,
@@ -12,6 +14,7 @@ import type {
   CollectionResponse,
   CreateCollectionRequest,
   CreateItemRequest,
+  CreateWorkspaceRequest,
   ForgotPasswordRequest,
   InviteResponse,
   InviteUserRequest,
@@ -155,6 +158,15 @@ export const workspaceApi = {
     ),
   update: (workspaceId: string, request: UpdateWorkspaceRequest) =>
     apiClient.put<WorkspaceResponse>(`/workspaces/${workspaceId}`, request),
+}
+
+export const adminApi = {
+  createWorkspace: (request: CreateWorkspaceRequest) =>
+    apiClient.post<AdminWorkspaceResponse>('/admin/workspaces', request),
+  invite: (workspaceId: string, request: AdminInviteRequest) =>
+    apiClient.post<void>(`/admin/workspaces/${workspaceId}/invites`, request),
+  listWorkspaces: () =>
+    apiClient.get<AdminWorkspaceResponse[]>('/admin/workspaces'),
 }
 
 export const inviteApi = {

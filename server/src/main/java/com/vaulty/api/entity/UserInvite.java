@@ -47,6 +47,13 @@ public class UserInvite {
     @JoinColumn(name = "invited_by_user_id", nullable = false)
     private User invitedBy;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "workspace_id", nullable = false)
+    private Workspace workspace;
+
+    @Column(name = "owner_invite", nullable = false)
+    private boolean ownerInvite;
+
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 

@@ -29,8 +29,9 @@ public class Workspace {
     @GeneratedValue
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "owner_id", nullable = false)
+    // Fica vazio até o primeiro dono convidado pelo administrador geral concluir o cadastro.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
     private User owner;
 
     @Column(nullable = false, length = 100)
@@ -46,4 +47,8 @@ public class Workspace {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
+
+    public boolean isOwnedBy(UUID userId) {
+        return owner != null && owner.getId().equals(userId);
+    }
 }

@@ -376,7 +376,7 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     private UUID configureWorkspaceWithFixtureCleanup(User owner) {
-        var original = workspaceRepository.findSingleton().orElseThrow();
+        var original = workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow();
         committedWorkspace = original.getId();
         originalWorkspaceOwner = original.getOwner().getId();
         originalOwnerRole = workspaceMemberRepository

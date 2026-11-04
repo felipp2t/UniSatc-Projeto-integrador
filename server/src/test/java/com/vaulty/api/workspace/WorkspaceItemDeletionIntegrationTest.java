@@ -57,7 +57,7 @@ class WorkspaceItemDeletionIntegrationTest extends PostgresIntegrationTest {
     @AfterEach
     void restoreAdminAsWorkspaceOwner() {
         userRepository.findByEmail("admin@gmail.com").ifPresent(admin -> {
-            Workspace workspace = workspaceRepository.findSingleton().orElseThrow();
+            Workspace workspace = workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow();
             workspace.setOwner(admin);
             workspaceRepository.saveAndFlush(workspace);
             memberRepository.deleteAll();
@@ -237,7 +237,7 @@ class WorkspaceItemDeletionIntegrationTest extends PostgresIntegrationTest {
     }
 
     private UUID workspace(User owner) {
-        Workspace workspace = workspaceRepository.findSingleton().orElseThrow();
+        Workspace workspace = workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow();
         workspace.setOwner(owner);
         workspaceRepository.saveAndFlush(workspace);
         memberRepository.deleteAll();

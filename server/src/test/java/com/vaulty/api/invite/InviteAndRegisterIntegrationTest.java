@@ -11,6 +11,7 @@ import com.vaulty.api.PostgresIntegrationTest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
 import com.vaulty.api.entity.UserInviteStatus;
+import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.UserInviteRepository;
@@ -187,7 +188,7 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
         WorkspaceMember membership = workspaceMemberRepository.findByUserId(createdUser.getId()).orElseThrow();
 
         assertThat(membership.getRole().getName()).isEqualTo(WorkspaceRole.MEMBER_ROLE_NAME);
-        assertThat(membership.getWorkspace().getId()).isEqualTo(workspaceRepository.findSingleton().orElseThrow().getId());
+        assertThat(membership.getWorkspace().getId()).isEqualTo(defaultWorkspace().getId());
     }
 
     @Test
@@ -506,9 +507,15 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
         user.setPasswordHash(passwordEncoder.encode("password123"));
         userRepository.save(user);
 
-        workspaceService.addAsMember(user);
+        UserInvite memberInvite = new UserInvite();
+        memberInvite.setWorkspace(defaultWorkspace());
+        workspaceService.addAsMember(user, memberInvite);
 
         return user;
+    }
+
+    private Workspace defaultWorkspace() {
+        return workspaceRepository.findFirstByOrderByCreatedAtAscIdAsc().orElseThrow();
     }
 
     private UserInvite createInvite(String email) {
@@ -520,6 +527,7 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
         invite.setEmail(email);
         invite.setToken(UUID.randomUUID().toString());
         invite.setInvitedBy(admin());
+        invite.setWorkspace(defaultWorkspace());
         invite.setExpiresAt(expiresAt);
         return userInviteRepository.save(invite);
     }

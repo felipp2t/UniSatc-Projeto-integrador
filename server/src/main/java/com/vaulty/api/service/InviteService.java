@@ -6,6 +6,7 @@ import com.vaulty.api.dto.invite.InviteValidationRequest;
 import com.vaulty.api.dto.invite.InviteValidationResponse;
 import com.vaulty.api.entity.UserInvite;
 import com.vaulty.api.entity.UserInviteStatus;
+import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.enums.ActivityAction;
 import com.vaulty.api.enums.ActivityActorContext;
 import com.vaulty.api.enums.ActivityResourceType;
@@ -78,8 +79,9 @@ public class InviteService {
 
     @Transactional(readOnly = true)
     public List<InviteResponse> listPending(UUID ownerId) {
-        workspaceService.requireOwner(ownerId);
-        return userInviteRepository.findPendingUsable(OffsetDateTime.now(clock), UserInviteStatus.PENDING);
+        var workspace = workspaceService.requireOwner(ownerId);
+        return userInviteRepository.findPendingUsable(
+                workspace.getId(), OffsetDateTime.now(clock), UserInviteStatus.PENDING);
     }
 
     @Transactional
@@ -87,25 +89,35 @@ public class InviteService {
         OffsetDateTime now = OffsetDateTime.now(clock);
         UserInvite invite = requirePendingInviteForUpdate(request, now);
         invite.setStatus(UserInviteStatus.DECLINED);
-        activityLogService.recordInviteeEmail(workspaceService.singletonId(), invite.getEmail(),
+        activityLogService.recordInviteeEmail(invite.getWorkspace().getId(), invite.getEmail(),
                 ActivityAction.MEMBER_INVITE_DECLINED, ActivityResourceType.MEMBER, invite.getId(),
                 Map.of("email", invite.getEmail()));
     }
 
     @Transactional
     public void inviteUser(UUID inviterId, InviteUserRequest request) {
-        var workspace = workspaceService.requireOwner(inviterId);
+        createInvite(inviterId, workspaceService.requireOwner(inviterId), request.email(), false);
+    }
 
-        if (userRepository.findByEmail(request.email()).isPresent()) {
+    @Transactional
+    public void inviteToWorkspace(UUID adminId, Workspace workspace, String email, boolean owner) {
+        createInvite(adminId, workspace, email, owner);
+    }
+
+    private void createInvite(UUID inviterId, Workspace workspace, String email, boolean ownerInvite) {
+        if (userRepository.findByEmail(email).isPresent()) {
             throw new ConflictException("E-mail já possui uma conta");
         }
 
-        userInviteRepository.deleteAllByEmail(request.email());
+        // Cada pessoa entra em um único workspace, então o convite mais recente substitui os anteriores.
+        userInviteRepository.deleteAllByEmail(email);
 
         UserInvite invite = new UserInvite();
-        invite.setEmail(request.email());
+        invite.setEmail(email);
         invite.setToken(UUID.randomUUID().toString());
         invite.setInvitedBy(userRepository.getReferenceById(inviterId));
+        invite.setWorkspace(workspace);
+        invite.setOwnerInvite(ownerInvite);
         invite.setExpiresAt(OffsetDateTime.now(clock).plus(Duration.ofMillis(inviteExpirationMs)));
         userInviteRepository.save(invite);
 
@@ -120,6 +132,7 @@ public class InviteService {
     public void revoke(UUID ownerId, UUID inviteId) {
         var workspace = workspaceService.requireOwner(ownerId);
         UserInvite invite = userInviteRepository.findByIdAndStatusForUpdate(inviteId, UserInviteStatus.PENDING)
+                .filter(pending -> pending.getWorkspace().getId().equals(workspace.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Convite indisponível"));
 
         invite.setStatus(UserInviteStatus.REVOKED);

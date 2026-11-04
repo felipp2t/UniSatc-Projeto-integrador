@@ -92,7 +92,7 @@ public class WorkspaceMemberService {
 
         var before = accessNotifications.snapshot(workspaceId);
         member.setRole(role);
-        if (previousRole.isOwnerRole() && workspace.getOwner().getId().equals(member.getUser().getId())) {
+        if (previousRole.isOwnerRole() && workspace.isOwnedBy(member.getUser().getId())) {
             var successor = owners.stream()
                     .filter(owner -> !owner.getId().equals(memberId))
                     .findFirst()
@@ -130,7 +130,7 @@ public class WorkspaceMemberService {
             if (otherOwners.isEmpty()) {
                 throw new ConflictException("O workspace precisa manter ao menos um dono");
             }
-            if (workspace.getOwner().getId().equals(member.getUser().getId())) {
+            if (workspace.isOwnedBy(member.getUser().getId())) {
                 successor = otherOwners.get(0).getUser();
             }
         }

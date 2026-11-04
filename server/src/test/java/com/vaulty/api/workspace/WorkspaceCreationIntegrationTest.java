@@ -20,32 +20,34 @@ import org.springframework.http.MediaType;
 class WorkspaceCreationIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Test
-    void rejectsASecondWorkspaceAtTheDatabaseLevel() {
+    void allowsSeveralWorkspacesWithoutAnOwnerYet() {
         User owner = createUser();
         configureWorkspace(owner);
 
         Workspace second = new Workspace();
-        second.setOwner(owner);
         second.setName("Segundo workspace");
+        workspaceRepository.saveAndFlush(second);
 
-        assertThatThrownBy(() -> workspaceRepository.saveAndFlush(second))
-                .isInstanceOfAny(DataIntegrityViolationException.class, PersistenceException.class)
-                .hasMessageContaining("uq_workspace_singleton");
+        assertThat(workspaceRepository.count()).isEqualTo(2);
+        assertThat(workspaceRepository.findById(second.getId()).orElseThrow().getOwner()).isNull();
     }
 
     @Test
-    void rejectsSingletonFalseEvenAsTheOnlyRow() {
+    void keepsEachUserInASingleWorkspace() {
         User owner = createUser();
-        jdbcTemplate.update("DELETE FROM workspace");
+        WorkspaceResponse first = configureWorkspace(owner);
+        Workspace second = new Workspace();
+        second.setName("Segundo workspace");
+        workspaceRepository.saveAndFlush(second);
+        jdbcTemplate.update("INSERT INTO workspace_role (id, workspace_id, name) VALUES (gen_random_uuid(), ?, 'Member')",
+                second.getId());
 
-        assertThatThrownBy(() -> jdbcTemplate.update(
-                        """
-                        INSERT INTO workspace (id, owner_id, name, singleton)
-                        VALUES (gen_random_uuid(), ?, 'Workspace', false)
-                        """,
-                        owner.getId()))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("ck_workspace_singleton");
+        assertThat(first.id()).isNotEqualTo(second.getId());
+        assertThatThrownBy(() -> {
+                    addMember(owner, second.getId());
+                    workspaceMemberRepository.flush();
+                })
+                .isInstanceOfAny(DataIntegrityViolationException.class, PersistenceException.class);
     }
 
     @Test

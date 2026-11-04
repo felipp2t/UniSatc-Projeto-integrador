@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './pages/login'
 import { Route as RedefinirSenhaRouteImport } from './pages/redefinir-senha'
 import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
 import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
+import { Route as ProtectedAdministracaoRouteImport } from './pages/_protected/administracao'
 import { Route as ProtectedAtividadesRouteImport } from './pages/_protected/atividades'
 import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
 import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
@@ -56,6 +57,11 @@ const ProtectedSplatRoute = ProtectedSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
+const ProtectedAdministracaoRoute = ProtectedAdministracaoRouteImport.update({
+  id: '/administracao',
+  path: '/administracao',
+  getParentRoute: () => ProtectedLayoutRoute,
+} as any)
 const ProtectedAtividadesRoute = ProtectedAtividadesRouteImport.update({
   id: '/atividades',
   path: '/atividades',
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
+  '/administracao': typeof ProtectedAdministracaoRoute
   '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
   '/configuracoes': typeof ProtectedConfiguracoesRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/$': typeof ProtectedSplatRoute
+  '/administracao': typeof ProtectedAdministracaoRoute
   '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
   '/configuracoes': typeof ProtectedConfiguracoesRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/_protected/$': typeof ProtectedSplatRoute
+  '/_protected/administracao': typeof ProtectedAdministracaoRoute
   '/_protected/atividades': typeof ProtectedAtividadesRoute
   '/_protected/components': typeof ProtectedComponentsRoute
   '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/$'
+    | '/administracao'
     | '/atividades'
     | '/components'
     | '/configuracoes'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/$'
+    | '/administracao'
     | '/atividades'
     | '/components'
     | '/configuracoes'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/redefinir-senha'
     | '/_protected/$'
+    | '/_protected/administracao'
     | '/_protected/atividades'
     | '/_protected/components'
     | '/_protected/configuracoes'
@@ -227,6 +239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedSplatRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
+    '/_protected/administracao': {
+      id: '/_protected/administracao'
+      path: '/administracao'
+      fullPath: '/administracao'
+      preLoaderRoute: typeof ProtectedAdministracaoRouteImport
+      parentRoute: typeof ProtectedLayoutRoute
+    }
     '/_protected/atividades': {
       id: '/_protected/atividades'
       path: '/atividades'
@@ -267,6 +286,7 @@ declare module '@tanstack/react-router' {
 
 interface ProtectedLayoutRouteChildren {
   ProtectedSplatRoute: typeof ProtectedSplatRoute
+  ProtectedAdministracaoRoute: typeof ProtectedAdministracaoRoute
   ProtectedAtividadesRoute: typeof ProtectedAtividadesRoute
   ProtectedComponentsRoute: typeof ProtectedComponentsRoute
   ProtectedConfiguracoesRoute: typeof ProtectedConfiguracoesRoute
@@ -277,6 +297,7 @@ interface ProtectedLayoutRouteChildren {
 
 const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
   ProtectedSplatRoute: ProtectedSplatRoute,
+  ProtectedAdministracaoRoute: ProtectedAdministracaoRoute,
   ProtectedAtividadesRoute: ProtectedAtividadesRoute,
   ProtectedComponentsRoute: ProtectedComponentsRoute,
   ProtectedConfiguracoesRoute: ProtectedConfiguracoesRoute,

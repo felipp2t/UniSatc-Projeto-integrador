@@ -1,4 +1,9 @@
-import { GearIcon, SignOutIcon, UserCircleIcon } from '@phosphor-icons/react'
+import {
+  BuildingsIcon,
+  GearIcon,
+  SignOutIcon,
+  UserCircleIcon,
+} from '@phosphor-icons/react'
 import { Link } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import type { NotificationData } from '@/components/notification-bell'
@@ -23,6 +28,7 @@ import type { AppRoute } from '@/types/navigation'
 
 interface HeaderProps extends React.ComponentProps<'header'> {
   accountTo?: AppRoute
+  adminTo?: AppRoute
   notifications?: NotificationData[]
   onAccountSettings?: () => void | Promise<void>
   onLogout?: () => void | Promise<void>
@@ -34,6 +40,7 @@ interface HeaderProps extends React.ComponentProps<'header'> {
 
 export function Header({
   accountTo,
+  adminTo,
   notifications,
   onAccountSettings,
   onLogout,
@@ -109,6 +116,17 @@ export function Header({
                   </span>
                 </div>
                 <DropdownMenuSeparator />
+                {adminTo ? (
+                  <DropdownMenuItem asChild>
+                    <Link
+                      className='flex w-full items-center gap-2'
+                      to={adminTo}
+                    >
+                      <BuildingsIcon aria-hidden='true' size={14} />
+                      Administração
+                    </Link>
+                  </DropdownMenuItem>
+                ) : null}
                 {accountTo ? (
                   <DropdownMenuItem asChild>
                     <Link
