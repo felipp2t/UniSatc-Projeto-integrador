@@ -1,4 +1,4 @@
-import { FolderIcon } from '@phosphor-icons/react'
+import { Folder } from 'lucide-react'
 import { revalidateLogic, useForm, useSelector } from '@tanstack/react-form'
 import {
   createFileRoute,
@@ -125,7 +125,7 @@ function LoginPage() {
                   href='/'
                 >
                   <div className='flex size-8 items-center justify-center rounded-md text-foreground'>
-                    <FolderIcon aria-hidden='true' size={24} />
+                    <Folder aria-hidden='true' size={24} />
                   </div>
                   <span className='sr-only'>Vaulty</span>
                 </a>

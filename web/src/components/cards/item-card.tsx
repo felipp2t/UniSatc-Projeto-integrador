@@ -1,4 +1,4 @@
-import { ArchiveIcon, FileIcon, TrashIcon } from '@phosphor-icons/react'
+import { Archive, File, Trash2 } from 'lucide-react'
 import { useForm, useSelector } from '@tanstack/react-form'
 import { cn } from 'cn'
 import { useCallback, useId, useState } from 'react'
@@ -91,7 +91,7 @@ export function ItemCard({
     >
       <div className='flex items-center justify-between gap-3'>
         <div className='flex min-w-0 items-center gap-2'>
-          <FileIcon aria-hidden='true' className='size-4 text-primary' />
+          <File aria-hidden='true' className='size-4 text-primary' />
           <span className='truncate font-bold font-mono text-sm'>
             {item.title}
           </span>
@@ -111,7 +111,7 @@ export function ItemCard({
             size='sm'
             variant='outline'
           >
-            <ArchiveIcon aria-hidden='true' />
+            <Archive aria-hidden='true' />
             {archived ? 'Restaurar' : 'Arquivar'}
           </Button>
         ) : null}
@@ -122,7 +122,7 @@ export function ItemCard({
             size='sm'
             variant='destructive'
           >
-            <TrashIcon aria-hidden='true' />
+            <Trash2 aria-hidden='true' />
             Excluir
           </Button>
         ) : null}

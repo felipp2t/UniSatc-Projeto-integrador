@@ -1,4 +1,4 @@
-import { XIcon } from '@phosphor-icons/react'
+import { X } from 'lucide-react'
 import { cn } from 'cn'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
@@ -48,7 +48,7 @@ export function DialogContent({
               size='icon'
               variant='ghost'
             >
-              <XIcon size={12} />
+              <X size={12} />
             </Button>
           </DialogPrimitive.Close>
         )}

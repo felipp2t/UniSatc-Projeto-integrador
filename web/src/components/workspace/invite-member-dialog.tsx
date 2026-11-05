@@ -1,4 +1,4 @@
-import { UserPlusIcon } from '@phosphor-icons/react'
+import { UserPlus } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
@@ -91,7 +91,7 @@ export function InviteMemberDialog() {
     <Dialog onOpenChange={handleOpenChange} open={open}>
       <DialogTrigger asChild>
         <Button className='cursor-pointer rounded-none' size='sm'>
-          <UserPlusIcon aria-hidden='true' size={16} weight='bold' />
+          <UserPlus aria-hidden='true' size={16} />
           Convidar
         </Button>
       </DialogTrigger>

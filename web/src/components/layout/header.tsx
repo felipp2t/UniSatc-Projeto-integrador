@@ -1,4 +1,4 @@
-import { GearIcon, SignOutIcon, UserCircleIcon } from '@phosphor-icons/react'
+import { Settings, LogOut, CircleUserRound } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { GlobalItemSearch } from '@/components/items/global-item-search'
@@ -98,7 +98,7 @@ export function Header({
                   size='icon'
                   variant='ghost'
                 >
-                  <UserCircleIcon aria-hidden='true' size={18} />
+                  <CircleUserRound aria-hidden='true' size={18} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align='end' className='w-56'>
@@ -117,7 +117,7 @@ export function Header({
                       className='flex w-full items-center gap-2'
                       to={accountTo}
                     >
-                      <GearIcon aria-hidden='true' size={14} />
+                      <Settings aria-hidden='true' size={14} />
                       Configurações da conta
                     </Link>
                   </DropdownMenuItem>
@@ -128,7 +128,7 @@ export function Header({
                       onClick={onAccountSettings}
                       type='button'
                     >
-                      <GearIcon aria-hidden='true' size={14} />
+                      <Settings aria-hidden='true' size={14} />
                       Configurações da conta
                     </button>
                   </DropdownMenuItem>
@@ -138,7 +138,7 @@ export function Header({
                     onSelect={openLogoutDialog}
                     variant='destructive'
                   >
-                    <SignOutIcon aria-hidden='true' size={14} />
+                    <LogOut aria-hidden='true' size={14} />
                     Sair da conta
                   </DropdownMenuItem>
                 ) : null}

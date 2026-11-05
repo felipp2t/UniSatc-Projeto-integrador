@@ -1,4 +1,4 @@
-import { UserGearIcon, UserIcon } from '@phosphor-icons/react'
+import { UserCog, UserRound } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
@@ -93,7 +93,7 @@ function AccountSettingsPage() {
           items={[{ label: 'Início', to: '/' }, { label: 'Conta' }]}
         />
         <div className='flex items-center gap-4'>
-          <UserGearIcon
+          <UserCog
             aria-hidden='true'
             className='size-6 shrink-0 text-primary'
           />
@@ -117,7 +117,7 @@ function AccountSettingsPage() {
             }}
             to='/configuracoes/conta'
           >
-            <UserIcon aria-hidden='true' className='size-3.5 shrink-0' />
+            <UserRound aria-hidden='true' className='size-3.5 shrink-0' />
             Perfil
           </Link>
         </nav>

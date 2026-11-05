@@ -1,4 +1,4 @@
-import { FolderIcon, TrashIcon } from '@phosphor-icons/react'
+import { Folder, Trash2 } from 'lucide-react'
 import { cn } from 'cn'
 import { useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -58,7 +58,7 @@ export function FolderCard({
       {...props}
     >
       <div className='flex items-center gap-2'>
-        <FolderIcon aria-hidden='true' className='size-5 text-primary' />
+        <Folder aria-hidden='true' className='size-5 text-primary' />
         <span className='min-w-0 truncate font-bold font-mono text-sm'>
           {name}
         </span>
@@ -75,7 +75,7 @@ export function FolderCard({
         <Dialog onOpenChange={setOpen} open={open}>
           <DialogTrigger asChild>
             <Button size='sm' variant='destructive'>
-              <TrashIcon aria-hidden='true' />
+              <Trash2 aria-hidden='true' />
               Excluir
             </Button>
           </DialogTrigger>

@@ -1,4 +1,4 @@
-import { CaretDownIcon, CheckIcon } from '@phosphor-icons/react'
+import { ChevronDown, Check } from 'lucide-react'
 import { cn } from 'cn'
 import { Select as SelectPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
@@ -23,7 +23,7 @@ export function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon>
-        <CaretDownIcon size={13} />
+        <ChevronDown size={13} />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -66,7 +66,7 @@ export function SelectItem({
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator className='absolute right-2'>
-        <CheckIcon size={13} />
+        <Check size={13} />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   )

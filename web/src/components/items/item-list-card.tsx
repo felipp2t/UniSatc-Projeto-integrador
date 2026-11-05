@@ -1,10 +1,4 @@
-import {
-  FileIcon,
-  FolderIcon,
-  ImageIcon,
-  KeyIcon,
-  LinkIcon,
-} from '@phosphor-icons/react'
+import { File, Folder, Image, KeyRound, Link } from 'lucide-react'
 import type { ItemResponse } from '@/api/types'
 import { type CopyKind, ItemActions } from '@/components/items/item-actions'
 import { ItemAttachmentDialog } from '@/components/items/item-attachment-dialog'
@@ -13,12 +7,12 @@ import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 import { canAccessItem } from '@/lib/item-permissions'
 
 const typeIcons = {
-  file: FileIcon,
-  folder: FolderIcon,
-  image: ImageIcon,
-  link: LinkIcon,
-  secret: KeyIcon,
-  text: FileIcon,
+  file: File,
+  folder: Folder,
+  image: Image,
+  link: Link,
+  secret: KeyRound,
+  text: File,
 } as const
 
 export function ItemListCard({

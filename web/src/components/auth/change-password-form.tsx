@@ -1,4 +1,4 @@
-import { KeyIcon } from '@phosphor-icons/react'
+import { KeyRound } from 'lucide-react'
 import { revalidateLogic, useForm, useSelector } from '@tanstack/react-form'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { z } from 'zod'
@@ -183,7 +183,7 @@ export function ChangePasswordForm({
             loading={submitting}
             type='submit'
           >
-            {submitting ? null : <KeyIcon aria-hidden='true' size={16} />}
+            {submitting ? null : <KeyRound aria-hidden='true' size={16} />}
             ALTERAR SENHA
           </Button>
         </div>

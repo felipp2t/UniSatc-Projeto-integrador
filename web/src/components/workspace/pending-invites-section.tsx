@@ -1,4 +1,4 @@
-import { TrashIcon } from '@phosphor-icons/react'
+import { Trash2 } from 'lucide-react'
 import {
   type UseQueryResult,
   useMutation,
@@ -223,7 +223,7 @@ function PendingInviteRow({
         size='icon'
         variant='outline'
       >
-        <TrashIcon aria-hidden='true' className='size-3.5' />
+        <Trash2 aria-hidden='true' className='size-3.5' />
       </Button>
     </li>
   )

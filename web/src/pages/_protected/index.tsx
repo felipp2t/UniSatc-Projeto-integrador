@@ -1,10 +1,4 @@
-import {
-  ClockCounterClockwiseIcon,
-  DotsThreeVerticalIcon,
-  FileIcon,
-  FolderIcon,
-  GearIcon,
-} from '@phosphor-icons/react'
+import { History, EllipsisVertical, File, Folder, Settings } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
@@ -339,7 +333,7 @@ function WorkspaceHeading({
   return (
     <header className='flex flex-wrap items-center justify-between gap-5 border-border border-b pb-6'>
       <div className='flex min-w-0 items-center gap-4'>
-        <FolderIcon
+        <Folder
           aria-hidden='true'
           className='size-7 shrink-0 text-primary'
         />
@@ -362,10 +356,9 @@ function WorkspaceHeading({
                       className='flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-sm text-foreground/80 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent data-[state=open]:text-accent-foreground'
                       type='button'
                     >
-                      <DotsThreeVerticalIcon
+                      <EllipsisVertical
                         aria-hidden='true'
                         className='size-6'
-                        weight='bold'
                       />
                     </button>
                   </DropdownMenuTrigger>
@@ -376,7 +369,7 @@ function WorkspaceHeading({
                           className='flex w-full items-center gap-2'
                           to='/atividades'
                         >
-                          <ClockCounterClockwiseIcon
+                          <History
                             aria-hidden='true'
                             size={14}
                           />
@@ -389,7 +382,7 @@ function WorkspaceHeading({
                         className='flex w-full items-center gap-2'
                         to='/configuracoes/geral'
                       >
-                        <GearIcon aria-hidden='true' size={14} />
+                        <Settings aria-hidden='true' size={14} />
                         Configurações do workspace
                       </Link>
                     </DropdownMenuItem>
@@ -759,7 +752,7 @@ function EmptyItemsContent({
     <>
       <EmptyState
         description={copy.description}
-        icon={<FileIcon aria-hidden='true' className='size-6' />}
+        icon={<File aria-hidden='true' className='size-6' />}
         title={copy.title}
         variant='compact'
         bordered={!isEmptyCollection}

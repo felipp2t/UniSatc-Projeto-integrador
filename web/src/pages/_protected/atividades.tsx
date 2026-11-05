@@ -1,4 +1,4 @@
-import { ClockCounterClockwiseIcon } from '@phosphor-icons/react'
+import { History } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
@@ -211,7 +211,7 @@ function ActivityHistory({ workspaceId }: { workspaceId: string }) {
           items={[{ label: 'Início', to: '/' }, { label: 'Atividades' }]}
         />
         <div className='flex items-center gap-4'>
-          <ClockCounterClockwiseIcon
+          <History
             aria-hidden='true'
             className='size-6 shrink-0 text-primary'
           />

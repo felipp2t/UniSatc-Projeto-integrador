@@ -1,10 +1,4 @@
-import {
-  FileTextIcon,
-  KeyIcon,
-  LinkSimpleIcon,
-  ParagraphIcon,
-  PlusIcon,
-} from '@phosphor-icons/react'
+import { FileText, KeyRound, Link, Text, Plus } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
@@ -45,10 +39,10 @@ import { AttachmentFields } from '@/components/items/attachment-fields'
 import { UploadProgress } from '@/components/items/upload-progress'
 
 const itemTypes = [
-  { icon: FileTextIcon, label: 'documento', value: 'file' },
-  { icon: LinkSimpleIcon, label: 'link', value: 'link' },
-  { icon: KeyIcon, label: 'segredo', value: 'secret' },
-  { icon: ParagraphIcon, label: 'texto', value: 'text' },
+  { icon: FileText, label: 'documento', value: 'file' },
+  { icon: Link, label: 'link', value: 'link' },
+  { icon: KeyRound, label: 'segredo', value: 'secret' },
+  { icon: Text, label: 'texto', value: 'text' },
 ] as const
 
 interface CollectionLocation {
@@ -614,7 +608,7 @@ export function CreateItemDialog({
     <Dialog onOpenChange={handleOpenChange} open={open}>
       <DialogTrigger asChild>
         <Button>
-          <PlusIcon aria-hidden='true' size={15} />
+          <Plus aria-hidden='true' size={15} />
           Novo item
         </Button>
       </DialogTrigger>
@@ -760,7 +754,7 @@ export function CreateItemDialog({
               loading={submitting}
               type='submit'
             >
-              <PlusIcon aria-hidden='true' size={13} />
+              <Plus aria-hidden='true' size={13} />
               CRIAR
             </Button>
           </DialogFooter>

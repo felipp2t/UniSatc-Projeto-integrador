@@ -1,4 +1,4 @@
-import { BellIcon, CheckIcon } from '@phosphor-icons/react'
+import { Bell, Check } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
@@ -103,7 +103,7 @@ export function NotificationBell({
           size='icon'
           variant='ghost'
         >
-          <BellIcon aria-hidden='true' size={18} />
+          <Bell aria-hidden='true' size={18} />
           {unreadCount > 0 ? (
             <span className='absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] text-primary-foreground'>
               {unreadBadge}
@@ -125,7 +125,7 @@ export function NotificationBell({
             size='sm'
             variant='ghost'
           >
-            <CheckIcon aria-hidden='true' size={16} />
+            <Check aria-hidden='true' size={16} />
             Marcar todas como lidas
           </Button>
         ) : null}
@@ -265,7 +265,7 @@ function NotificationRow({
             size='sm'
             variant='ghost'
           >
-            <CheckIcon aria-hidden='true' size={16} />
+            <Check aria-hidden='true' size={16} />
             Marcar como lida
           </Button>
         )}

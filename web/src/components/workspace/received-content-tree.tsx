@@ -1,4 +1,4 @@
-import { FolderIcon } from '@phosphor-icons/react'
+import { Folder } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { receivedContentApi } from '@/api/endpoints'
@@ -115,7 +115,7 @@ function TreeEntry({
       <li>
         <details>
           <summary className='flex min-h-10 cursor-pointer list-none items-center gap-2 rounded px-2 py-2 text-sm outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring'>
-            <FolderIcon
+            <Folder
               aria-hidden='true'
               className='size-4 shrink-0 text-muted-foreground'
             />

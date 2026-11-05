@@ -1,4 +1,4 @@
-import { GearIcon, ShieldIcon, UsersThreeIcon } from '@phosphor-icons/react'
+import { Settings, Shield, UsersRound } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { Separator } from '@/components/ui/separator'
 
@@ -10,12 +10,12 @@ export function WorkspaceSettingsNavigation({
   canManageRoles: boolean
 }) {
   const sections = [
-    { icon: GearIcon, label: 'Geral', to: '/configuracoes/geral' },
-    { icon: UsersThreeIcon, label: 'Membros', to: '/configuracoes' },
+    { icon: Settings, label: 'Geral', to: '/configuracoes/geral' },
+    { icon: UsersRound, label: 'Membros', to: '/configuracoes' },
     ...(canManageRoles
       ? [
           {
-            icon: ShieldIcon,
+            icon: Shield,
             label: 'Cargos',
             to: '/configuracoes/cargos',
           },
@@ -24,7 +24,7 @@ export function WorkspaceSettingsNavigation({
     ...(canManageGroups
       ? [
           {
-            icon: UsersThreeIcon,
+            icon: UsersRound,
             label: 'Times',
             to: '/configuracoes/grupo',
           },

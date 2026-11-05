@@ -1,4 +1,4 @@
-import { FolderIcon } from '@phosphor-icons/react'
+import { Folder } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface AuthStatusProps {
@@ -47,7 +47,7 @@ export function BrandMark() {
       className='flex size-10 items-center justify-center rounded-md text-foreground'
       role='img'
     >
-      <FolderIcon aria-hidden='true' size={28} />
+      <Folder aria-hidden='true' size={28} />
     </div>
   )
 }

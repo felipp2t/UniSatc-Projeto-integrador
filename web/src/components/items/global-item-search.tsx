@@ -1,4 +1,4 @@
-import { FileSearchIcon } from '@phosphor-icons/react'
+import { FileSearch } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { collectionsApi, itemsApi, receivedContentApi } from '@/api/endpoints'
@@ -125,7 +125,7 @@ export function GlobalItemSearch() {
         size='icon'
         variant='ghost'
       >
-        <FileSearchIcon aria-hidden='true' size={18} />
+        <FileSearch aria-hidden='true' size={18} />
       </Button>
       <Dialog onOpenChange={setOpen} open={open}>
         <DialogContent className='max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl'>

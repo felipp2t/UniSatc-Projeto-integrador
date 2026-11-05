@@ -1,4 +1,4 @@
-import { CircleNotchIcon } from '@phosphor-icons/react'
+import { LoaderCircle } from 'lucide-react'
 import { cn } from 'cn'
 import type { ButtonHTMLAttributes, Ref } from 'react'
 
@@ -58,7 +58,7 @@ export function Button({
       {...props}
     >
       {!!loading && (
-        <CircleNotchIcon
+        <LoaderCircle
           aria-hidden='true'
           className='animate-spin'
           size={14}

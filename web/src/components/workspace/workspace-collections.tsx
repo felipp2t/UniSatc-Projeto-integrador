@@ -1,4 +1,4 @@
-import { FolderIcon } from '@phosphor-icons/react'
+import { Folder } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -248,7 +248,7 @@ function CollectionsSection({
               ? 'Esta pasta ainda não tem subpastas.'
               : 'Este workspace ainda não tem pastas.'
           }
-          icon={<FolderIcon aria-hidden='true' className='size-6' />}
+          icon={<Folder aria-hidden='true' className='size-6' />}
           title='Nenhuma pasta encontrada'
           variant='compact'
           bordered={false}

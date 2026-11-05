@@ -1,10 +1,4 @@
-import {
-  DotsThreeVerticalIcon,
-  FolderIcon,
-  PencilSimpleIcon,
-  PlusIcon,
-  TrashIcon,
-} from '@phosphor-icons/react'
+import { EllipsisVertical, Folder, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
@@ -84,7 +78,7 @@ export function CollectionCard({
           search={{ collectionId: collection.id }}
           to='/'
         >
-          <FolderIcon
+          <Folder
             aria-hidden='true'
             className='size-5 shrink-0 text-muted-foreground group-hover:text-primary'
           />
@@ -100,7 +94,7 @@ export function CollectionCard({
                 className='relative z-10 shrink-0 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
                 type='button'
               >
-                <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
+                <EllipsisVertical aria-hidden='true' className='size-4' />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end'>
@@ -111,13 +105,13 @@ export function CollectionCard({
               ) : null}
               {canRename ? (
                 <DropdownMenuItem onSelect={handleRename}>
-                  <PencilSimpleIcon aria-hidden='true' />
+                  <Pencil aria-hidden='true' />
                   Renomear
                 </DropdownMenuItem>
               ) : null}
               {canDelete ? (
                 <DropdownMenuItem onSelect={handleDelete} variant='destructive'>
-                  <TrashIcon aria-hidden='true' />
+                  <Trash2 aria-hidden='true' />
                   Excluir
                 </DropdownMenuItem>
               ) : null}
@@ -395,7 +389,7 @@ function getCollectionMutationError(
 export function CreateCollectionButton({ onClick }: { onClick: () => void }) {
   return (
     <Button onClick={onClick}>
-      <PlusIcon aria-hidden='true' size={15} />
+      <Plus aria-hidden='true' size={15} />
       Nova pasta
     </Button>
   )

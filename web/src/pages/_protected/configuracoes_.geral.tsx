@@ -1,4 +1,4 @@
-import { ArchiveIcon, FloppyDiskIcon } from '@phosphor-icons/react'
+import { Archive, Save } from 'lucide-react'
 import { useForm, useSelector } from '@tanstack/react-form'
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useId, useState } from 'react'
@@ -159,7 +159,7 @@ function WorkspaceGeneralSettingsPage() {
               onClick={generateBackup}
               type='button'
             >
-              <ArchiveIcon aria-hidden='true' size={16} />
+              <Archive aria-hidden='true' size={16} />
               {backupPending ? 'Gerando backup…' : 'Baixar backup'}
             </Button>
             <p
@@ -292,7 +292,7 @@ function WorkspaceGeneralForm({
       ) : null}
       {canUpdate ? (
         <Button disabled={!hasChanges || submitting} type='submit'>
-          <FloppyDiskIcon aria-hidden='true' size={16} />
+          <Save aria-hidden='true' size={16} />
           {submitting ? 'Salvando…' : 'Salvar'}
         </Button>
       ) : null}

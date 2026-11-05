@@ -1,4 +1,4 @@
-import { GearIcon } from '@phosphor-icons/react'
+import { Settings } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { AppBreadcrumb } from '@/components/layout/app-breadcrumb'
 import { WorkspaceSettingsNavigation } from '@/components/workspace/workspace-settings-navigation'
@@ -29,7 +29,7 @@ export function WorkspaceSettingsLayout({
           ]}
         />
         <div className='flex min-w-0 items-center gap-4'>
-          <GearIcon
+          <Settings
             aria-hidden='true'
             className='size-6 shrink-0 text-primary'
           />

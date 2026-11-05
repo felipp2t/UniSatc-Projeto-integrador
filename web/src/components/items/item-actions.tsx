@@ -1,4 +1,4 @@
-import { DotsThreeVerticalIcon } from '@phosphor-icons/react'
+import { EllipsisVertical } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { itemsApi } from '@/api/endpoints'
 import { getArchiveError, getRestoreError } from '@/api/item-errors'
@@ -100,7 +100,7 @@ export function ItemActions({
             className='text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground'
             type='button'
           >
-            <DotsThreeVerticalIcon aria-hidden='true' className='size-4' />
+            <EllipsisVertical aria-hidden='true' className='size-4' />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end'>
