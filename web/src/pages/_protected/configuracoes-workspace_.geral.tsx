@@ -117,6 +117,7 @@ function WorkspaceGeneralSettingsPage() {
       breadcrumbLabel='Geral'
       breadcrumbParentLabel='Configurações do Workspace'
       canManageGroups={permissions.can('group', 'manage')}
+      canManageRoles={isOwner}
     >
       <section
         aria-labelledby='workspace-general-title'

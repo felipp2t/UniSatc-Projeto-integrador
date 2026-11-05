@@ -50,12 +50,40 @@ de redefinição de uso único.
    mvn spring-boot:run
    ```
 
-   Em um banco vazio, o Flyway cria as tabelas de autenticação, convite e recuperação de senha.
-   A migration `V2` também insere o usuário inicial `admin@gmail.com`. Como não existe cadastro
-   público, solicite a redefinição de senha desse e-mail para definir a primeira senha e então
-   enviar o primeiro convite.
+   Em um banco vazio, o Flyway cria o schema e insere a conta inicial `admin@gmail.com`. Para
+   recriar os dados de desenvolvimento com contas de demonstração, use o seed descrito abaixo.
 
 A API sobe em `http://localhost:8080`.
+
+### Seed local de demonstração
+
+O seed apaga os dados das tabelas da aplicação no banco **local** `vaulty` e recria um workspace
+com usuários, cargos e permissões, grupos, pastas com diferentes compartilhamentos, itens,
+notificações e histórico. Ele recusa URLs de banco que não sejam loopback e cujo nome não seja
+`vaulty`. Anexos e tokens temporários não são semeados.
+
+Pare a API e rode, dentro de `server`:
+
+```bash
+APP_DEV_SEED_ENABLED=true SERVER_PORT=0 mvn spring-boot:run
+```
+
+O servidor inicia em uma porta aleatória para não conflitar com outra aplicação local. Depois da
+mensagem `Development database seeded`, encerre o processo com `Ctrl+C`.
+
+Todas as contas abaixo usam a senha `vaulty123`:
+
+| E-mail | Cargo |
+|---|---|
+| `owner@vaulty.local` | Owner |
+| `editor@vaulty.local` | Editor |
+| `viewer@vaulty.local` | Viewer |
+| `auditor@vaulty.local` | Auditor |
+| `contributor@vaulty.local` | Contributor |
+| `rafael.augusto@vaulty.local` | Member |
+| `matheus.silveira@vaulty.local` | Member |
+
+O seed é transacional e pode ser executado novamente para restaurar o mesmo conjunto de dados.
 
 A documentação interativa OpenAPI está disponível em `http://localhost:8080/swagger-ui.html`; a
 especificação JSON pode ser acessada em `http://localhost:8080/v3/api-docs`.
@@ -88,10 +116,10 @@ refresh tokens existentes são associados ao vínculo atual pela V20, e os sem v
 descartados. Login de usuário sem vínculo não emite sessão; um refresh migrado de membro atual pode
 rotacionar e emitir um novo par.
 
-A V20 mantém a política existente de workspace, membros e proprietário. O papel é consultado no
-banco por requisição, mas grupos, concessões e herança de permissões não existem nesta branch e
-seguem para as issues #132/#133. Isso não representa atendimento integral ao RNF04 nem validação
-completa de conteúdo granular.
+A V20 associa as sessões à membresia atual do workspace. As permissões do papel, os grupos e o
+compartilhamento de pastas e itens estão implementados: o acesso efetivo combina as permissões do
+papel com concessões herdadas de pastas, concessões para todos os membros e concessões diretas de
+itens. As permissões do papel ainda são definidas para o workspace, não individualmente por pasta.
 
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|

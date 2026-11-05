@@ -21,5 +21,5 @@ export function useWorkspacePermissions(workspaceId: string | undefined) {
     query.isError || !query.data
       ? denyAllPermissions
       : createPermissionChecker(query.data.permissions, query.data.isOwner)
-  return { ...query, can: checker.can }
+  return { ...query, can: checker.can, isOwner: query.data?.isOwner ?? false }
 }

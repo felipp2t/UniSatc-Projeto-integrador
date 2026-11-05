@@ -240,34 +240,7 @@ function WorkspaceRoleRow({
 
   return (
     <TableRow>
-      <TableCell className='font-semibold'>
-        <div className='flex items-center gap-1'>
-          <span>{role.name}</span>
-          {role.builtIn ? (
-            <span className='sr-only' id={`rename-disabled-${role.id}`}>
-              Cargos iniciais não podem ser renomeados.
-            </span>
-          ) : null}
-          <Button
-            aria-describedby={
-              role.builtIn ? `rename-disabled-${role.id}` : undefined
-            }
-            aria-label={`Renomear cargo ${role.name}`}
-            className='size-6 p-0'
-            disabled={role.builtIn}
-            onClick={handleRename}
-            size='icon'
-            title={
-              role.builtIn
-                ? 'Cargos iniciais não podem ser renomeados.'
-                : `Renomear ${role.name}`
-            }
-            variant='ghost'
-          >
-            <PencilSimpleIcon aria-hidden='true' size={14} />
-          </Button>
-        </div>
-      </TableCell>
+      <TableCell className='font-semibold'>{role.name}</TableCell>
       <TableCell>{role.memberCount}</TableCell>
       <TableCell>
         {permissionsPending ? <span>…</span> : <span>{permissionsCount}</span>}
@@ -300,6 +273,18 @@ function WorkspaceRoleRow({
               Ajustar permissões
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={role.builtIn}
+              onSelect={handleRename}
+              title={
+                role.builtIn
+                  ? 'Cargos iniciais não podem ser renomeados.'
+                  : undefined
+              }
+            >
+              <PencilSimpleIcon aria-hidden='true' />
+              Renomear cargo
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={handleDelete} variant='destructive'>
               <TrashIcon aria-hidden='true' />
               Excluir cargo
