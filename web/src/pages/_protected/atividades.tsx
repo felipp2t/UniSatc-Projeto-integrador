@@ -36,6 +36,8 @@ import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 const PAGE_SIZE = 20
 
 const actionLabels: Record<ActivityAction, string> = {
+  content_publication_revoked: 'revogou uma publicação',
+  content_published: 'publicou conteúdo',
   folder_created: 'criou uma pasta',
   folder_deleted: 'excluiu uma pasta',
   folder_renamed: 'renomeou uma pasta',
@@ -58,6 +60,13 @@ const actionLabels: Record<ActivityAction, string> = {
   role_created: 'criou um papel',
   role_deleted: 'excluiu um papel',
   role_permissions_changed: 'alterou as permissões de um papel',
+  role_renamed: 'renomeou um papel',
+  team_created: 'criou um time',
+  team_deleted: 'excluiu um time',
+  team_leader_changed: 'alterou a liderança de um time',
+  team_member_added: 'adicionou alguém a um time',
+  team_member_removed: 'removeu alguém de um time',
+  team_renamed: 'renomeou um time',
   workspace_renamed: 'renomeou o workspace',
 }
 
@@ -66,7 +75,9 @@ const resourceLabels: Record<ActivityResourceType, string> = {
   group: 'Grupo',
   item: 'Item',
   member: 'Membro',
+  publication: 'Publicação',
   role: 'Papel',
+  team: 'Time',
   workspace: 'Workspace',
 }
 

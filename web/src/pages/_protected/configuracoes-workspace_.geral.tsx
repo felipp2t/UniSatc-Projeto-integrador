@@ -116,7 +116,7 @@ function WorkspaceGeneralSettingsPage() {
     <WorkspaceSettingsLayout
       breadcrumbLabel='Geral'
       breadcrumbParentLabel='Configurações do Workspace'
-      canManageGroups={permissions.can('group', 'manage')}
+      canManageGroups={permissions.can('team', 'manage')}
       canManageRoles={isOwner}
     >
       <section

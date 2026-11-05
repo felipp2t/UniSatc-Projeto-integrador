@@ -1,6 +1,6 @@
 package com.vaulty.api.config;
 
-import com.vaulty.api.service.PermissionCatalog;
+import com.vaulty.api.service.ReceivedContentProjectionService;
 import com.vaulty.api.service.SecretCipher;
 import java.net.URI;
 import java.util.UUID;
@@ -19,49 +19,53 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
 
     private static final String DEV_PASSWORD = "vaulty123";
     private static final UUID WORKSPACE = id("10000000-0000-4000-8000-000000000001");
-
     private static final UUID OWNER = id("20000000-0000-4000-8000-000000000001");
-    private static final UUID EDITOR = id("20000000-0000-4000-8000-000000000002");
-    private static final UUID VIEWER = id("20000000-0000-4000-8000-000000000003");
-    private static final UUID AUDITOR = id("20000000-0000-4000-8000-000000000004");
-    private static final UUID CONTRIBUTOR = id("20000000-0000-4000-8000-000000000005");
-    private static final UUID RAFAEL = id("20000000-0000-4000-8000-000000000006");
-    private static final UUID MATHEUS = id("20000000-0000-4000-8000-000000000007");
-
-    private static final UUID OWNER_ROLE = id("30000000-0000-4000-8000-000000000001");
-    private static final UUID MEMBER_ROLE = id("30000000-0000-4000-8000-000000000002");
-    private static final UUID EDITOR_ROLE = id("30000000-0000-4000-8000-000000000003");
-    private static final UUID VIEWER_ROLE = id("30000000-0000-4000-8000-000000000004");
-    private static final UUID AUDITOR_ROLE = id("30000000-0000-4000-8000-000000000005");
-    private static final UUID CONTRIBUTOR_ROLE = id("30000000-0000-4000-8000-000000000006");
+    private static final UUID ADMIN = id("20000000-0000-4000-8000-000000000002");
+    private static final UUID MAINTAINER = id("20000000-0000-4000-8000-000000000003");
+    private static final UUID MARCELO = id("20000000-0000-4000-8000-000000000004");
+    private static final UUID ANDREW = id("20000000-0000-4000-8000-000000000005");
+    private static final UUID MATHEUS = id("20000000-0000-4000-8000-000000000006");
+    private static final UUID RAFAEL = id("20000000-0000-4000-8000-000000000007");
+    private static final UUID GIOVANI = id("20000000-0000-4000-8000-000000000008");
+    private static final UUID UNASSIGNED = id("20000000-0000-4000-8000-000000000009");
+    private static final UUID TEAM_MEMBER = id("20000000-0000-4000-8000-000000000010");
 
     private static final UUID OWNER_MEMBER = id("40000000-0000-4000-8000-000000000001");
-    private static final UUID EDITOR_MEMBER = id("40000000-0000-4000-8000-000000000002");
-    private static final UUID VIEWER_MEMBER = id("40000000-0000-4000-8000-000000000003");
-    private static final UUID AUDITOR_MEMBER = id("40000000-0000-4000-8000-000000000004");
-    private static final UUID CONTRIBUTOR_MEMBER = id("40000000-0000-4000-8000-000000000005");
-    private static final UUID RAFAEL_MEMBER = id("40000000-0000-4000-8000-000000000006");
-    private static final UUID MATHEUS_MEMBER = id("40000000-0000-4000-8000-000000000007");
+    private static final UUID ADMIN_MEMBER = id("40000000-0000-4000-8000-000000000002");
+    private static final UUID MAINTAINER_MEMBER = id("40000000-0000-4000-8000-000000000003");
+    private static final UUID MARCELO_MEMBER = id("40000000-0000-4000-8000-000000000004");
+    private static final UUID ANDREW_MEMBER = id("40000000-0000-4000-8000-000000000005");
+    private static final UUID MATHEUS_MEMBER = id("40000000-0000-4000-8000-000000000006");
+    private static final UUID RAFAEL_MEMBER = id("40000000-0000-4000-8000-000000000007");
+    private static final UUID GIOVANI_MEMBER = id("40000000-0000-4000-8000-000000000008");
+    private static final UUID UNASSIGNED_MEMBER = id("40000000-0000-4000-8000-000000000009");
+    private static final UUID TEAM_MEMBER_MEMBER = id("40000000-0000-4000-8000-000000000010");
 
-    private static final UUID ENGINEERING_GROUP = id("50000000-0000-4000-8000-000000000001");
-    private static final UUID FINANCE_GROUP = id("50000000-0000-4000-8000-000000000002");
+    private static final UUID FINANCE_TEAM = id("50000000-0000-4000-8000-000000000001");
+    private static final UUID IOT_TEAM = id("50000000-0000-4000-8000-000000000002");
+    private static final UUID OSMANGAS_TEAM = id("50000000-0000-4000-8000-000000000003");
+    private static final UUID DROPTABLE_TEAM = id("50000000-0000-4000-8000-000000000004");
+    private static final UUID ADMIN_TEAM = id("50000000-0000-4000-8000-000000000005");
 
-    private static final UUID ENGINEERING = id("60000000-0000-4000-8000-000000000001");
-    private static final UUID FRONTEND = id("60000000-0000-4000-8000-000000000002");
-    private static final UUID RESTRICTED = id("60000000-0000-4000-8000-000000000003");
-    private static final UUID FINANCE = id("60000000-0000-4000-8000-000000000004");
-    private static final UUID SHARED = id("60000000-0000-4000-8000-000000000005");
+    private static final UUID FINANCE = id("60000000-0000-4000-8000-000000000001");
+    private static final UUID IOT = id("60000000-0000-4000-8000-000000000002");
+    private static final UUID OSMANGAS = id("60000000-0000-4000-8000-000000000003");
+    private static final UUID DROPTABLE = id("60000000-0000-4000-8000-000000000004");
+    private static final UUID ADMIN_COLLECTION = id("60000000-0000-4000-8000-000000000005");
+    private static final UUID FINANCE_OPERATIONS = id("60000000-0000-4000-8000-000000000006");
+    private static final UUID UNASSIGNED_COLLECTION = id("60000000-0000-4000-8000-000000000007");
 
-    private static final UUID WELCOME_ITEM = id("70000000-0000-4000-8000-000000000001");
-    private static final UUID ROADMAP_ITEM = id("70000000-0000-4000-8000-000000000002");
-    private static final UUID SECRET_ITEM = id("70000000-0000-4000-8000-000000000003");
-    private static final UUID FINANCE_ITEM = id("70000000-0000-4000-8000-000000000004");
-    private static final UUID SHARED_ITEM = id("70000000-0000-4000-8000-000000000005");
-    private static final UUID DIRECT_SHARED_ITEM = id("70000000-0000-4000-8000-000000000006");
+    private static final UUID FINANCE_TEXT = id("70000000-0000-4000-8000-000000000001");
+    private static final UUID FINANCE_LINK = id("70000000-0000-4000-8000-000000000002");
+    private static final UUID FINANCE_SECRET = id("70000000-0000-4000-8000-000000000003");
+    private static final UUID IOT_PUBLICATION_ITEM = id("70000000-0000-4000-8000-000000000005");
+    private static final UUID ADMIN_ITEM = id("70000000-0000-4000-8000-000000000006");
+    private static final UUID UNASSIGNED_ITEM = id("70000000-0000-4000-8000-000000000007");
 
     private final JdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
     private final SecretCipher secretCipher;
+    private final ReceivedContentProjectionService projectionService;
     private final TransactionTemplate transaction;
     private final Environment environment;
 
@@ -69,11 +73,13 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
             JdbcTemplate jdbc,
             PasswordEncoder passwordEncoder,
             SecretCipher secretCipher,
+            ReceivedContentProjectionService projectionService,
             TransactionTemplate transaction,
             Environment environment) {
         this.jdbc = jdbc;
         this.passwordEncoder = passwordEncoder;
         this.secretCipher = secretCipher;
+        this.projectionService = projectionService;
         this.transaction = transaction;
         this.environment = environment;
     }
@@ -88,208 +94,110 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
     private void seed() {
         jdbc.execute("""
                 TRUNCATE TABLE email_outbox, password_reset_token, refresh_token, user_invite,
-                    notification, activity_log, collection_public_grant, item_member_grant,
-                    collection_access_grant, access_group_member, item_file, item_media,
-                    item_secret, item, collection, role_permission, workspace_member,
-                    access_group, workspace_role, workspace, \"user\"
+                    notification, activity_log, received_content_coverage, received_content_projection,
+                    content_publication, collection_public_grant, item_member_grant,
+                    collection_access_grant, access_group_member, item_media, item_file,
+                    item_secret, item, workspace_team, collection, role_permission,
+                    workspace_member, access_group, workspace_role, workspace, "user"
                 RESTART IDENTITY CASCADE
                 """);
 
         String passwordHash = passwordEncoder.encode(DEV_PASSWORD);
         insertUser(OWNER, "Olivia Owner", "owner@vaulty.local", passwordHash);
-        insertUser(EDITOR, "Eddie Editor", "editor@vaulty.local", passwordHash);
-        insertUser(VIEWER, "Vera Viewer", "viewer@vaulty.local", passwordHash);
-        insertUser(AUDITOR, "Alex Auditor", "auditor@vaulty.local", passwordHash);
-        insertUser(CONTRIBUTOR, "Casey Contributor", "contributor@vaulty.local", passwordHash);
-        insertUser(RAFAEL, "Rafael Augusto", "rafael.augusto@vaulty.local", passwordHash);
+        insertUser(ADMIN, "Admin Vaulty", "admin@vaulty.local", passwordHash);
+        insertUser(MAINTAINER, "Maintainer Vaulty", "maintainer@vaulty.local", passwordHash);
+        insertUser(MARCELO, "Marcelo Serpa", "marcelo.serpa@vaulty.local", passwordHash);
+        insertUser(ANDREW, "Andrew Senra", "andrew.senra@vaulty.local", passwordHash);
         insertUser(MATHEUS, "Matheus Silveira", "matheus.silveira@vaulty.local", passwordHash);
+        insertUser(RAFAEL, "Rafael Augusto", "rafael.augusto@vaulty.local", passwordHash);
+        insertUser(GIOVANI, "Giovani Martings", "giovani.martings@vaulty.local", passwordHash);
+        insertUser(UNASSIGNED, "Membro sem time", "member@vaulty.local", passwordHash);
+        insertUser(TEAM_MEMBER, "Membro Financeiro", "team.member@vaulty.local", passwordHash);
 
-        jdbc.update(
-                "INSERT INTO workspace (id, owner_id, name, description, singleton) VALUES (?, ?, ?, ?, TRUE)",
-                WORKSPACE,
-                OWNER,
-                "Vaulty Demo",
-                "Workspace de demonstração com cargos, grupos, pastas e compartilhamento.");
+        jdbc.update("INSERT INTO workspace (id, owner_id, name, description, singleton) VALUES (?, ?, ?, ?, TRUE)",
+                WORKSPACE, OWNER, "Vaulty Demo", "Workspace de demonstração com times e conteúdo compartilhado.");
 
-        insertRole(OWNER_ROLE, "Owner");
-        insertRole(MEMBER_ROLE, "Member");
-        insertRole(EDITOR_ROLE, "Editor");
-        insertRole(VIEWER_ROLE, "Viewer");
-        insertRole(AUDITOR_ROLE, "Auditor");
-        insertRole(CONTRIBUTOR_ROLE, "Contributor");
-        seedPermissions();
+        insertMember(OWNER_MEMBER, OWNER, null, null);
+        insertMember(ADMIN_MEMBER, ADMIN, null, "ADMIN");
+        insertMember(MAINTAINER_MEMBER, MAINTAINER, null, "MAINTAINER");
+        insertMember(MARCELO_MEMBER, MARCELO, FINANCE_TEAM, null);
+        insertMember(ANDREW_MEMBER, ANDREW, IOT_TEAM, null);
+        insertMember(MATHEUS_MEMBER, MATHEUS, OSMANGAS_TEAM, null);
+        insertMember(RAFAEL_MEMBER, RAFAEL, DROPTABLE_TEAM, null);
+        insertMember(GIOVANI_MEMBER, GIOVANI, ADMIN_TEAM, null);
+        insertMember(UNASSIGNED_MEMBER, UNASSIGNED, null, null);
+        insertMember(TEAM_MEMBER_MEMBER, TEAM_MEMBER, FINANCE_TEAM, null);
 
-        insertMember(OWNER_MEMBER, OWNER, OWNER_ROLE);
-        insertMember(EDITOR_MEMBER, EDITOR, EDITOR_ROLE);
-        insertMember(VIEWER_MEMBER, VIEWER, VIEWER_ROLE);
-        insertMember(AUDITOR_MEMBER, AUDITOR, AUDITOR_ROLE);
-        insertMember(CONTRIBUTOR_MEMBER, CONTRIBUTOR, CONTRIBUTOR_ROLE);
-        insertMember(RAFAEL_MEMBER, RAFAEL, MEMBER_ROLE);
-        insertMember(MATHEUS_MEMBER, MATHEUS, MEMBER_ROLE);
+        insertCollection(FINANCE, "Financeiro");
+        insertCollection(IOT, "IOT");
+        insertCollection(OSMANGAS, "OsMangas");
+        insertCollection(DROPTABLE, "DropTable_OsMangas");
+        insertCollection(ADMIN_COLLECTION, "Administração");
+        insertCollection(UNASSIGNED_COLLECTION, "Coleção preservada");
+        insertCollection(FINANCE_OPERATIONS, "Operações", FINANCE);
+        insertTeam(FINANCE_TEAM, "Financeiro", FINANCE, MARCELO_MEMBER);
+        insertTeam(IOT_TEAM, "IOT", IOT, ANDREW_MEMBER);
+        insertTeam(OSMANGAS_TEAM, "OsMangas", OSMANGAS, MATHEUS_MEMBER);
+        insertTeam(DROPTABLE_TEAM, "DropTable_OsMangas", DROPTABLE, RAFAEL_MEMBER);
+        insertTeam(ADMIN_TEAM, "Administração", ADMIN_COLLECTION, GIOVANI_MEMBER);
 
-        insertGroup(ENGINEERING_GROUP, "Engineering");
-        insertGroup(FINANCE_GROUP, "Finance");
-        insertGroupMember(ENGINEERING_GROUP, EDITOR_MEMBER);
-        insertGroupMember(ENGINEERING_GROUP, CONTRIBUTOR_MEMBER);
-        insertGroupMember(FINANCE_GROUP, VIEWER_MEMBER);
-        insertGroupMember(FINANCE_GROUP, AUDITOR_MEMBER);
+        insertItem(FINANCE_TEXT, FINANCE_OPERATIONS, "Fechamento mensal", "text",
+                "Enviar os relatórios até o último dia útil do mês.", null);
+        insertItem(FINANCE_LINK, FINANCE, "Portal financeiro", "link", null, "https://example.com/financeiro");
+        insertItem(FINANCE_SECRET, FINANCE, "Token de demonstração", "secret", null, null);
+        jdbc.update("INSERT INTO item_secret (item_id, value) VALUES (?, ?)",
+                FINANCE_SECRET, secretCipher.encrypt("demo-secret-123"));
+        insertItem(IOT_PUBLICATION_ITEM, IOT, "Padrão de integração", "text",
+                "Integrações devem registrar timeout e política de retry.", null);
+        insertItem(ADMIN_ITEM, ADMIN_COLLECTION, "Manual administrativo", "text", "Conteúdo de demonstração.", null);
+        insertItem(UNASSIGNED_ITEM, UNASSIGNED_COLLECTION, "Notas da coleção", "text",
+                "Conteúdo preservado para demonstrar uma coleção sem time.", null);
 
-        insertCollection(ENGINEERING, null, "Engineering", true);
-        insertCollection(FRONTEND, ENGINEERING, "Frontend", true);
-        insertCollection(RESTRICTED, ENGINEERING, "Restricted", false);
-        insertCollection(FINANCE, null, "Finance", true);
-        insertCollection(SHARED, null, "Shared", true);
-        jdbc.update(
-                "INSERT INTO collection_access_grant (collection_id, group_id, workspace_id) VALUES (?, ?, ?), (?, ?, ?)",
-                ENGINEERING,
-                ENGINEERING_GROUP,
-                WORKSPACE,
-                FINANCE,
-                FINANCE_GROUP,
-                WORKSPACE);
-        jdbc.update(
-                "INSERT INTO collection_public_grant (collection_id, workspace_id) VALUES (?, ?)",
-                SHARED,
-                WORKSPACE);
+        jdbc.update("""
+                INSERT INTO content_publication (id, workspace_id, original_type, original_item_id,
+                    source_collection_id, destination_collection_id, source_team_name, captured_path)
+                VALUES (?, ?, 'ITEM', ?, ?, ?, ?, ?)
+                """, id("80000000-0000-4000-8000-000000000001"), WORKSPACE,
+                IOT_PUBLICATION_ITEM, IOT, OSMANGAS, "IOT", "");
+        projectionService.refresh(WORKSPACE, OSMANGAS);
 
-        insertItem(WELCOME_ITEM, null, "Welcome", "text", "Welcome to the Vaulty demo workspace.", null);
-        insertItem(ROADMAP_ITEM, FRONTEND, "Frontend roadmap", "text", "1. Build accessible flows.\n2. Ship with confidence.", null);
-        insertItem(SECRET_ITEM, RESTRICTED, "Demo credentials", "secret", null, null);
-        jdbc.update(
-                "INSERT INTO item_secret (item_id, value) VALUES (?, ?)",
-                SECRET_ITEM,
-                secretCipher.encrypt("demo-secret-123"));
-        insertItem(FINANCE_ITEM, FINANCE, "Invoice process", "text", "Submit invoices by the last business day of the month.", null);
-        insertItem(SHARED_ITEM, SHARED, "Team handbook", "link", null, "https://example.com/handbook");
-        insertItem(DIRECT_SHARED_ITEM, RESTRICTED, "Access request", "text", "Ask the owner for access to this restricted folder.", null);
-
-        jdbc.update(
-                "INSERT INTO item_member_grant (item_id, workspace_member_id, workspace_id) VALUES (?, ?, ?)",
-                DIRECT_SHARED_ITEM,
-                VIEWER_MEMBER,
-                WORKSPACE);
-
-        insertNotification(EDITOR, "Folder shared", "Engineering is now available to you.", false);
-        insertNotification(VIEWER, "Welcome to Vaulty", "Your demo workspace is ready.", true);
-        insertActivity(OWNER, "Olivia Owner", "folder_created", "folder", ENGINEERING, "{\"name\":\"Engineering\"}");
-        insertActivity(EDITOR, "Eddie Editor", "item_created", "item", ROADMAP_ITEM, "{\"title\":\"Frontend roadmap\"}");
-        insertActivity(OWNER, "Olivia Owner", "group_created", "group", ENGINEERING_GROUP, "{\"name\":\"Engineering\"}");
-    }
-
-    private void seedPermissions() {
-        PermissionCatalog.effectiveOwnerPermissions()
-                .forEach(permission -> insertPermission(OWNER_ROLE, permission.resource(), permission.action()));
-        insertPermission(MEMBER_ROLE, "collection", "read");
-        insertPermission(MEMBER_ROLE, "item", "read");
-        insertPermission(VIEWER_ROLE, "collection", "read");
-        insertPermission(VIEWER_ROLE, "item", "read");
-        insertPermission(EDITOR_ROLE, "collection", "read");
-        insertPermission(EDITOR_ROLE, "collection", "create");
-        insertPermission(EDITOR_ROLE, "collection", "update");
-        insertPermission(EDITOR_ROLE, "item", "read");
-        insertPermission(EDITOR_ROLE, "item", "create");
-        insertPermission(EDITOR_ROLE, "item", "update");
-        insertPermission(EDITOR_ROLE, "item", "delete");
-        insertPermission(EDITOR_ROLE, "secret", "read");
-        insertPermission(CONTRIBUTOR_ROLE, "collection", "read");
-        insertPermission(CONTRIBUTOR_ROLE, "item", "read");
-        insertPermission(CONTRIBUTOR_ROLE, "item", "create");
-        insertPermission(CONTRIBUTOR_ROLE, "item", "update");
-        insertPermission(AUDITOR_ROLE, "collection", "read");
-        insertPermission(AUDITOR_ROLE, "item", "read");
-        insertPermission(AUDITOR_ROLE, "activity", "read");
+        insertActivity(OWNER, "Olivia Owner", "team_created", "team", FINANCE_TEAM, "{\"name\":\"Financeiro\"}");
+        insertActivity(OWNER, "Olivia Owner", "item_created", "item", FINANCE_TEXT, "{\"title\":\"Fechamento mensal\"}");
     }
 
     private void insertUser(UUID userId, String name, String email, String passwordHash) {
-        jdbc.update(
-                "INSERT INTO \"user\" (id, name, email, password_hash) VALUES (?, ?, ?, ?)",
-                userId,
-                name,
-                email,
-                passwordHash);
+        jdbc.update("INSERT INTO \"user\" (id, name, email, password_hash) VALUES (?, ?, ?, ?)", userId, name, email, passwordHash);
     }
 
-    private void insertRole(UUID roleId, String name) {
-        jdbc.update(
-                "INSERT INTO workspace_role (id, workspace_id, name) VALUES (?, ?, ?)",
-                roleId,
-                WORKSPACE,
-                name);
+    private void insertMember(UUID memberId, UUID userId, UUID teamId, String globalRole) {
+        jdbc.update("INSERT INTO workspace_member (id, user_id, workspace_id, role_id, team_id, global_role) VALUES (?, ?, ?, NULL, ?, ?)",
+                memberId, userId, WORKSPACE, teamId, globalRole);
     }
 
-    private void insertPermission(UUID roleId, String resource, String action) {
-        jdbc.update(
-                "INSERT INTO role_permission (role_id, resource, action) VALUES (?, ?, ?)",
-                roleId,
-                resource,
-                action);
+    private void insertCollection(UUID collectionId, String name) {
+        insertCollection(collectionId, name, null);
     }
 
-    private void insertMember(UUID memberId, UUID userId, UUID roleId) {
-        jdbc.update(
-                "INSERT INTO workspace_member (id, user_id, workspace_id, role_id) VALUES (?, ?, ?, ?)",
-                memberId,
-                userId,
-                WORKSPACE,
-                roleId);
+    private void insertCollection(UUID collectionId, String name, UUID parentId) {
+        jdbc.update("INSERT INTO collection (id, workspace_id, parent_id, name, inherit_access) VALUES (?, ?, ?, ?, TRUE)",
+                collectionId, WORKSPACE, parentId, name);
     }
 
-    private void insertGroup(UUID groupId, String name) {
-        jdbc.update("INSERT INTO access_group (id, workspace_id, name) VALUES (?, ?, ?)", groupId, WORKSPACE, name);
-    }
-
-    private void insertGroupMember(UUID groupId, UUID memberId) {
-        jdbc.update(
-                "INSERT INTO access_group_member (group_id, workspace_member_id, workspace_id) VALUES (?, ?, ?)",
-                groupId,
-                memberId,
-                WORKSPACE);
-    }
-
-    private void insertCollection(UUID collectionId, UUID parentId, String name, boolean inheritAccess) {
-        jdbc.update(
-                "INSERT INTO collection (id, workspace_id, parent_id, name, inherit_access) VALUES (?, ?, ?, ?, ?)",
-                collectionId,
-                WORKSPACE,
-                parentId,
-                name,
-                inheritAccess);
+    private void insertTeam(UUID teamId, String name, UUID rootCollectionId, UUID leaderMemberId) {
+        jdbc.update("INSERT INTO workspace_team (id, workspace_id, name, root_collection_id, leader_member_id) VALUES (?, ?, ?, ?, ?)",
+                teamId, WORKSPACE, name, rootCollectionId, leaderMemberId);
     }
 
     private void insertItem(UUID itemId, UUID collectionId, String title, String type, String text, String link) {
-        jdbc.update(
-                "INSERT INTO item (id, workspace_id, collection_id, title, type, text_content, link_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                itemId,
-                WORKSPACE,
-                collectionId,
-                title,
-                type,
-                text,
-                link);
+        jdbc.update("INSERT INTO item (id, workspace_id, collection_id, title, type, text_content, link_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                itemId, WORKSPACE, collectionId, title, type, text, link);
     }
 
-    private void insertNotification(UUID recipientId, String title, String content, boolean read) {
-        jdbc.update(
-                "INSERT INTO notification (id, recipient_id, title, content, metadata, read_at) VALUES (?, ?, ?, ?, '{}'::jsonb, CASE WHEN ? THEN now() ELSE NULL END)",
-                UUID.randomUUID(),
-                recipientId,
-                title,
-                content,
-                read);
-    }
-
-    private void insertActivity(
-            UUID actorId, String actorName, String action, String resourceType, UUID resourceId, String snapshot) {
-        jdbc.update(
-                "INSERT INTO activity_log (id, workspace_id, actor_id, actor_name, actor_context, action, resource_type, resource_id, snapshot) VALUES (?, ?, ?, ?, 'MEMBER', ?, ?, ?, ?::jsonb)",
-                UUID.randomUUID(),
-                WORKSPACE,
-                actorId,
-                actorName,
-                action,
-                resourceType,
-                resourceId,
-                snapshot);
+    private void insertActivity(UUID actorId, String actorName, String action, String resourceType, UUID resourceId, String snapshot) {
+        jdbc.update("""
+                INSERT INTO activity_log (id, workspace_id, actor_id, actor_name, actor_context, action, resource_type, resource_id, snapshot)
+                VALUES (?, ?, ?, ?, 'REGISTERED_USER', ?, ?, ?, ?::jsonb)
+                """, UUID.randomUUID(), WORKSPACE, actorId, actorName, action, resourceType, resourceId, snapshot);
     }
 
     private void requireLocalDevelopmentDatabase(String jdbcUrl) {

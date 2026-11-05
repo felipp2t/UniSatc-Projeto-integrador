@@ -8,15 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.vaulty.api.PostgresIntegrationTest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
-import com.vaulty.api.entity.RolePermission;
 import com.vaulty.api.entity.WorkspaceMember;
-import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
-import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
-import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
@@ -28,6 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @AutoConfigureMockMvc
@@ -42,12 +39,11 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
     @Autowired private JwtService jwtService;
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
     @Autowired private WorkspaceRepository workspaceRepository;
-    @Autowired private WorkspaceRoleRepository workspaceRoleRepository;
-    @Autowired private RolePermissionRepository rolePermissionRepository;
     @Autowired private EntityManager entityManager;
+    @Autowired private PasswordEncoder passwordEncoder;
 
     @Test
-    void loginAsOwnerEmbedsTheOwnerRoleInTheAccessToken() throws Exception {
+    void loginAsOwnerUsesMembershipIdentityWithoutWorkspaceRoleClaims() throws Exception {
         MvcResult result = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -58,15 +54,14 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
 
         String accessToken = result.getResponse().getCookie("accessToken").getValue();
 
-        assertThat(jwtService.validateAccessToken(accessToken).map(JwtService.AccessTokenClaims::role))
-                .contains(WorkspaceRole.OWNER_ROLE_NAME);
         var claims = jwtService.validateAccessToken(accessToken).orElseThrow();
+        assertThat(claims.role()).isNull();
         assertThat(claims.membershipId()).isEqualTo(workspaceMemberRepository
                 .findByUserId(userRepository.findByEmail(ADMIN_EMAIL).orElseThrow().getId()).orElseThrow().getId());
     }
 
     @Test
-    void registeringThroughAnInviteEmbedsTheMemberRoleInTheAccessToken() throws Exception {
+    void registeringThroughAnInviteCreatesUnassignedMembershipWithoutRoleClaims() throws Exception {
         UserInvite invite = createInvite("colaborador@example.com");
 
         MvcResult result = mockMvc.perform(post("/auth/register").with(uniqueRemoteAddress())
@@ -85,35 +80,46 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
 
         String accessToken = result.getResponse().getCookie("accessToken").getValue();
 
-        assertThat(jwtService.validateAccessToken(accessToken).map(JwtService.AccessTokenClaims::role))
-                .contains(WorkspaceRole.MEMBER_ROLE_NAME);
         User registered = userRepository.findByEmail("colaborador@example.com").orElseThrow();
-        assertThat(jwtService.validateAccessToken(accessToken).orElseThrow().membershipId())
-                .isEqualTo(workspaceMemberRepository.findByUserId(registered.getId()).orElseThrow().getId());
+        var membership = workspaceMemberRepository.findByUserId(registered.getId()).orElseThrow();
+        var claims = jwtService.validateAccessToken(accessToken).orElseThrow();
+        assertThat(claims.role()).isNull();
+        assertThat(claims.membershipId()).isEqualTo(membership.getId());
+        assertThat(membership.getRole()).isNull();
+        assertThat(membership.getGlobalRole()).isNull();
+        assertThat(membership.getTeam()).isNull();
     }
 
     @Test
     @Transactional
-    void refreshRecalculatesTheRoleFromTheCurrentMembership() throws Exception {
+    void refreshTokenDoesNotRestoreRemovedWorkspaceRoleClaims() throws Exception {
+        User maintainer = new User();
+        maintainer.setName("Maintainer");
+        maintainer.setEmail(UUID.randomUUID() + "@example.com");
+        maintainer.setPasswordHash(passwordEncoder.encode("password123"));
+        userRepository.saveAndFlush(maintainer);
+        var ownerMembership = workspaceMemberRepository.findByUserId(
+                userRepository.findByEmail(ADMIN_EMAIL).orElseThrow().getId()).orElseThrow();
+        WorkspaceMember membership = new WorkspaceMember();
+        membership.setUser(maintainer);
+        membership.setWorkspace(ownerMembership.getWorkspace());
+        membership.setGlobalRole(com.vaulty.api.enums.GlobalRole.MAINTAINER);
+        workspaceMemberRepository.saveAndFlush(membership);
+
         MvcResult login = mockMvc.perform(post("/auth/login").with(uniqueRemoteAddress())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "email": "%s", "password": "%s" }
-                                """.formatted(ADMIN_EMAIL, ADMIN_PASSWORD)))
+                                { "email": "%s", "password": "password123" }
+                                """.formatted(maintainer.getEmail())))
                 .andExpect(status().isOk()).andReturn();
-        User owner = userRepository.findByEmail(ADMIN_EMAIL).orElseThrow();
-        var membership = workspaceMemberRepository.findByUserId(owner.getId()).orElseThrow();
-        var memberRole = workspaceRoleRepository.findByWorkspaceIdAndName(
-                membership.getWorkspace().getId(), WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
-        membership.setRole(memberRole);
+        membership.setGlobalRole(com.vaulty.api.enums.GlobalRole.ADMIN);
         workspaceMemberRepository.saveAndFlush(membership);
 
         MvcResult refresh = mockMvc.perform(post("/auth/refresh")
                         .cookie(login.getResponse().getCookie("refreshToken")))
                 .andExpect(status().isOk()).andReturn();
         String accessToken = refresh.getResponse().getCookie("accessToken").getValue();
-        assertThat(jwtService.validateAccessToken(accessToken).map(JwtService.AccessTokenClaims::role))
-                .contains(WorkspaceRole.MEMBER_ROLE_NAME);
+        assertThat(jwtService.validateAccessToken(accessToken).orElseThrow().role()).isNull();
     }
 
     @Test
@@ -125,7 +131,6 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
         UUID userId = user.getId();
         UUID oldMemberId = oldMember.getId();
         UUID workspaceId = oldMember.getWorkspace().getId();
-        UUID roleId = oldMember.getRole().getId();
         String accessToken = login.getResponse().getCookie("accessToken").getValue();
         var refreshCookie = login.getResponse().getCookie("refreshToken");
 
@@ -140,7 +145,6 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
         var newMember = new com.vaulty.api.entity.WorkspaceMember();
         newMember.setUser(userRepository.findById(userId).orElseThrow());
         newMember.setWorkspace(workspaceRepository.findById(workspaceId).orElseThrow());
-        newMember.setRole(workspaceRoleRepository.findById(roleId).orElseThrow());
         newMember = workspaceMemberRepository.saveAndFlush(newMember);
         assertThat(newMember.getId()).isNotEqualTo(oldMember.getId());
         mockMvc.perform(get("/me").cookie(new jakarta.servlet.http.Cookie("accessToken", accessToken)))
@@ -161,27 +165,11 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
         user.setPasswordHash("unused-test-password-hash");
         userRepository.saveAndFlush(user);
 
-        WorkspaceRole previousRole = new WorkspaceRole();
-        previousRole.setWorkspace(workspace);
-        previousRole.setName("TemporaryManager");
-        previousRole = workspaceRoleRepository.saveAndFlush(previousRole);
-        RolePermission createCollection = new RolePermission();
-        createCollection.setRole(previousRole);
-        createCollection.setResource("collection");
-        createCollection.setAction("create");
-        rolePermissionRepository.saveAndFlush(createCollection);
-
         WorkspaceMember membership = new WorkspaceMember();
         membership.setUser(user);
         membership.setWorkspace(workspace);
-        membership.setRole(previousRole);
         membership = workspaceMemberRepository.saveAndFlush(membership);
-        String accessToken = jwtService.generateAccessToken(user.getId(), membership.getId(), "TemporaryManager");
-
-        var memberRole = workspaceRoleRepository.findByWorkspaceIdAndName(
-                workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME).orElseThrow();
-        membership.setRole(memberRole);
-        workspaceMemberRepository.saveAndFlush(membership);
+        String accessToken = jwtService.generateAccessToken(user.getId(), membership.getId(), "ADMIN");
 
         mockMvc.perform(post("/workspaces/{workspaceId}/collections", workspace.getId())
                         .cookie(new jakarta.servlet.http.Cookie("accessToken", accessToken))

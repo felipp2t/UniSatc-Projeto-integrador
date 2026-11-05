@@ -23,18 +23,22 @@ export const ownerId = 'owner-1'
 export const members = [
   {
     email: 'ana@example.com',
+    globalRole: null,
     id: 'membership-1',
+    isTeamLeader: false,
     name: 'Ana Owner',
-    roleId: 'role-owner',
     roleName: 'Owner',
+    teamId: null,
     userId: ownerId,
   },
   {
     email: 'bia@example.com',
+    globalRole: null,
     id: 'membership-2',
+    isTeamLeader: false,
     name: 'Bia Member',
-    roleId: 'role-member',
     roleName: 'Member',
+    teamId: null,
     userId: 'member-2',
   },
 ]
@@ -59,13 +63,18 @@ export function setupWorkspaceSettingsMocks() {
     ],
   })
   workspaceApiMocks.listMembers.mockResolvedValue({ data: members })
-  workspaceApiMocks.listRoles.mockResolvedValue({
-    data: [
-      { id: 'role-owner', name: 'Owner' },
-      { id: 'role-member', name: 'Member' },
-    ],
+  workspaceApiMocks.permissions.mockResolvedValue({
+    data: {
+      globalRole: null,
+      isOwner: true,
+      isTeamLeader: false,
+      permissions: [],
+      roleName: 'Owner',
+      teamId: null,
+    },
   })
-  workspaceApiMocks.changeMemberRole.mockResolvedValue({ data: members[1] })
+  workspaceApiMocks.assignGlobalRole.mockResolvedValue(undefined)
+  workspaceApiMocks.transferOwnership.mockResolvedValue(undefined)
   workspaceApiMocks.removeMember.mockResolvedValue(undefined)
   workspaceApiMocks.update.mockResolvedValue({
     data: {

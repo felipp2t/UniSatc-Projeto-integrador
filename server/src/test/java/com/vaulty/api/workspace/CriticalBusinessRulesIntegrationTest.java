@@ -16,7 +16,6 @@ import static org.mockito.Mockito.doThrow;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaulty.api.entity.User;
-import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.storage.ObjectStorage;
 import com.vaulty.api.storage.StorageOperationException;
 import java.util.HashSet;
@@ -24,11 +23,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -41,7 +35,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
 
@@ -51,17 +44,15 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
     @MockBean private ObjectStorage storage;
     private final Set<UUID> committedUsers = new HashSet<>();
     private final Set<UUID> committedItems = new HashSet<>();
-    private final Set<UUID> committedRoles = new HashSet<>();
     private UUID committedWorkspace;
     private UUID originalWorkspaceOwner;
-    private UUID originalOwnerRole;
     private String originalWorkspaceName;
     private String originalWorkspaceDescription;
 
     @AfterEach
     void cleanupCommittedFixtures() {
-        if (committedUsers.isEmpty() && committedItems.isEmpty() && committedRoles.isEmpty()) return;
-        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+        if (committedUsers.isEmpty() && committedItems.isEmpty()) return;
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             if (committedWorkspace != null) {
                 jdbc.update("UPDATE workspace SET owner_id = ?, name = ?, description = ? WHERE id = ?",
                         originalWorkspaceOwner, originalWorkspaceName, originalWorkspaceDescription, committedWorkspace);
@@ -75,23 +66,17 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
                 jdbc.update("DELETE FROM activity_log WHERE resource_id = ?", itemId);
                 jdbc.update("DELETE FROM item WHERE id = ?", itemId);
             }
-            for (UUID roleId : committedRoles) {
-                jdbc.update("DELETE FROM activity_log WHERE resource_id = ?", roleId);
-                jdbc.update("DELETE FROM workspace_role WHERE id = ?", roleId);
-            }
             if (committedWorkspace != null) {
                 jdbc.update("""
-                        INSERT INTO workspace_member (id, user_id, workspace_id, role_id)
-                        SELECT gen_random_uuid(), ?, ?, role.id
-                        FROM workspace_role role
-                        WHERE role.workspace_id = ? AND role.id = ?
-                        ON CONFLICT (workspace_id, user_id) DO UPDATE SET role_id = EXCLUDED.role_id
-                        """, originalWorkspaceOwner, committedWorkspace, committedWorkspace, originalOwnerRole);
+                        INSERT INTO workspace_member (id, user_id, workspace_id, role_id, team_id, global_role)
+                        VALUES (gen_random_uuid(), ?, ?, NULL, NULL, NULL)
+                        ON CONFLICT (workspace_id, user_id) DO UPDATE
+                        SET role_id = NULL, team_id = NULL, global_role = NULL
+                        """, originalWorkspaceOwner, committedWorkspace);
             }
         });
         committedUsers.clear();
         committedItems.clear();
-        committedRoles.clear();
         committedWorkspace = null;
     }
 
@@ -191,33 +176,36 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
     void databaseEnforcesWorkspaceMemberUniqueness() {
         User owner = createUser("Constraint owner");
         UUID workspace = configureWorkspace(owner).id();
-        UUID ownerRole = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace, owner.getId())
-                .orElseThrow().getRole().getId();
-
         assertConstraintViolation("uq_workspace_member_workspace_user", () -> jdbc.update("""
                 INSERT INTO workspace_member (id, user_id, workspace_id, role_id) VALUES (?, ?, ?, ?)
-                """, UUID.randomUUID(), owner.getId(), workspace, ownerRole));
+                """, UUID.randomUUID(), owner.getId(), workspace, null));
     }
 
     @Test
-    void roleCatalogAddsOnlyTheSharingManagePermission() throws Exception {
+    void roleCatalogExposesFixedDefinitionsAndRejectsLegacyPermissionCatalog() throws Exception {
         User owner = createUser("Catalog owner");
         UUID workspace = configureWorkspace(owner).id();
-        mockMvc.perform(get("/workspaces/{workspaceId}/roles/permissions/catalog", workspace)
+        mockMvc.perform(get("/workspaces/{workspaceId}/roles", workspace)
                         .cookie(authCookie(owner)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.resource == 'sharing')].action")
-                        .value(org.hamcrest.Matchers.contains("manage")));
+                .andExpect(jsonPath("$[?(@.code == 'OWNER')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.code == 'ADMIN')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.code == 'MAINTAINER')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.code == 'LEADER')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.code == 'MEMBER')]").isNotEmpty());
+        mockMvc.perform(get("/workspaces/{workspaceId}/roles/permissions/catalog", workspace)
+                        .cookie(authCookie(owner)))
+                .andExpect(status().isConflict());
     }
 
     @Test
-    void databaseRestrictsDeletingRoleInUse() {
-        User owner = createUser("Role constraint owner");
+    void databaseRejectsUnknownFixedGlobalRoles() {
+        User owner = createUser("Global role constraint owner");
         UUID workspace = configureWorkspace(owner).id();
-        UUID ownerRole = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace, owner.getId())
-                .orElseThrow().getRole().getId();
-        assertConstraintViolation("workspace_member_role_id_fkey", () -> jdbc.update(
-                "DELETE FROM workspace_role WHERE id = ?", ownerRole));
+        UUID memberId = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace, owner.getId())
+                .orElseThrow().getId();
+        assertConstraintViolation("ck_workspace_member_global_role", () -> jdbc.update(
+                "UPDATE workspace_member SET global_role = 'CUSTOM' WHERE id = ?", memberId));
     }
 
     @Test
@@ -238,7 +226,7 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void memberRemovalCascadesIndividualGrantsAndRejectsItsRefreshToken() throws Exception {
+    void memberRemovalRevokesRefreshTokenAndLegacyItemGrantApiIsGone() throws Exception {
         User owner = createUser("Owner");
         committedUsers.add(owner.getId());
         User member = createUser("Member");
@@ -262,9 +250,9 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
 
         mockMvc.perform(put("/workspaces/{workspaceId}/sharing/items/{itemId}/members/{memberId}",
                         workspace, item, membership).cookie(authCookie(owner)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isGone());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM item_member_grant WHERE item_id = ?", Integer.class, item))
-                .isOne();
+                .isZero();
 
         mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspace, membership)
                         .cookie(authCookie(owner)).param("confirmMemberId", membership.toString()))
@@ -314,74 +302,22 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void sharingRoleMutationWaitsForRolePermissionUpdateLock() throws Exception {
+    void legacyRoleManagerSharingEndpointIsGone() throws Exception {
         User owner = createUser("Role owner");
-        committedUsers.add(owner.getId());
-        UUID workspace = configureWorkspaceWithFixtureCleanup(owner);
-        WorkspaceRole role = new WorkspaceRole();
-        role.setWorkspace(workspaceRepository.findById(workspace).orElseThrow());
-        role.setName("Concurrent sharing");
-        role = workspaceRoleRepository.saveAndFlush(role);
-        UUID roleId = role.getId();
-        committedRoles.add(roleId);
-        CountDownLatch lockHeld = new CountDownLatch(1);
-        CountDownLatch releaseLock = new CountDownLatch(1);
-        ExecutorService requests = Executors.newFixedThreadPool(2);
-        TransactionTemplate blockerTransaction = new TransactionTemplate(transactionManager);
+        UUID workspace = configureWorkspace(owner).id();
+        UUID roleId = UUID.randomUUID();
 
-        try {
-            Future<?> blocker = requests.submit(() -> blockerTransaction.execute(status -> {
-                jdbc.queryForObject("SELECT id FROM workspace_role WHERE id = ? FOR UPDATE", UUID.class, roleId);
-                lockHeld.countDown();
-                try {
-                    if (!releaseLock.await(10, TimeUnit.SECONDS)) {
-                        throw new IllegalStateException("Timed out while holding the role row lock");
-                    }
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Interrupted while holding the role row lock", exception);
-                }
-                return null;
-            }));
-            assertThat(lockHeld.await(5, TimeUnit.SECONDS)).isTrue();
-            Future<Integer> mutation = requests.submit(() -> mockMvc.perform(
-                            put("/workspaces/{workspaceId}/sharing/roles/{roleId}/manager", workspace, roleId)
-                                    .cookie(authCookie(owner)).param("enabled", "true"))
-                    .andReturn().getResponse().getStatus());
-            awaitBlockedRoleRequest();
-            releaseLock.countDown();
-            blocker.get(5, TimeUnit.SECONDS);
-            assertThat(mutation.get(15, TimeUnit.SECONDS)).isEqualTo(204);
-        } finally {
-            releaseLock.countDown();
-            requests.shutdownNow();
-        }
-
-        assertThat(jdbc.queryForList("SELECT resource || ':' || action FROM role_permission WHERE role_id = ?",
-                String.class, roleId)).contains("sharing:manage");
-    }
-
-    private void awaitBlockedRoleRequest() throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        int blocked;
-        do {
-            blocked = jdbc.queryForObject("""
-                    SELECT count(*) FROM pg_stat_activity
-                    WHERE wait_event_type = 'Lock' AND query LIKE '%workspace_role%'
-                    """, Integer.class);
-            if (blocked > 0) return;
-            Thread.sleep(10);
-        } while (System.nanoTime() < deadline);
-        assertThat(blocked).as("sharing mutation waiting for the held workspace_role lock").isPositive();
+        mockMvc.perform(put("/workspaces/{workspaceId}/sharing/roles/{roleId}/manager", workspace, roleId)
+                        .cookie(authCookie(owner)).param("enabled", "true"))
+                .andExpect(status().isGone());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM role_permission WHERE role_id = ?",
+                Integer.class, roleId)).isZero();
     }
 
     private UUID configureWorkspaceWithFixtureCleanup(User owner) {
         var original = workspaceRepository.findSingleton().orElseThrow();
         committedWorkspace = original.getId();
         originalWorkspaceOwner = original.getOwner().getId();
-        originalOwnerRole = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(committedWorkspace, originalWorkspaceOwner).orElseThrow()
-                .getRole().getId();
         originalWorkspaceName = original.getName();
         originalWorkspaceDescription = original.getDescription();
         return configureWorkspace(owner).id();

@@ -34,25 +34,6 @@ public class WorkspaceActivityService {
     private static final Set<String> RESOURCE_TYPES = Arrays.stream(ActivityResourceType.values())
             .map(value -> value.name().toLowerCase(Locale.ROOT))
             .collect(Collectors.toUnmodifiableSet());
-    private static final String VISIBILITY_FILTER = """
-              AND (
-                    :owner OR (
-                        activity.action NOT IN ('folder_deleted', 'item_deleted') AND (
-                            (activity.resource_type = 'folder' AND :canReadCollections
-                                AND EXISTS (SELECT 1 FROM collection content
-                                            WHERE content.id = activity.resource_id
-                                              AND content.workspace_id = activity.workspace_id))
-                            OR
-                            (activity.resource_type = 'item' AND :canReadItems
-                                AND EXISTS (SELECT 1 FROM item content
-                                            WHERE content.id = activity.resource_id
-                                              AND content.workspace_id = activity.workspace_id
-                                              AND (content.type <> 'secret' OR :canReadSecrets)))
-                        )
-                    )
-              )
-            """;
-
     private static final String BASE_QUERY = """
             FROM activity_log activity
             WHERE activity.workspace_id = :workspaceId
@@ -70,15 +51,9 @@ public class WorkspaceActivityService {
         authorization.require(userId, workspace, "activity", "read");
         validateFilters(page, size, from, to, action, resourceType);
 
-        boolean owner = authorization.isOwner(userId, workspace);
         var query = new StringBuilder(BASE_QUERY);
         var parameters = new MapSqlParameterSource()
-                .addValue("workspaceId", workspaceId)
-                .addValue("owner", owner)
-                .addValue("canReadCollections", owner || authorization.allows(userId, workspace, "collection", "read"))
-                .addValue("canReadItems", owner || authorization.allows(userId, workspace, "item", "read"))
-                .addValue("canReadSecrets", owner || authorization.allows(userId, workspace, "secret", "read"));
-        query.append(VISIBILITY_FILTER);
+                .addValue("workspaceId", workspaceId);
         addFilter(query, parameters, from, "activity.created_at >= :fromTime", "fromTime");
         addFilter(query, parameters, to, "activity.created_at <= :toTime", "toTime");
         addFilter(query, parameters, actorId, "activity.actor_id = :actorId", "actorId");

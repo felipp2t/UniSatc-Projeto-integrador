@@ -87,7 +87,7 @@ public class NotificationService {
         publish(recipientId, NotificationEvent.PASSWORD_CHANGED);
     }
 
-    // Producers for future role, group, sharing, and inherited permission changes use only this fixed event.
+    // Access change producers share one non-sensitive event payload.
     @Transactional
     public void accessChanged(Collection<UUID> affectedRecipients) {
         accessChanged(affectedRecipients, null);

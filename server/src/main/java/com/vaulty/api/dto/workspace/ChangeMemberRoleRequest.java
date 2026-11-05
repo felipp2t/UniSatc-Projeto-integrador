@@ -1,6 +1,5 @@
 package com.vaulty.api.dto.workspace;
 
-import jakarta.validation.constraints.NotNull;
-import java.util.UUID;
+import com.vaulty.api.enums.GlobalRole;
 
-public record ChangeMemberRoleRequest(@NotNull(message = "Papel é obrigatório") UUID roleId) {}
+public record ChangeMemberRoleRequest(GlobalRole globalRole) {}

@@ -2,6 +2,10 @@
 
 Vaulty é uma aplicação web para uma empresa guardar e compartilhar informações em um workspace. O sistema combina uma interface React com uma API Java/Spring Boot, PostgreSQL e armazenamento de anexos compatível com S3. Inclui gerenciamento de membros, permissões, itens e pastas, anexos e compartilhamento de conteúdo.
 
+## Acesso e compartilhamento
+
+A aplicação implementa papéis globais fixos (Owner, Admin e Maintainer) sem time, e times com um Líder e uma coleção raiz. Membros comuns pertencem a no máximo um time e têm acesso uniforme à coleção associada; aceitar convite não concede acesso ao conteúdo. Publicações para outros times aparecem como projeções sincronizadas e somente leitura. O estado e os limites conhecidos estão em [docs/REQUISITOS.md](docs/REQUISITOS.md), [docs/MODELO-CONCEITUAL.md](docs/MODELO-CONCEITUAL.md) e nos diagramas HTML na raiz.
+
 ## Requisitos
 
 - Git

@@ -1,7 +1,10 @@
 package com.vaulty.api.entity;
 
+import com.vaulty.api.enums.GlobalRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -37,9 +40,17 @@ public class WorkspaceMember {
     @JoinColumn(name = "workspace_id", nullable = false)
     private Workspace workspace;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "role_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "role_id", nullable = true)
     private WorkspaceRole role;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private WorkspaceTeam team;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "global_role", length = 20)
+    private GlobalRole globalRole;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

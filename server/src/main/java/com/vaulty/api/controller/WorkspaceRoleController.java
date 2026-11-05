@@ -3,6 +3,7 @@ package com.vaulty.api.controller;
 import com.vaulty.api.controller.docs.WorkspaceRoleControllerDocs;
 import com.vaulty.api.dto.role.RoleRequest;
 import com.vaulty.api.dto.role.RoleResponse;
+import com.vaulty.api.dto.role.WorkspaceRoleDefinitionResponse;
 import com.vaulty.api.dto.workspace.RolePermissionsRequest;
 import com.vaulty.api.dto.workspace.RolePermissionsResponse;
 import com.vaulty.api.dto.workspace.WorkspacePermission;
@@ -39,8 +40,8 @@ public class WorkspaceRoleController implements WorkspaceRoleControllerDocs {
     }
 
     @GetMapping
-    public ResponseEntity<List<RoleResponse>> list(@AuthenticationPrincipal UUID userId,
-                                                   @PathVariable UUID workspaceId) {
+    public ResponseEntity<List<WorkspaceRoleDefinitionResponse>> list(@AuthenticationPrincipal UUID userId,
+                                                                      @PathVariable UUID workspaceId) {
         return ResponseEntity.ok(roleService.list(userId, workspaceId));
     }
 

@@ -35,14 +35,15 @@ export type ItemAction =
 
 export function getItemActions(
   item: Pick<ItemResponse, 'type' | 'archivedAt'>,
-  checker: PermissionChecker
+  checker: PermissionChecker,
+  canPublish = false
 ): ItemAction[] {
   const archived = Boolean(item.archivedAt)
   const canRead = canAccessItem(checker, item.type, 'read')
   const canUpdate = canAccessItem(checker, item.type, 'update')
   const canDelete = canAccessItem(checker, item.type, 'delete')
   const actions: { id: ItemAction; allowed: boolean }[] = [
-    { allowed: !archived && checker.can('sharing', 'manage'), id: 'share' },
+    { allowed: !archived && canPublish, id: 'share' },
     { allowed: canRead && canUpdate && !archived, id: 'edit' },
     { allowed: canRead, id: 'view' },
     { allowed: true, id: 'copyTitle' },

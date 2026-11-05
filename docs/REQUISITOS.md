@@ -8,7 +8,32 @@ Este documento consolida os requisitos discutidos até aqui; a revisão do conju
 
 “Confirmado” significa acordado com o proponente do projeto nesta sessão. Os requisitos são propostas do grupo para o contexto descrito; não foram levantados em entrevistas nem aprovados pela infraestrutura da empresa. O contato com a empresa tratou da assinatura necessária à continuidade do projeto. Esta especificação é uma versão de trabalho e não constitui uma baseline aprovada pela empresa nem evidência de implementação.
 
-### Convenções de identificação
+### Status da implementação (Etapa 14, 05/11/2026)
+
+A implementação entregue nas etapas 1–13 usa o modelo de times e papéis fixos descrito abaixo. Este retrato é delimitado pelo código presente no repositório; ele não declara que os critérios abaixo foram executados em testes backend ou validados em CI. O texto de requisitos que segue preserva decisões e critérios anteriores como histórico de levantamento. Onde conflitar com este status, o modelo abaixo descreve o escopo implementado; os critérios antigos não devem ser lidos como funcionalidades presentes.
+
+- Owner, Admin e Maintainer são papéis globais fixos e sem time. Há exatamente um Owner; só ele atribui Admin/Maintainer e transfere a titularidade. Na transferência, o antigo Owner torna-se Admin.
+- Um membro comum pertence a no máximo um time. Cada time associa uma coleção raiz e um Líder; os membros recebem acesso uniforme à coleção. Convite aceito, por si só, não dá acesso ao conteúdo.
+- Não há ACL por pasta/item, concessões de acesso a grupos ou raiz pública no modelo atual. Papéis globais têm acesso de conteúdo conforme seu papel; papéis de time agem na coleção associada.
+- Publicações entre times geram projeções somente leitura na coleção destinatária, com cobertura sincronizada por relações internas estáveis, caminho/nome de origem capturados e nomes atuais de itens para exibição. A revogação remove a projeção daquele destinatário; excluir o original remove as projeções relacionadas. Excluir time preserva coleção/conteúdo/publicações; a coleção sem time fica sob acesso global e pode ser reassociada.
+- As rotas legadas de grupos de acesso respondem HTTP 410. Isso não significa que grupos ainda sejam um mecanismo de autorização ativo.
+
+As seções de requisitos funcionais abaixo continuam úteis para rastrear origem e intenção, mas requisitos de ACL, grupos e herança são **superados pelo modelo implementado** e requerem uma revisão formal de baseline antes de serem tratados como compromisso vigente. A existência de testes no repositório não é evidência de que o backend foi executado nesta etapa.
+
+## Critérios vigentes de acesso e publicação (substituem RF42–RF47 anteriores)
+
+Os itens seguintes são a referência normativa atual para o modelo implementado. Os critérios RF42–RF47 legados, sobre grupos ACL, concessões e herança, ficam preservados abaixo como origem histórica e não são critérios vigentes.
+
+- **Papel global e titularidade:** existe exatamente um Owner por workspace. Owner e Admin têm leitura e escrita global do conteúdo e gerenciam convites/times; apenas Owner atribui ou remove Admin/Maintainer e transfere Owner. Maintainer tem leitura global, inclusive de segredos, sem escrita. Os papéis são fixos e seus titulares não pertencem a time. Ao transferir Owner, o anterior torna-se Admin.
+- **Membros e times:** convite aceito cria membro sem papel global, sem time e sem acesso a conteúdo. Um membro comum pertence a zero ou um time. Um time tem exatamente uma coleção raiz e um Líder; uma coleção raiz pode estar associada a zero ou um time. Criar time exige definir um Líder que seja membro sem papel global nem time. A associação concede acesso uniforme a todo o conteúdo da coleção; não existem ACL por item/pasta, grupo, raiz pública ou herança.
+- **Liderança e associação:** Líder administra membros do próprio time, publica conteúdo e transfere liderança. Owner/Admin podem administrar todos os times e associar membros sem papel global. Mudar/remover um membro revoga acesso à coleção anterior imediatamente, sem remover conteúdo criado. Papéis globais e associação a time são mutuamente exclusivos.
+- **Publicação:** somente o Líder atual publica item ou pasta para outro time. Cada destinatário tem publicação independente. O conteúdo recebido aparece como projeção somente leitura na coleção destinatária, acompanha a cobertura/estrutura do original e usa relações internas estáveis; nome do time de origem e caminho externo capturado permanecem como referência, enquanto nomes atuais dos itens/pastas são apresentados. Destinatário não pode editar, excluir, duplicar ou republicar a projeção.
+- **Revogação e ciclo de vida:** revogar remove a projeção só daquele destinatário. Excluir o original remove publicações/projeções relacionadas. Excluir time remove seus membros, mas preserva coleção, conteúdo e publicações; a coleção sem time fica acessível apenas aos papéis globais até reassociação. Reassociar concede acesso uniforme ao novo time e preserva a identificação capturada da origem. Owner/Admin podem revogar publicação quando a coleção de origem está sem time.
+- **Compatibilidade:** endpoints legados de grupos, ACL, herança e origem respondem HTTP 410 Gone; `/workspaces/{workspaceId}/teams`, `/workspaces/{workspaceId}/sharing/publications` e `/workspaces/{workspaceId}/received` são as rotas atuais de times, publicação e consulta recebida.
+
+A implementação foi confrontada com serviços, controllers e migrações V30–V34 no código entregue nas etapas 1–13. Este registro não afirma execução de testes backend ou validação de CI.
+
+## Convenções de identificação
 
 - **ON:** objetivo de negócio.
 - **RU:** requisito de usuário — objetivo ou tarefa que a pessoa precisa realizar.

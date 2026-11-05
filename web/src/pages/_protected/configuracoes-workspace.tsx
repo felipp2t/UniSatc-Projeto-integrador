@@ -1,24 +1,24 @@
-import { MagnifyingGlassIcon, TrashIcon } from '@phosphor-icons/react'
-import { type UseQueryResult, useQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { type ReactNode, useCallback, useMemo, useState } from 'react'
-import { workspaceApi } from '@/api/endpoints'
-import { isForbiddenOrNotFound } from '@/api/http-status'
+import { useCallback, useMemo, useState } from 'react'
+import { globalRoleApi, workspaceApi } from '@/api/endpoints'
+import type { WorkspaceMemberResponse } from '@/api/types'
 import {
-  getMemberPermissions,
-  isOwnerRole,
-  type MemberPermissions,
-} from '@/api/member-permissions'
-import type {
-  WorkspaceMemberResponse,
-  WorkspaceRoleResponse,
-} from '@/api/types'
-import { workspaceRolesQueryKey } from '@/api/workspace-keys'
-import { ChangeMemberRoleDialog } from '@/components/change-member-role-dialog'
+  workspaceMembersQueryKey,
+  workspacesQueryKey,
+} from '@/api/workspace-keys'
 import { InviteMemberDialog } from '@/components/invite-member-dialog'
 import { PendingInvitesSection } from '@/components/pending-invites-section'
 import { RemoveMemberDialog } from '@/components/remove-member-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
@@ -31,8 +31,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { appToast } from '@/components/ui/toast'
 import { WorkspaceSettingsLayout } from '@/components/workspace-settings-layout'
-import { useChangeMemberRole } from '@/hooks/use-change-member-role'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useRemoveMember } from '@/hooks/use-remove-member'
 import { useWorkspaceMembers } from '@/hooks/use-workspace-members'
@@ -46,95 +46,149 @@ export const Route = createFileRoute('/_protected/configuracoes-workspace')({
 function WorkspaceSettingsPage() {
   const { session } = Route.useRouteContext()
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
+  const [transferTarget, setTransferTarget] =
+    useState<WorkspaceMemberResponse | null>(null)
   const workspaces = useCurrentWorkspace()
-  const currentWorkspace = workspaces.data
-  const workspaceId = currentWorkspace?.id
-  const { currentUserRole, isOwner, members } = useWorkspaceMembers(
-    workspaceId,
-    session.user?.id
-  )
+  const workspaceId = workspaces.data?.id
+  const { members } = useWorkspaceMembers(workspaceId, session.user?.id)
   const permissions = useWorkspacePermissions(workspaceId)
-  const roles = useQuery({
-    enabled: Boolean(workspaceId && isOwner),
-    queryFn: async () => {
-      if (!workspaceId) throw new Error('Workspace indisponível.')
-      return (await workspaceApi.listRoles(workspaceId)).data
-    },
-    queryKey: workspaceRolesQueryKey(workspaceId),
-  })
-  const retryWorkspaces = useCallback(async () => {
-    await workspaces.refetch()
-  }, [workspaces.refetch])
-  const retryMembers = useCallback(async () => {
-    await members.refetch()
-  }, [members.refetch])
-  const retryRoles = useCallback(async () => {
-    await roles.refetch()
-  }, [roles.refetch])
-  const roleChange = useChangeMemberRole({
-    currentUserId: session.user?.id,
-    roles: roles.data,
-    workspaceId,
-  })
-  const memberRemoval = useRemoveMember({
+  const queryClient = useQueryClient()
+  const removal = useRemoveMember({
     currentUserId: session.user?.id,
     session,
     workspaceId,
   })
-  const roleSelectionDisabled =
-    isOwner &&
-    (roles.isPending ||
-      roles.isError ||
-      roleChange.isChangingRole ||
-      (roles.data?.length ?? 0) === 0)
-  const rolesLoadError =
-    isOwner && roles.isError ? <RolesLoadError onRetry={retryRoles} /> : null
-  const roleNames = useMemo(
-    () =>
-      [
-        ...new Set((members.data ?? []).map((member) => member.roleName)),
-      ].sort(),
-    [members.data]
+  const invalidateWorkspaceData = useCallback(
+    async (includeWorkspaces = false) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: workspaceMembersQueryKey(workspaceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-permissions', workspaceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-teams', workspaceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-team-members', workspaceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-root-collections', workspaceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-received', workspaceId],
+        }),
+        ...(includeWorkspaces
+          ? [queryClient.invalidateQueries({ queryKey: workspacesQueryKey })]
+          : []),
+      ])
+    },
+    [queryClient, workspaceId]
   )
-  const filteredMembers = (members.data ?? []).filter((member) => {
-    const matchesName = member.name
-      .toLocaleLowerCase()
-      .includes(search.trim().toLocaleLowerCase())
-    return (
-      matchesName && (roleFilter === 'all' || member.roleName === roleFilter)
-    )
+  const role = useMutation({
+    mutationFn: ({
+      member,
+      value,
+    }: {
+      member: WorkspaceMemberResponse
+      value: string
+    }) => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      const nextRole =
+        value === 'NONE' ? null : (value as 'ADMIN' | 'MAINTAINER')
+      return globalRoleApi.assign(workspaceId, member.id, nextRole)
+    },
+    onError: () => appToast.error('Não foi possível atualizar o papel global.'),
+    onSuccess: async () => {
+      await invalidateWorkspaceData()
+      appToast.success('Papel global atualizado.')
+    },
   })
-  const memberAccessError = members.isError ? members.error : undefined
-  const memberAccessDenied = isForbiddenOrNotFound(memberAccessError)
+  const transfer = useMutation({
+    mutationFn: (memberId: string) => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      return workspaceApi.transferOwnership(workspaceId, memberId)
+    },
+    onError: () => appToast.error('Não foi possível transferir a propriedade.'),
+    onSuccess: async () => {
+      await invalidateWorkspaceData(true)
+      appToast.success('Propriedade transferida. Você agora é administrador.')
+    },
+  })
+  const retryMembers = useCallback(async () => {
+    await members.refetch()
+  }, [members.refetch])
+  const handleRoleChange = useCallback(
+    (member: WorkspaceMemberResponse, value: string) => {
+      role.mutate({ member, value })
+    },
+    [role.mutate]
+  )
+  const handleTransfer = useCallback((member: WorkspaceMemberResponse) => {
+    setTransferTarget(member)
+  }, [])
+  const confirmTransfer = useCallback(() => {
+    if (!transferTarget) return
+    transfer.mutate(transferTarget.id)
+    setTransferTarget(null)
+  }, [transfer.mutate, transferTarget])
+  const handleTransferDialogChange = useCallback((open: boolean) => {
+    if (!open) setTransferTarget(null)
+  }, [])
+  const cancelTransfer = useCallback(() => setTransferTarget(null), [])
+  const handleRemove = useCallback(
+    (member: WorkspaceMemberResponse) => {
+      removal.request(member)
+    },
+    [removal.request]
+  )
+  const filtered = useMemo(
+    () =>
+      (members.data ?? []).filter((member) =>
+        member.name
+          .toLocaleLowerCase()
+          .includes(search.trim().toLocaleLowerCase())
+      ),
+    [members.data, search]
+  )
 
-  if (memberRemoval.signedOut) return null
+  if (removal.signedOut) return null
   if (workspaces.isPending)
     return <LoadingState label='Carregando workspace…' />
   if (workspaces.isError)
     return (
       <ErrorState
         error={workspaces.error}
-        message='Não foi possível carregar seu workspace. Se você perdeu o vínculo, procure um dono.'
-        onRetry={retryWorkspaces}
+        message='Não foi possível carregar seu workspace.'
+        onRetry={workspaces.refetch}
       />
     )
-  if (!currentWorkspace?.id) {
+  if (!workspaceId)
     return (
       <main className='container mx-auto px-4 py-8 md:px-8 md:py-12'>
         <EmptyState
-          description='Você precisa estar vinculado a um workspace para consultar os membros. Peça a um dono para verificar seu acesso.'
+          description='Você precisa estar vinculado a um workspace para consultar os membros.'
           title='Nenhum workspace disponível'
         />
       </main>
     )
-  }
+  if (permissions.isPending)
+    return <LoadingState label='Verificando permissão…' />
+  if (permissions.isError)
+    return (
+      <ErrorState
+        error={permissions.error}
+        message='Não foi possível confirmar sua permissão.'
+        onRetry={permissions.refetch}
+      />
+    )
 
   return (
     <WorkspaceSettingsLayout
       breadcrumbLabel='Configurações do workspace'
-      canManageGroups={permissions.can('group', 'manage')}
-      canManageRoles={isOwner}
+      canManageGroups={permissions.canManageTeams}
+      canManageRoles={permissions.isOwner}
     >
       <section
         aria-label='Configurações do workspace'
@@ -144,289 +198,207 @@ function WorkspaceSettingsPage() {
           <div className='flex flex-wrap items-center justify-between gap-3'>
             <TabsList>
               <TabsTrigger value='members'>
-                Membros ({members.isError ? 0 : (members.data?.length ?? 0)})
+                Membros ({members.data?.length ?? 0})
               </TabsTrigger>
-              {isOwner ? (
+              {permissions.isOwner ? (
                 <TabsTrigger value='invites'>Convites</TabsTrigger>
               ) : null}
             </TabsList>
-            {isOwner ? <InviteMemberDialog /> : null}
+            {permissions.canInvite ? <InviteMemberDialog /> : null}
           </div>
           <TabsContent className='mt-4 space-y-4' value='members'>
-            <div className='flex flex-col gap-2 md:flex-row'>
-              <div className='relative flex-1'>
-                <label className='sr-only' htmlFor='member-search'>
-                  Buscar membro por nome
-                </label>
-                <MagnifyingGlassIcon
-                  aria-hidden='true'
-                  className='absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground'
-                />
-                <Input
-                  className='pl-9'
-                  id='member-search'
-                  onValueChange={setSearch}
-                  placeholder='Buscar por nome'
-                  value={search}
-                />
-              </div>
-              <Select onValueChange={setRoleFilter} value={roleFilter}>
-                <SelectTrigger
-                  aria-label='Filtrar por cargo'
-                  className='w-full md:w-40'
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>Todos os cargos</SelectItem>
-                  {roleNames.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <MembersList
-              currentUserRole={currentUserRole}
-              filteredMembers={filteredMembers}
-              isOwner={isOwner}
-              isRemoving={memberRemoval.isPending}
-              memberAccessDenied={memberAccessDenied}
-              members={members}
-              onChangeRole={roleChange.requestRoleChange}
-              onRemove={memberRemoval.request}
-              onRetry={retryMembers}
-              roleSelectionDisabled={roleSelectionDisabled}
-              roles={roles.data ?? []}
-              rolesLoadError={rolesLoadError}
+            <label className='sr-only' htmlFor='member-search'>
+              Buscar membro por nome
+            </label>
+            <Input
+              id='member-search'
+              onValueChange={setSearch}
+              placeholder='Buscar por nome'
+              value={search}
             />
+            {members.isPending ? (
+              <LoadingState label='Carregando membros…' />
+            ) : members.isError ? (
+              <ErrorState
+                error={members.error}
+                message='Não foi possível carregar os membros.'
+                onRetry={retryMembers}
+              />
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                description={
+                  search
+                    ? 'Ajuste a busca e tente novamente.'
+                    : 'Este workspace ainda não tem membros.'
+                }
+                title='Nenhum membro encontrado'
+              />
+            ) : (
+              <ul
+                aria-label='Membros do workspace'
+                className='mt-3 divide-y divide-border rounded-md border border-border'
+              >
+                {filtered.map((member) => (
+                  <MemberRow
+                    canManageRoles={permissions.isOwner}
+                    currentUserId={session.user?.id}
+                    isRemoving={removal.isPending}
+                    isRolePending={role.isPending}
+                    isTransferring={transfer.isPending}
+                    key={member.id}
+                    member={member}
+                    onRemove={handleRemove}
+                    onRoleChange={handleRoleChange}
+                    onTransfer={handleTransfer}
+                  />
+                ))}
+              </ul>
+            )}
           </TabsContent>
-          {isOwner ? (
+          {permissions.isOwner ? (
             <TabsContent className='mt-4' value='invites'>
               <PendingInvitesSection />
             </TabsContent>
           ) : null}
         </Tabs>
       </section>
-      <ChangeMemberRoleDialog roleChange={roleChange} />
-      <RemoveMemberDialog removal={memberRemoval} />
+      <RemoveMemberDialog removal={removal} />
+      <TransferOwnershipDialog
+        isPending={transfer.isPending}
+        onCancel={cancelTransfer}
+        onConfirm={confirmTransfer}
+        onOpenChange={handleTransferDialogChange}
+        target={transferTarget}
+      />
     </WorkspaceSettingsLayout>
   )
 }
 
-function MembersList({
-  filteredMembers,
-  isOwner,
-  memberAccessDenied,
-  members,
-  isRemoving,
-  onRetry,
-  roles,
-  roleSelectionDisabled,
-  rolesLoadError,
-  onChangeRole,
-  currentUserRole,
-  onRemove,
+function TransferOwnershipDialog({
+  isPending,
+  onCancel,
+  onConfirm,
+  onOpenChange,
+  target,
 }: {
-  filteredMembers: WorkspaceMemberResponse[]
-  isOwner: boolean
-  memberAccessDenied: boolean
-  members: UseQueryResult<WorkspaceMemberResponse[]>
-  isRemoving: boolean
-  onRemove: (member: WorkspaceMemberResponse) => void
-  onRetry: () => Promise<void>
-  roles: WorkspaceRoleResponse[]
-  roleSelectionDisabled: boolean
-  rolesLoadError: ReactNode
-  onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
-  currentUserRole: string | undefined
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+  onOpenChange: (open: boolean) => void
+  target: WorkspaceMemberResponse | null
 }) {
-  if (members.isPending) return <LoadingState label='Carregando membros…' />
-  if (members.isError) {
-    return (
-      <ErrorState
-        error={members.error}
-        message={
-          memberAccessDenied
-            ? 'Acesso ao workspace negado. Se você perdeu o vínculo, procure um dono.'
-            : 'Não foi possível carregar os membros.'
-        }
-        onRetry={onRetry}
-      />
-    )
-  }
-  if (members.data.length === 0) {
-    return (
-      <EmptyState
-        description='Este workspace ainda não tem membros.'
-        title='Nenhum membro encontrado'
-      />
-    )
-  }
-  if (filteredMembers.length === 0) {
-    return (
-      <EmptyState
-        description='Ajuste a busca ou o filtro de cargo.'
-        title='Nenhum resultado'
-        variant='compact'
-      />
-    )
-  }
-
-  const ownerCount = members.data.filter((member) =>
-    isOwnerRole(member.roleName)
-  ).length
-  const membersWithPermissions = filteredMembers.map((member) => ({
-    member,
-    permissions: getMemberPermissions({
-      currentUserRole,
-      memberRoleName: member.roleName,
-      ownerCount,
-    }),
-  }))
   return (
-    <>
-      {rolesLoadError}
-      <div className='max-h-120 overflow-auto border border-border'>
-        <table
-          aria-label='Membros e cargos'
-          className='w-full table-fixed border-collapse text-left'
-        >
-          <colgroup>
-            <col />
-            <col className='w-24 md:w-36' />
-            {isOwner ? <col className='w-11 md:w-15' /> : null}
-          </colgroup>
-          <tbody className='divide-y divide-border'>
-            {membersWithPermissions.map(({ member, permissions }, index) => (
-              <MemberRow
-                index={index}
-                isOwner={isOwner}
-                isRemoving={isRemoving}
-                key={member.id}
-                member={member}
-                onChangeRole={onChangeRole}
-                onRemove={onRemove}
-                permissions={permissions}
-                roleSelectDisabled={
-                  roleSelectionDisabled || permissions.isLastOwner
-                }
-                roles={roles}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  )
-}
-
-function RolesLoadError({ onRetry }: { onRetry: () => Promise<void> }) {
-  return (
-    <div className='flex items-center justify-between border border-destructive/40 p-3'>
-      <p className='text-destructive text-xs' role='alert'>
-        Não foi possível carregar os cargos.
-      </p>
-      <Button onClick={onRetry} size='sm' variant='outline'>
-        Recarregar cargos
-      </Button>
-    </div>
+    <Dialog onOpenChange={onOpenChange} open={target !== null}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Transferir propriedade do workspace?</DialogTitle>
+          <DialogDescription>
+            {target
+              ? `${target.name} será o novo dono. Você passará a ser administrador.`
+              : null}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button onClick={onCancel} variant='outline'>
+            Cancelar
+          </Button>
+          <Button disabled={isPending} loading={isPending} onClick={onConfirm}>
+            Transferir propriedade
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 function MemberRow({
-  index,
-  isOwner,
+  canManageRoles,
+  currentUserId,
   isRemoving,
+  isRolePending,
+  isTransferring,
   member,
-  permissions,
-  roles,
-  roleSelectDisabled,
-  onChangeRole,
   onRemove,
+  onRoleChange,
+  onTransfer,
 }: {
-  index: number
-  isOwner: boolean
+  canManageRoles: boolean
+  currentUserId: string | undefined
   isRemoving: boolean
+  isRolePending: boolean
+  isTransferring: boolean
   member: WorkspaceMemberResponse
-  permissions: MemberPermissions
-  roles: WorkspaceRoleResponse[]
-  roleSelectDisabled: boolean
-  onChangeRole: (member: WorkspaceMemberResponse, roleId: string) => void
   onRemove: (member: WorkspaceMemberResponse) => void
+  onRoleChange: (member: WorkspaceMemberResponse, value: string) => void
+  onTransfer: (member: WorkspaceMemberResponse) => void
 }) {
-  const { name } = member
   const handleRoleChange = useCallback(
-    (roleId: string) => onChangeRole(member, roleId),
-    [member, onChangeRole]
+    (value: string) => onRoleChange(member, value),
+    [member, onRoleChange]
   )
   const handleRemove = useCallback(() => onRemove(member), [member, onRemove])
+  const handleTransfer = useCallback(
+    () => onTransfer(member),
+    [member, onTransfer]
+  )
+  const roleLabel = member.isTeamLeader
+    ? 'Líder'
+    : member.globalRole === 'MAINTAINER'
+      ? 'Maintainer'
+      : member.globalRole === 'ADMIN'
+        ? 'Admin'
+        : (member.roleName ?? 'Sem time/papel')
 
   return (
-    <tr className={index % 2 === 0 ? 'bg-card' : 'bg-muted/10'}>
-      <td className='max-w-0 px-2 py-3 md:px-4'>
-        <div className='flex items-center gap-3'>
-          <span
-            aria-hidden='true'
-            className='flex size-8 shrink-0 items-center justify-center border border-border bg-muted/30 font-bold font-mono text-primary text-xs uppercase'
-          >
-            {name.charAt(0)}
-          </span>
-          <div className='flex min-w-0 flex-1 flex-col'>
-            <span className='truncate font-mono font-semibold text-xs uppercase tracking-wide'>
-              {name}
-            </span>
-            {isOwner ? (
-              <span className='truncate font-mono text-muted-foreground text-xs'>
-                {member.email ?? '—'}
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </td>
-      <td className='px-1 py-3 md:px-2'>
-        {isOwner ? (
+    <li className='flex flex-wrap items-center gap-3 p-3'>
+      <div className='min-w-0 flex-1'>
+        <p className='truncate font-semibold text-sm'>{member.name}</p>
+        <p className='text-muted-foreground text-xs'>
+          {member.email ?? member.roleName ?? 'Sem time/papel'}
+        </p>
+      </div>
+      <span className='font-mono text-muted-foreground text-xs'>
+        {roleLabel}
+      </span>
+      {canManageRoles && member.userId !== currentUserId ? (
+        <>
           <Select
-            disabled={roleSelectDisabled}
+            disabled={isRolePending}
             onValueChange={handleRoleChange}
-            value={member.roleId}
+            value={member.globalRole ?? 'NONE'}
           >
             <SelectTrigger
-              aria-label={`Cargo de ${name}`}
-              className='w-24 max-w-full border-primary/50 bg-primary/5 font-mono text-primary text-xs uppercase md:w-36'
+              aria-label={`Papel global de ${member.name}`}
+              className='w-36'
             >
-              <SelectValue className='truncate'>{member.roleName}</SelectValue>
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {roles.map((role) => (
-                <SelectItem className='uppercase' key={role.id} value={role.id}>
-                  {role.name}
-                </SelectItem>
-              ))}
+              <SelectItem value='NONE'>Sem papel global</SelectItem>
+              <SelectItem value='ADMIN'>Admin</SelectItem>
+              <SelectItem value='MAINTAINER'>Maintainer</SelectItem>
             </SelectContent>
           </Select>
-        ) : (
-          <span className='font-mono text-primary text-xs uppercase'>
-            {member.roleName}
-          </span>
-        )}
-      </td>
-      {isOwner ? (
-        <td className='px-2 py-3 text-right md:px-4'>
           <Button
-            aria-label={`Remover ${name}`}
-            className='size-7 shrink-0 border border-destructive/40 text-destructive hover:bg-destructive/10'
-            disabled={isRemoving || Boolean(permissions.removeReason)}
-            onClick={handleRemove}
-            size='icon'
-            title={permissions.removeReason ?? 'Remover membro.'}
+            aria-label={`Transferir propriedade para ${member.name}`}
+            disabled={isTransferring}
+            onClick={handleTransfer}
+            size='sm'
             variant='outline'
           >
-            <TrashIcon aria-hidden='true' className='size-3.5' />
+            Transferir propriedade
           </Button>
-        </td>
+          <Button
+            aria-label={`Remover ${member.name} do workspace`}
+            disabled={isRemoving}
+            onClick={handleRemove}
+            size='sm'
+            variant='outline'
+          >
+            Remover
+          </Button>
+        </>
       ) : null}
-    </tr>
+    </li>
   )
 }

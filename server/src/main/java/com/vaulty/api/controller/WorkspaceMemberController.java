@@ -3,6 +3,7 @@ package com.vaulty.api.controller;
 import com.vaulty.api.controller.docs.WorkspaceMemberControllerDocs;
 import com.vaulty.api.dto.workspace.ChangeMemberRoleRequest;
 import com.vaulty.api.dto.workspace.ReadmitMemberRequest;
+import com.vaulty.api.dto.workspace.TransferOwnershipRequest;
 import com.vaulty.api.dto.workspace.WorkspaceMemberResponse;
 import com.vaulty.api.service.WorkspaceMemberService;
 import jakarta.validation.Valid;
@@ -50,6 +51,15 @@ public class WorkspaceMemberController implements WorkspaceMemberControllerDocs 
             @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId, @PathVariable UUID memberId,
             @Valid @RequestBody ChangeMemberRoleRequest request) {
         return workspaceMemberService.changeRole(userId, workspaceId, memberId, request);
+    }
+
+    @PutMapping("/transfer-owner")
+    @Override
+    public WorkspaceMemberResponse transferOwnership(
+            @AuthenticationPrincipal UUID userId,
+            @PathVariable UUID workspaceId,
+            @Valid @RequestBody TransferOwnershipRequest request) {
+        return workspaceMemberService.transferOwnership(userId, workspaceId, request);
     }
 
     @DeleteMapping("/{membershipId}")

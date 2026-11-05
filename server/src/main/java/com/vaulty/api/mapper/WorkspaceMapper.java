@@ -1,12 +1,10 @@
 package com.vaulty.api.mapper;
 
 import com.vaulty.api.dto.workspace.UpdateWorkspaceRequest;
-import com.vaulty.api.dto.workspace.WorkspaceMemberResponse;
 import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceMember;
-import com.vaulty.api.entity.WorkspaceRole;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -27,15 +25,10 @@ public interface WorkspaceMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "user", source = "user")
     @Mapping(target = "workspace", source = "workspace")
-    @Mapping(target = "role", source = "role")
+    @Mapping(target = "role", ignore = true)
+    @Mapping(target = "team", ignore = true)
+    @Mapping(target = "globalRole", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    WorkspaceMember toMember(User user, Workspace workspace, WorkspaceRole role);
-
-    @Mapping(target = "userId", source = "member.user.id")
-    @Mapping(target = "name", source = "member.user.name")
-    @Mapping(target = "email", expression = "java(includeEmail ? member.getUser().getEmail() : null)")
-    @Mapping(target = "roleId", source = "member.role.id")
-    @Mapping(target = "roleName", source = "member.role.name")
-    WorkspaceMemberResponse toResponse(WorkspaceMember member, boolean includeEmail);
+    WorkspaceMember toMember(User user, Workspace workspace);
 }

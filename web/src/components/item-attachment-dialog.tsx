@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
-import { itemsApi } from '@/api/endpoints'
+import { itemsApi, receivedContentApi } from '@/api/endpoints'
 import { itemKeys } from '@/api/item-keys'
 import type { ItemResponse } from '@/api/types'
+import { receivedContentKeys } from '@/api/workspace-keys'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -23,10 +24,16 @@ interface LoadedAttachment {
   contentDisposition?: string
 }
 
-const attachmentQuery = (workspaceId: string, itemId: string) => ({
+const attachmentQuery = (
+  workspaceId: string,
+  itemId: string,
+  received = false
+) => ({
   gcTime: ATTACHMENT_CACHE_MS,
   queryFn: async (): Promise<LoadedAttachment> => {
-    const response = await itemsApi.downloadAttachment(workspaceId, itemId)
+    const response = received
+      ? await receivedContentApi.attachment(workspaceId, itemId, true)
+      : await itemsApi.downloadAttachment(workspaceId, itemId)
     const contentDisposition = response.headers['content-disposition']
     return {
       blob: response.data,
@@ -34,7 +41,9 @@ const attachmentQuery = (workspaceId: string, itemId: string) => ({
         typeof contentDisposition === 'string' ? contentDisposition : undefined,
     }
   },
-  queryKey: itemKeys.attachment(workspaceId, itemId),
+  queryKey: received
+    ? receivedContentKeys.attachment(workspaceId, itemId)
+    : itemKeys.attachment(workspaceId, itemId),
   refetchOnWindowFocus: false,
   retry: false,
   staleTime: ATTACHMENT_CACHE_MS,
@@ -42,6 +51,14 @@ const attachmentQuery = (workspaceId: string, itemId: string) => ({
 
 function isPreviewable(blob: Blob) {
   return blob.type === 'application/pdf' || blob.type.startsWith('image/')
+}
+
+function visibleAttachment<T>(
+  enabled: boolean,
+  isError: boolean,
+  data: T | undefined
+) {
+  return enabled && !isError ? data : undefined
 }
 
 function AttachmentPreview({
@@ -103,9 +120,11 @@ function useObjectUrl(blob: Blob | undefined) {
 
 export function ItemAttachmentDialog({
   item,
+  received = false,
   workspaceId,
 }: {
   item: ItemResponse
+  received?: boolean
   workspaceId: string
 }) {
   const queryClient = useQueryClient()
@@ -114,12 +133,16 @@ export function ItemAttachmentDialog({
   const [downloadError, setDownloadError] = useState(false)
   const isImage = item.type === 'image'
   const triggerLabel = isImage ? 'Abrir imagem' : 'Abrir documento'
-  const options = attachmentQuery(workspaceId, item.id)
+  const options = attachmentQuery(workspaceId, item.id, received)
   const query = useQuery({
     ...options,
     enabled: open && (isImage || previewRequested),
   })
-  const attachment = query.isEnabled ? query.data : undefined
+  const attachment = visibleAttachment(
+    query.isEnabled,
+    query.isError,
+    query.data
+  )
   const previewUrl = useObjectUrl(attachment?.blob)
   const loading = query.isFetching && !attachment
   const previewFailed = open && query.isError && !attachment
@@ -140,7 +163,7 @@ export function ItemAttachmentDialog({
   const download = useCallback(async () => {
     try {
       const loaded = await queryClient.fetchQuery(
-        attachmentQuery(workspaceId, item.id)
+        attachmentQuery(workspaceId, item.id, received)
       )
       setDownloadError(false)
       const url = URL.createObjectURL(loaded.blob)
@@ -155,7 +178,7 @@ export function ItemAttachmentDialog({
     } catch {
       setDownloadError(true)
     }
-  }, [item.id, item.title, queryClient, workspaceId])
+  }, [item.id, item.title, queryClient, received, workspaceId])
 
   let error: string | undefined
   if (downloadError) error = 'Não foi possível baixar o anexo.'

@@ -1,5 +1,5 @@
 import { notFound } from '@tanstack/react-router'
-import type { WorkspacePermission } from '@/api/permissions'
+import { permissionSchema, type WorkspacePermission } from '@/api/permissions'
 import type { FileRouteTypes } from '@/route-tree.gen'
 
 export interface PermissionRequirement {
@@ -14,6 +14,28 @@ export interface PermissionChecker {
   can: (resource: PermissionResource, action: PermissionAction) => boolean
 }
 
+export const permissionCatalog = {
+  resources: [
+    'workspace',
+    'collection',
+    'item',
+    'secret',
+    'member',
+    'role',
+    'activity',
+    'team',
+  ] as const,
+  actions: [
+    'read',
+    'create',
+    'update',
+    'delete',
+    'invite',
+    'all',
+    'manage',
+  ] as const,
+}
+
 export const denyAllPermissions: PermissionChecker = {
   can: () => false,
 }
@@ -22,10 +44,13 @@ export function createPermissionChecker(
   permissions: WorkspacePermission[],
   isOwner = false
 ): PermissionChecker {
+  const validPermissions = permissions.filter(
+    (permission) => permissionSchema.safeParse(permission).success
+  )
   return {
     can: (resource, action) =>
       isOwner ||
-      permissions.some(
+      validPermissions.some(
         (permission) =>
           permission.resource === resource &&
           (permission.action === action || permission.action === 'all')

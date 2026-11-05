@@ -14,6 +14,8 @@ const apiMocks = vi.hoisted(() => ({
   get: vi.fn(),
   listWorkspaces: vi.fn(),
   path: vi.fn(),
+  permissions: vi.fn(),
+  received: vi.fn(),
   search: vi.fn(),
 }))
 
@@ -28,7 +30,15 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       get: apiMocks.get,
       search: apiMocks.search,
     },
-    workspaceApi: { ...actual.workspaceApi, list: apiMocks.listWorkspaces },
+    receivedContentApi: {
+      ...actual.receivedContentApi,
+      list: apiMocks.received,
+    },
+    workspaceApi: {
+      ...actual.workspaceApi,
+      list: apiMocks.listWorkspaces,
+      permissions: apiMocks.permissions,
+    },
   }
 })
 
@@ -90,6 +100,16 @@ async function openUnavailableResult(
 beforeEach(() => {
   vi.clearAllMocks()
   apiMocks.listWorkspaces.mockResolvedValue({ data: [{ id: workspaceId }] })
+  apiMocks.permissions.mockResolvedValue({
+    data: {
+      globalRole: 'ADMIN',
+      isOwner: false,
+      isTeamLeader: false,
+      permissions: [{ action: 'read', resource: 'item' }],
+      roleName: 'Admin',
+      teamId: null,
+    },
+  })
   apiMocks.path.mockResolvedValue({
     data: [{ id: 'collection-1', name: 'Projetos' }],
   })
@@ -98,6 +118,9 @@ beforeEach(() => {
     headers: {},
   })
   apiMocks.search.mockResolvedValue(makePage([]))
+  apiMocks.received.mockResolvedValue({
+    data: { items: [], page: 0, size: 20, totalItems: 0, totalPages: 0 },
+  })
   apiMocks.get.mockResolvedValue({ data: makeItem() })
 })
 

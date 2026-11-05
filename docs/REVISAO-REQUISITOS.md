@@ -4,6 +4,12 @@ Revisão de 12/10/2026. Escopo: [especificação](./REQUISITOS.md), [casos de us
 
 **Situação após avaliação em 12/10/2026:** o proponente aceitou todos os itens. L01–L09 são decisões aprovadas e incorporadas aos requisitos; L10–L14 são encaminhamentos autorizados, cuja execução continua pendente onde não houver resultado ou evidência. A aprovação do proponente não substitui a revisão dos demais integrantes nem a validação externa. As colunas abaixo preservam o texto avaliado como registro da proposta aceita.
 
+## Atualização de status — Etapa 14 (05/11/2026)
+
+A revisão datada de 12/10/2026 permanece como registro histórico da proposta então avaliada; suas recomendações sobre ACLs, grupos de acesso e herança não descrevem o produto entregue. Nas etapas 1–13 foi implementado modelo de papéis globais fixos (Owner/Admin/Maintainer), times com um Líder e uma coleção raiz, acesso uniforme por coleção e publicações com projeções recebidas sincronizadas e somente leitura. Owner/Admin/Maintainer não pertencem a times; membros comuns pertencem a no máximo um. Convite não concede acesso ao conteúdo. A transferência de Owner converte o titular anterior em Admin. As rotas antigas de grupos respondem 410.
+
+O conteúdo legado abaixo é preservado para rastreabilidade e não deve ser usado como critério de aceite atual onde conflitar com o modelo vigente. O status foi confrontado com código e migrações; não houve execução de testes backend nem validação de CI nesta atualização.
+
 ## Correções realizadas nesta revisão
 
 - Atualizada a convenção de IDs para RF41–RF51, RN11–RN17 e RNF15/RNF16; preservados os identificadores anteriores.

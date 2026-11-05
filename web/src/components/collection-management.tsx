@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { usePublicationManagementAccess } from '@/hooks/use-publication-management-access'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 const collectionNameSchema = z
@@ -58,7 +59,10 @@ export function CollectionCard({
 }) {
   const [shareOpen, setShareOpen] = useState(false)
   const permissions = useWorkspacePermissions(workspaceId)
-  const canManageSharing = permissions.can('sharing', 'manage')
+  const canManageSharing = usePublicationManagementAccess(
+    workspaceId,
+    collection.id
+  )
   const canRename = permissions.can('collection', 'update')
   const canDelete = permissions.can('collection', 'delete')
   const handleDelete = useCallback(
@@ -129,6 +133,7 @@ export function CollectionCard({
           onClose={closeSharing}
           open={shareOpen}
           target={{
+            collectionId: collection.id,
             id: collection.id,
             kind: 'collection',
             name: collection.name,
@@ -335,8 +340,8 @@ function DeleteCollectionDialog({
         <DialogHeader>
           <DialogTitle>Excluir pasta</DialogTitle>
           <DialogDescription>
-            Esta ação não pode ser desfeita. “{collection.name}” será excluída
-            permanentemente.
+            Esta ação remove permanentemente “{collection.name}”, todo o seu
+            conteúdo e as publicações relacionadas. Ela não pode ser desfeita.
           </DialogDescription>
         </DialogHeader>
         {error ? (
@@ -369,7 +374,7 @@ function getCollectionMutationError(
     403: 'Você não tem permissão para esta ação.',
     409:
       action === 'delete'
-        ? 'Esta pasta contém itens ou subpastas e não pode ser excluída.'
+        ? 'Esta coleção ainda está associada a um time e não pode ser excluída.'
         : 'Já existe uma pasta com esse nome nesta localização.',
   }
   if (action !== 'create') {

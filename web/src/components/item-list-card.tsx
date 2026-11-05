@@ -1,4 +1,10 @@
-import { FileIcon, ImageIcon, KeyIcon, LinkIcon } from '@phosphor-icons/react'
+import {
+  FileIcon,
+  FolderIcon,
+  ImageIcon,
+  KeyIcon,
+  LinkIcon,
+} from '@phosphor-icons/react'
 import type { ItemResponse } from '@/api/types'
 import { type CopyKind, ItemActions } from '@/components/item-actions'
 import { ItemAttachmentDialog } from '@/components/item-attachment-dialog'
@@ -8,6 +14,7 @@ import { canAccessItem } from '@/lib/item-permissions'
 
 const typeIcons = {
   file: FileIcon,
+  folder: FolderIcon,
   image: ImageIcon,
   link: LinkIcon,
   secret: KeyIcon,

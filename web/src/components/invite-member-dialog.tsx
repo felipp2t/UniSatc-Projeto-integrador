@@ -40,7 +40,7 @@ export function InviteMemberDialog() {
         getApiErrorMessage(error, {
           fallback: 'Não foi possível criar o convite. Tente novamente.',
           statusMessages: {
-            403: 'Apenas o dono do workspace pode executar esta ação.',
+            403: 'Somente Owner ou Admin pode convidar integrantes.',
             409: 'Este e-mail já possui uma conta.',
           },
         })

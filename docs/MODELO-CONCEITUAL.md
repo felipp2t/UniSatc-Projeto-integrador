@@ -2,6 +2,33 @@
 
 Iniciado em 11/10/2026 e revisado em 12/10/2026 a partir das decisões desta sessão, da [especificação de requisitos](./REQUISITOS.md), do [contexto](../CONTEXT.md) e do [ADR do workspace único](./adr/0001-workspace-unico-por-empresa.md). Representa conceitos do domínio e suas relações; não define tabelas, APIs ou uma implementação pronta.
 
+## Modelo vigente implementado — Etapa 14
+
+O modelo conceitual detalhado mais abaixo registra a proposta refinada em 12/10/2026. Seus conceitos de grupo de acesso, concessões diretas, raiz pública e herança por pasta foram superados pela implementação descrita aqui; permanecem como histórico, não como comportamento atual. Este resumo reflete o código entregue nas etapas 1–13 e não afirma execução dos testes backend.
+
+- Um workspace contém membros, times, coleções, conteúdo e publicações. Owner, Admin e Maintainer são globais e não pertencem a time; existe um Owner. Transferir Owner promove o titular anterior a Admin.
+- Um membro comum pode estar sem time ou em um único time. Cada time tem uma coleção raiz e um Líder; associação ao time dá acesso uniforme à coleção. Convite não concede acesso a conteúdo.
+- Pastas e itens não têm concessões individuais, grupos ACL, herança configurável ou raiz pública. O acesso decorre do papel global ou da associação à coleção.
+- Uma publicação de item ou pasta gera uma projeção recebida somente leitura. Relações internas identificam os originais; a projeção mantém caminho e nome do time capturados para apresentação e usa os nomes atuais do conteúdo. Cobertura acompanha a árvore publicada. Revogar remove só a publicação/destinatário correspondente; excluir o original remove as cópias relacionadas.
+- Excluir um time remove seu vínculo e integrantes, preservando coleção, conteúdo e publicações. A coleção sem time fica acessível aos papéis globais e pode ser reassociada; essa ação não reescreve os nomes/caminhos capturados da origem.
+- Endpoints antigos de grupos retornam 410 Gone.
+
+## Entidades conceituais e cardinalidades vigentes
+
+| Entidade/conceito | Cardinalidade / relação |
+|---|---|
+| Workspace — Owner | Cada workspace tem exatamente `1` Owner; esse membro não tem time. |
+| Workspace — membro | Workspace contém `1..N` membros vinculados, incluindo exatamente `1` Owner; uma conta pode permanecer sem vínculo ao workspace. |
+| Membro — papel global | Membro tem `0..1` papel global entre Admin/Maintainer; Owner é o único titular separado no workspace. Conta com papel global não pertence a time. |
+| Time — coleção raiz | Cada time referencia exatamente `1` coleção raiz; cada coleção está associada a `0..1` time. |
+| Time — Líder | Cada time tem exatamente `1` Líder ativo; um membro pode liderar `0..1` time. |
+| Membro — time | Membro comum pertence a `0..1` time. Associação concede acesso uniforme à coleção do time. |
+| Coleção — pasta/item | Coleção contém `0..N` pastas e itens; pastas podem conter subpastas e itens. Não há entidade ACL/hierarquia de permissão. |
+| Publicação — origem/destino | Publicação tem exatamente `1` origem (item ou pasta), `1` coleção de origem, `1` coleção destinatária e snapshot do nome do time/caminho de origem. Uma origem pode ter `0..N` publicações, uma por destinatário. |
+| Publicação — projeção/cobertura | Cada publicação origina `0..N` linhas de projeção/cobertura sincronizadas com seus originais via relações internas estáveis. Projeções não são conteúdo editável independente. |
+
+A exclusão de time desvincula sua coleção e remove integrantes, sem excluir coleção, conteúdo ou publicações. Uma coleção pode então ser reassociada a outro time; metadados de origem capturados nas publicações permanecem estáveis. Excluir o original ou revogar a publicação elimina as projeções correspondentes. Os papéis globais e a autorização por coleção estão detalhados na [ADR 0002](./adr/0002-times-papeis-globais-e-publicacoes.md).
+
 ## Conceitos
 
 | Conceito | Significado |

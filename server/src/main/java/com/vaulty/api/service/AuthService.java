@@ -154,6 +154,13 @@ public class AuthService {
             throw new ValidationException("As senhas não conferem");
         }
 
+        UserInvite pendingInvite = userInviteRepository.findByEmailAndTokenAndStatus(
+                        request.email(), request.token(), UserInviteStatus.PENDING)
+                .orElseThrow(() -> new ResourceNotFoundException("Convite não encontrado"));
+        if (!pendingInvite.getExpiresAt().isAfter(OffsetDateTime.now(clock))) {
+            throw new InvalidInviteException("Convite expirado");
+        }
+        workspaceService.lockSingletonForUpdate();
         UserInvite invite = userInviteRepository.findByEmailAndTokenAndStatusForUpdate(
                         request.email(), request.token(), UserInviteStatus.PENDING)
                 .orElseThrow(() -> new ResourceNotFoundException("Convite não encontrado"));
@@ -233,7 +240,7 @@ public class AuthService {
         refreshTokenRepository.save(refreshToken);
 
         String accessToken = jwtService.generateAccessToken(
-                userId, membership.getId(), membership.getRole().getName());
+                userId, membership.getId(), membership.getRole() == null ? null : membership.getRole().getName());
 
         return new TokenPair(accessToken, refreshToken.getToken());
     }
