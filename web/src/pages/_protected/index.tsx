@@ -762,6 +762,7 @@ function EmptyItemsContent({
         icon={<FileIcon aria-hidden='true' className='size-6' />}
         title={copy.title}
         variant='compact'
+        bordered={!isEmptyCollection}
       />
       {items && shouldShowPagination ? (
         <PaginationControls

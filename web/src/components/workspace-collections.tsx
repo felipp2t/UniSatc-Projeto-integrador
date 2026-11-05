@@ -251,6 +251,7 @@ function CollectionsSection({
           icon={<FolderIcon aria-hidden='true' className='size-6' />}
           title='Nenhuma pasta encontrada'
           variant='compact'
+          bordered={false}
         />
       </section>
     )
