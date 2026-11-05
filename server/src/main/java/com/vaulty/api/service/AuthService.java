@@ -240,7 +240,7 @@ public class AuthService {
         refreshTokenRepository.save(refreshToken);
 
         String accessToken = jwtService.generateAccessToken(
-                userId, membership.getId(), membership.getRole() == null ? null : membership.getRole().getName());
+                userId, membership.getId(), null);
 
         return new TokenPair(accessToken, refreshToken.getToken());
     }

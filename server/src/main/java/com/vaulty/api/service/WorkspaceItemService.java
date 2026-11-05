@@ -337,6 +337,7 @@ public class WorkspaceItemService {
 
     private void lockWorkspace(UUID workspaceId) {
         accessNotifications.lockWorkspace(workspaceId);
+        entityManager.flush();
         entityManager.clear();
     }
 

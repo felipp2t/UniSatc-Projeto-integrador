@@ -176,9 +176,12 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
     void databaseEnforcesWorkspaceMemberUniqueness() {
         User owner = createUser("Constraint owner");
         UUID workspace = configureWorkspace(owner).id();
+        User member = createUser("Constraint member");
+        addMember(member, workspace);
+        workspaceMemberRepository.flush();
         assertConstraintViolation("uq_workspace_member_workspace_user", () -> jdbc.update("""
                 INSERT INTO workspace_member (id, user_id, workspace_id, role_id) VALUES (?, ?, ?, ?)
-                """, UUID.randomUUID(), owner.getId(), workspace, null));
+                """, UUID.randomUUID(), member.getId(), workspace, null));
     }
 
     @Test
@@ -202,7 +205,9 @@ class CriticalBusinessRulesIntegrationTest extends WorkspaceIntegrationSupport {
     void databaseRejectsUnknownFixedGlobalRoles() {
         User owner = createUser("Global role constraint owner");
         UUID workspace = configureWorkspace(owner).id();
-        UUID memberId = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace, owner.getId())
+        User member = createUser("Global role constraint member");
+        addMember(member, workspace);
+        UUID memberId = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspace, member.getId())
                 .orElseThrow().getId();
         assertConstraintViolation("ck_workspace_member_global_role", () -> jdbc.update(
                 "UPDATE workspace_member SET global_role = 'CUSTOM' WHERE id = ?", memberId));

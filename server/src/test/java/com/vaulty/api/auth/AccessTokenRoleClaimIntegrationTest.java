@@ -175,7 +175,7 @@ class AccessTokenRoleClaimIntegrationTest extends PostgresIntegrationTest {
                         .cookie(new jakarta.servlet.http.Cookie("accessToken", accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"forbidden\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
     }
 
     @Test

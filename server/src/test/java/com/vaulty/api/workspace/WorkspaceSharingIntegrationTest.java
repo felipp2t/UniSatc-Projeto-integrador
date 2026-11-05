@@ -79,7 +79,7 @@ class WorkspaceSharingIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(0));
         mockMvc.perform(get("/workspaces/{workspaceId}/received", workspace.id())
                         .cookie(authCookie(unrelatedMember)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(0));
+                .andExpect(status().isForbidden());
 
         UUID receivedId = UUID.fromString(objectMapper.readTree(mockMvc.perform(
                                 get("/workspaces/{workspaceId}/received", workspace.id())

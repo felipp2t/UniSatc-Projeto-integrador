@@ -16,6 +16,7 @@ import com.vaulty.api.exception.ConflictException;
 import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.repository.ContentPublicationRepository;
+import com.vaulty.api.repository.PersistenceConstraints;
 import com.vaulty.api.repository.WorkspaceCollectionRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceTeamRepository;
@@ -31,6 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class WorkspaceSharingService {
+
+    private static final String ITEM_PUBLICATION_CONSTRAINT = "uq_content_publication_item_destination";
+    private static final String COLLECTION_PUBLICATION_CONSTRAINT = "uq_content_publication_collection_destination";
 
     private final JdbcTemplate jdbc;
     private final WorkspaceContentAuthorization authorization;
@@ -110,7 +114,11 @@ public class WorkspaceSharingService {
                             destination.getRootCollection().getId()));
             return response(saved);
         } catch (DataIntegrityViolationException exception) {
-            throw new ConflictException("Esse original já está publicado para o time de destino");
+            if (PersistenceConstraints.causedBy(exception, ITEM_PUBLICATION_CONSTRAINT,
+                    COLLECTION_PUBLICATION_CONSTRAINT)) {
+                throw new ConflictException("Esse original já está publicado para o time de destino");
+            }
+            throw exception;
         }
     }
 

@@ -15,6 +15,15 @@ export interface PermissionChecker {
 }
 
 export const permissionCatalog = {
+  actions: [
+    'read',
+    'create',
+    'update',
+    'delete',
+    'invite',
+    'all',
+    'manage',
+  ] as const,
   resources: [
     'workspace',
     'collection',
@@ -24,15 +33,6 @@ export const permissionCatalog = {
     'role',
     'activity',
     'team',
-  ] as const,
-  actions: [
-    'read',
-    'create',
-    'update',
-    'delete',
-    'invite',
-    'all',
-    'manage',
   ] as const,
 }
 

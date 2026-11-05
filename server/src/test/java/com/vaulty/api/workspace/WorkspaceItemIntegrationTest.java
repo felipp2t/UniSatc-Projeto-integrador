@@ -77,6 +77,7 @@ class WorkspaceItemIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void validatesTypeUrlDuplicateTitleAndFolderDeletion() throws Exception {
         User owner = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
