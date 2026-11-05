@@ -7,8 +7,8 @@ import {
 import { vi } from 'vitest'
 import type { SessionService } from '@/auth/session'
 import { routeTree } from '@/route-tree.gen'
-import type { RouterContext } from '@/router-context'
-import { routerDefaults } from '@/router-defaults'
+import type { RouterContext } from '@/config/routes/router-context'
+import { routerDefaults } from '@/config/routes/router-defaults'
 import { renderWithProviders } from '@/test/render'
 import { createSessionStub } from '@/test/session-stub'
 import {

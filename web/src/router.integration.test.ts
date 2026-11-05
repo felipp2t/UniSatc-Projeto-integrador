@@ -17,7 +17,7 @@ import type { SessionService, SessionStatus } from '@/auth/session'
 import { createSessionStub } from '@/test/session-stub'
 import { Route as ProtectedSplatRoute } from './pages/_protected/$'
 import { routeTree } from './route-tree.gen'
-import type { RouterContext } from './router-context'
+import type { RouterContext } from './config/routes/router-context'
 
 // Guard integration tests do not need to preload the login page UI.
 vi.mock('./pages/login', async (importOriginal) => {

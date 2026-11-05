@@ -8,7 +8,7 @@ import { createQueryClient } from './api/query-client'
 import { sanitizeInternalRedirect } from './auth/redirect'
 import { syncOnlineStatus } from './hooks/use-online-status'
 import { routeTree } from './route-tree.gen'
-import { routerDefaults } from './router-defaults'
+import { routerDefaults } from './config/routes/router-defaults'
 
 const session = createSessionService()
 const queryClient = createQueryClient()

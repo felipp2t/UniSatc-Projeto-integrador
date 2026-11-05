@@ -5,7 +5,7 @@ import {
 } from '@tanstack/react-router'
 import { NotFoundPage } from '@/components/not-found-page'
 import { Toaster } from '@/components/ui/toast'
-import type { RouterContext } from '@/router-context'
+import type { RouterContext } from '@/config/routes/router-context'
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootComponent,

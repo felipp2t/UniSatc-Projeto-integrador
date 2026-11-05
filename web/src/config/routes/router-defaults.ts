@@ -1,5 +1,5 @@
-import { RouteError } from './components/route-error'
-import { LoadingState } from './components/ui/loading-state'
+import { RouteError } from '../../components/route-error'
+import { LoadingState } from '../../components/ui/loading-state'
 
 export const routerDefaults = {
   defaultErrorComponent: RouteError,
