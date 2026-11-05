@@ -32,6 +32,8 @@ export function SelectTrigger({
 export function SelectContent({
   children,
   className,
+  align = 'start',
+  position = 'popper',
   ...props
 }: ComponentProps<typeof SelectPrimitive.Content>) {
   return (
@@ -41,6 +43,8 @@ export function SelectContent({
           'z-50 min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md',
           className
         )}
+        align={align}
+        position={position}
         {...props}
       >
         <SelectPrimitive.Viewport className='p-0.5'>
