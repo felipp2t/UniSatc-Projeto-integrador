@@ -8,8 +8,7 @@ const resources = [
   'member',
   'role',
   'activity',
-  'group',
-  'sharing',
+  'team',
 ] as const
 
 const actions = [
@@ -29,13 +28,26 @@ export const permissionSchema = z.object({
 
 export const permissionsSchema = z.array(permissionSchema)
 
+export const globalRoleSchema = z.enum(['ADMIN', 'MAINTAINER'])
+export const workspaceRoleDefinitionSchema = z.object({
+  code: z.enum(['OWNER', 'ADMIN', 'MAINTAINER', 'LEADER', 'MEMBER']),
+  name: z.string(),
+  permissions: permissionsSchema,
+  scope: z.enum(['GLOBAL', 'COLLECTION']),
+})
+export const workspaceRoleDefinitionsSchema = z.array(
+  workspaceRoleDefinitionSchema
+)
+
 export type WorkspacePermission = z.infer<typeof permissionSchema>
 
 export const workspacePermissionsSchema = z.object({
+  globalRole: globalRoleSchema.nullable(),
   isOwner: z.boolean(),
+  isTeamLeader: z.boolean(),
   permissions: permissionsSchema,
-  roleId: z.string(),
-  roleName: z.string(),
+  roleName: z.string().nullable(),
+  teamId: z.string().uuid().nullable(),
 })
 export type WorkspacePermissionsResponse = z.infer<
   typeof workspacePermissionsSchema

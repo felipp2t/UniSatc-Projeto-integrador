@@ -21,7 +21,7 @@ export function useWorkspaceMembers(
 
   return {
     currentUserRole,
-    isOwner: isOwnerRole(currentUserRole),
+    isOwner: isOwnerRole(currentUserRole ?? undefined),
     members,
   }
 }

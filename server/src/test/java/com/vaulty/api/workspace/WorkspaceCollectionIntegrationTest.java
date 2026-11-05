@@ -153,7 +153,7 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void memberCanReadButCannotCreateFolders() throws Exception {
+    void unassignedMemberCannotReadOrCreateFolders() throws Exception {
         User owner = createUser();
         User member = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
@@ -162,13 +162,11 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
 
         mockMvc.perform(get("/workspaces/{workspaceId}/collections", workspaceId)
                         .cookie(authCookie(member)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].id").value(folderId.toString()));
+                .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/workspaces/{workspaceId}/collections/{collectionId}/path", workspaceId, folderId)
                         .cookie(authCookie(member)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Compartilhado"));
+                .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/workspaces/{workspaceId}/collections", workspaceId)
                         .cookie(authCookie(member))
@@ -176,7 +174,7 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
                         .content("""
                                 {"name":"Proibida"}
                                 """))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -271,7 +269,7 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
     }
 
     @Test
-    void deletesOnlyEmptyFolders() throws Exception {
+    void deletingFolderAlsoDeletesItsDescendants() throws Exception {
         User owner = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
         UUID parentId = createFolder(owner, workspaceId, "Pai", null);
@@ -279,13 +277,10 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
 
         mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, parentId)
                         .cookie(authCookie(owner)))
-                .andExpect(status().isConflict());
-        mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, childId)
-                        .cookie(authCookie(owner)))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, parentId)
+        mockMvc.perform(get("/workspaces/{workspaceId}/collections/{collectionId}/path", workspaceId, childId)
                         .cookie(authCookie(owner)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -299,10 +294,10 @@ class WorkspaceCollectionIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(put("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, folderId)
                         .cookie(authCookie(member)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Alterada\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
         mockMvc.perform(delete("/workspaces/{workspaceId}/collections/{collectionId}", workspaceId, folderId)
                         .cookie(authCookie(member)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
     }
 
     @ParameterizedTest

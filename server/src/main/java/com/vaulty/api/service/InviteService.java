@@ -78,14 +78,15 @@ public class InviteService {
 
     @Transactional(readOnly = true)
     public List<InviteResponse> listPending(UUID ownerId) {
-        workspaceService.requireOwner(ownerId);
+        workspaceService.requireInviteManager(ownerId);
         return userInviteRepository.findPendingUsable(OffsetDateTime.now(clock), UserInviteStatus.PENDING);
     }
 
     @Transactional
     public void decline(InviteValidationRequest request) {
-        OffsetDateTime now = OffsetDateTime.now(clock);
-        UserInvite invite = requirePendingInviteForUpdate(request, now);
+        requirePendingInvite(request, OffsetDateTime.now(clock));
+        workspaceService.lockSingletonForUpdate();
+        UserInvite invite = requirePendingInviteForUpdate(request, OffsetDateTime.now(clock));
         invite.setStatus(UserInviteStatus.DECLINED);
         activityLogService.recordInviteeEmail(workspaceService.singletonId(), invite.getEmail(),
                 ActivityAction.MEMBER_INVITE_DECLINED, ActivityResourceType.MEMBER, invite.getId(),
@@ -94,7 +95,7 @@ public class InviteService {
 
     @Transactional
     public void inviteUser(UUID inviterId, InviteUserRequest request) {
-        var workspace = workspaceService.requireOwner(inviterId);
+        var workspace = workspaceService.requireInviteManagerForUpdate(inviterId);
 
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new ConflictException("E-mail já possui uma conta");
@@ -118,7 +119,7 @@ public class InviteService {
 
     @Transactional
     public void revoke(UUID ownerId, UUID inviteId) {
-        var workspace = workspaceService.requireOwner(ownerId);
+        var workspace = workspaceService.requireInviteManagerForUpdate(ownerId);
         UserInvite invite = userInviteRepository.findByIdAndStatusForUpdate(inviteId, UserInviteStatus.PENDING)
                 .orElseThrow(() -> new ResourceNotFoundException("Convite indisponível"));
 

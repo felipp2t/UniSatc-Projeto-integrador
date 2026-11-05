@@ -12,7 +12,6 @@ import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.UserInvite;
 import com.vaulty.api.entity.UserInviteStatus;
 import com.vaulty.api.entity.WorkspaceMember;
-import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.repository.UserInviteRepository;
 import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
@@ -186,7 +185,9 @@ class InviteAndRegisterIntegrationTest extends PostgresIntegrationTest {
         User createdUser = userRepository.findByEmail("novo@example.com").orElseThrow();
         WorkspaceMember membership = workspaceMemberRepository.findByUserId(createdUser.getId()).orElseThrow();
 
-        assertThat(membership.getRole().getName()).isEqualTo(WorkspaceRole.MEMBER_ROLE_NAME);
+        assertThat(membership.getRole()).isNull();
+        assertThat(membership.getGlobalRole()).isNull();
+        assertThat(membership.getTeam()).isNull();
         assertThat(membership.getWorkspace().getId()).isEqualTo(workspaceRepository.findSingleton().orElseThrow().getId());
     }
 

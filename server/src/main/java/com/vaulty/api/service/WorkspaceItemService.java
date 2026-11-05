@@ -18,6 +18,7 @@ import com.vaulty.api.repository.PersistenceConstraints;
 import com.vaulty.api.repository.WorkspaceCollectionRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.repository.WorkspaceItemSecretRepository;
+import jakarta.persistence.EntityManager;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.OffsetDateTime;
@@ -46,19 +47,19 @@ public class WorkspaceItemService {
     private final SecretCipher secretCipher;
     private final ActivityLogService activityLogService;
     private final WorkspaceItemAttachmentService attachmentService;
+    private final WorkspaceAccessNotifications accessNotifications;
+    private final EntityManager entityManager;
 
     @Transactional
     public ItemResponse create(UUID userId, UUID workspaceId, CreateItemRequest request) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "create");
         validateContent(request);
-        if ("secret".equals(request.type())) {
-            authorization.require(userId, workspace, "secret", "create");
-        }
         var collection = request.collectionId() == null ? null
                 : collectionRepository.findByIdAndWorkspaceId(request.collectionId(), workspaceId)
                         .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
-        if (collection != null) contentAccess.requireCollection(userId, workspace, collection.getId());
+        contentAccess.requireCollectionWrite(userId, workspace, collection == null ? null : collection.getId());
 
         var item = new WorkspaceItem();
         item.setWorkspace(workspace);
@@ -88,9 +89,10 @@ public class WorkspaceItemService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ItemPageResponse list(UUID userId, UUID workspaceId, UUID collectionId, boolean archived,
                                  int page, int size) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         validatePage(page, size);
@@ -99,14 +101,15 @@ public class WorkspaceItemService {
         }
         if (collectionId != null) contentAccess.requireCollection(userId, workspace, collectionId);
         var pageable = PageRequest.of(page, size);
-        boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
+        boolean includeSecrets = true;
         return ItemPageResponse.from(itemRepository.listAccessible(workspaceId, userId, collectionId, includeSecrets, archived, pageable)
                 .map(item -> toResponse(item, false)));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ItemPageResponse search(UUID userId, UUID workspaceId, String query, boolean includeArchived,
                                    int page, int size) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
         validatePage(page, size);
@@ -114,29 +117,28 @@ public class WorkspaceItemService {
             throw new ValidationException("Busca deve conter entre 1 e 255 caracteres");
         }
         var pageable = PageRequest.of(page, size);
-        boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
+        boolean includeSecrets = true;
         return ItemPageResponse.from(itemRepository.searchAccessible(
                         workspaceId, userId, query.trim(), includeSecrets, includeArchived, pageable)
                 .map(item -> toAccessibleResponse(userId, workspace, item, false)));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ItemResponse get(UUID userId, UUID workspaceId, UUID itemId) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
-        boolean includeSecrets = authorization.allows(userId, workspace, "secret", "read");
         var item = itemRepository.findIncludingArchived(itemId, workspaceId)
-                .filter(found -> includeSecrets || !"secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
         contentAccess.requireItem(userId, workspace, itemId);
         return toAccessibleResponse(userId, workspace, item, true);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public SecretValueResponse reveal(UUID userId, UUID workspaceId, UUID itemId) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "read");
-        authorization.require(userId, workspace, "secret", "read");
         var item = itemRepository.findIncludingArchived(itemId, workspaceId)
                 .filter(found -> "secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Segredo não encontrado"));
@@ -148,6 +150,7 @@ public class WorkspaceItemService {
 
     @Transactional
     public void delete(UUID userId, UUID workspaceId, UUID itemId, boolean confirm) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "delete");
         if (!confirm) {
@@ -156,12 +159,8 @@ public class WorkspaceItemService {
         var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
         contentAccess.requireItem(userId, workspace, itemId);
-        if ("secret".equals(item.getType())) {
-            if (!authorization.allows(userId, workspace, "secret", "read")) {
-                throw new ResourceNotFoundException("Item indisponível");
-            }
-            authorization.require(userId, workspace, "secret", "delete");
-        }
+        contentAccess.requireCollectionWrite(userId, workspace,
+                item.getCollection() == null ? null : item.getCollection().getId());
         if (item.getArchivedAt() == null) {
             throw new ConflictException("Somente itens arquivados podem ser excluídos definitivamente");
         }
@@ -176,17 +175,14 @@ public class WorkspaceItemService {
 
     @Transactional
     public void restore(UUID userId, UUID workspaceId, UUID itemId) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "update");
         var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
         contentAccess.requireItem(userId, workspace, itemId);
-        if ("secret".equals(item.getType())) {
-            if (!authorization.allows(userId, workspace, "secret", "read")) {
-                throw new ResourceNotFoundException("Item indisponível");
-            }
-            authorization.require(userId, workspace, "secret", "update");
-        }
+        contentAccess.requireCollectionWrite(userId, workspace,
+                item.getCollection() == null ? null : item.getCollection().getId());
         if (item.getArchivedAt() == null) {
             throw new ConflictException("Item não está arquivado");
         }
@@ -197,17 +193,14 @@ public class WorkspaceItemService {
 
     @Transactional
     public void archive(UUID userId, UUID workspaceId, UUID itemId) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "update");
         var item = itemRepository.findAnyForUpdate(itemId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
         contentAccess.requireItem(userId, workspace, itemId);
-        if ("secret".equals(item.getType())) {
-            if (!authorization.allows(userId, workspace, "secret", "read")) {
-                throw new ResourceNotFoundException("Item indisponível");
-            }
-            authorization.require(userId, workspace, "secret", "update");
-        }
+        contentAccess.requireCollectionWrite(userId, workspace,
+                item.getCollection() == null ? null : item.getCollection().getId());
         if (item.getArchivedAt() != null) {
             throw new ConflictException("Item já arquivado");
         }
@@ -218,6 +211,7 @@ public class WorkspaceItemService {
 
     @Transactional
     public ItemResponse update(UUID userId, UUID workspaceId, UUID itemId, UpdateItemRequest request) {
+        lockWorkspace(workspaceId);
         Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "item", "update");
         var item = itemRepository.findActiveForUpdate(itemId, workspaceId)
@@ -225,9 +219,8 @@ public class WorkspaceItemService {
                         || "secret".equals(found.getType()))
                 .orElseThrow(() -> new ResourceNotFoundException("Item indisponível"));
         contentAccess.requireItem(userId, workspace, itemId);
-        if ("secret".equals(item.getType())) {
-            authorization.require(userId, workspace, "secret", "update");
-        }
+        contentAccess.requireCollectionWrite(userId, workspace,
+                item.getCollection() == null ? null : item.getCollection().getId());
         validateContent(item.getType(), request.textContent(), request.linkUrl(), request.value());
 
         var before = itemSnapshot(item, false);
@@ -340,6 +333,12 @@ public class WorkspaceItemService {
             return value;
         }
         return value.substring(0, MAX_PREVIEW_LENGTH - 1) + "…";
+    }
+
+    private void lockWorkspace(UUID workspaceId) {
+        accessNotifications.lockWorkspace(workspaceId);
+        entityManager.flush();
+        entityManager.clear();
     }
 
 }

@@ -5,15 +5,15 @@ import com.vaulty.api.dto.workspace.WorkspacePermissionsResponse;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceMember;
 import com.vaulty.api.entity.WorkspaceRole;
+import com.vaulty.api.enums.GlobalRole;
 import com.vaulty.api.exception.ForbiddenException;
 import com.vaulty.api.exception.ResourceNotFoundException;
-import com.vaulty.api.repository.RolePermissionRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
+import com.vaulty.api.repository.WorkspaceTeamRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +24,7 @@ public class WorkspaceContentAuthorization {
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository memberRepository;
-    private final RolePermissionRepository permissionRepository;
+    private final WorkspaceTeamRepository teamRepository;
 
     public Workspace requireWorkspace(UUID userId, UUID workspaceId) {
         return workspaceRepository.findByIdAndMemberUserId(workspaceId, userId)
@@ -42,24 +42,23 @@ public class WorkspaceContentAuthorization {
     }
 
     public boolean allows(UUID userId, Workspace workspace, String resource, String action) {
-        var role = requireMember(userId, workspace.getId()).getRole();
-        if (role.isOwnerRole()) {
-            return true;
-        }
-        return permissionRepository.allows(role.getId(), resource, action);
+        WorkspaceMember member = requireMember(userId, workspace.getId());
+        return PermissionCatalog.allows(permissionsFor(userId, workspace, member), resource, action);
     }
 
     public boolean allowsIfMember(UUID userId, UUID workspaceId, String resource, String action) {
         return memberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
-                .map(member -> member.getRole().isOwnerRole()
-                        || permissionRepository.allows(member.getRole().getId(), resource, action))
+                .map(member -> allows(member.getUser().getId(), member.getWorkspace(), resource, action))
                 .orElse(false);
     }
 
     public boolean isOwner(UUID userId, Workspace workspace) {
-        return memberRepository.findByWorkspaceIdAndUserId(workspace.getId(), userId)
-                .map(member -> member.getRole().isOwnerRole())
-                .orElse(false);
+        return workspace.getOwner().getId().equals(userId);
+    }
+
+    public boolean isTeamLeader(WorkspaceMember member) {
+        return member.getTeam() != null
+                && teamRepository.existsByIdAndLeader_Id(member.getTeam().getId(), member.getId());
     }
 
     public Workspace requireOwner(UUID userId, UUID workspaceId) {
@@ -82,33 +81,49 @@ public class WorkspaceContentAuthorization {
     public Workspace requireOwnerForUpdate(UUID userId, UUID workspaceId) {
         Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        var member = requireMember(userId, workspaceId);
-        if (!member.getRole().isOwnerRole()) {
+        if (!isOwner(userId, workspace)) {
             throw new ForbiddenException("Permissão insuficiente");
         }
         return workspace;
     }
 
     public WorkspacePermissionsResponse permissions(UUID userId, UUID workspaceId) {
-        var role = requireMember(userId, workspaceId).getRole();
-        return new WorkspacePermissionsResponse(role.isOwnerRole(), role.getId().toString(),
-                role.getName(), rolePermissions(role));
+        Workspace workspace = requireWorkspace(userId, workspaceId);
+        WorkspaceMember member = requireMember(userId, workspaceId);
+        boolean owner = isOwner(userId, workspace);
+        boolean leader = isTeamLeader(member);
+        String roleName = owner ? "Owner"
+                : member.getGlobalRole() != null ? member.getGlobalRole().displayName()
+                : member.getTeam() == null ? null : leader ? "Leader" : "Member";
+        List<WorkspacePermission> permissions = permissionsFor(userId, workspace, member);
+        return new WorkspacePermissionsResponse(
+                owner,
+                member.getGlobalRole() == null ? null : member.getGlobalRole().name(),
+                member.getTeam() == null ? null : member.getTeam().getId(),
+                leader,
+                member.getRole() == null ? null : member.getRole().getId().toString(),
+                roleName,
+                permissions);
     }
 
     public List<WorkspacePermission> rolePermissions(WorkspaceRole role) {
-        if (role.isOwnerRole()) {
-            return PermissionCatalog.effectiveOwnerPermissions();
-        }
-        return permissionRepository.findAllByRoleId(role.getId()).stream()
-                .flatMap(permission -> ("all".equals(permission.getAction())
-                        ? PermissionCatalog.actions(permission.getResource()).stream()
-                        : Stream.of(permission.getAction()))
-                        .map(action -> new WorkspacePermission(permission.getResource(), action)))
-                .distinct().toList();
+        return role.isOwnerRole() ? PermissionCatalog.effectiveOwnerPermissions() : List.of();
     }
 
     private WorkspaceMember requireMember(UUID userId, UUID workspaceId) {
         return memberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+    }
+
+    private List<WorkspacePermission> permissionsFor(
+            UUID userId, Workspace workspace, WorkspaceMember member) {
+        if (isOwner(userId, workspace)) {
+            return PermissionCatalog.effectiveOwnerPermissions();
+        }
+        if (member.getGlobalRole() != null) {
+            return PermissionCatalog.permissionsForGlobalRole(member.getGlobalRole());
+        }
+        return member.getTeam() == null ? List.of()
+                : PermissionCatalog.permissionsForTeamRole(isTeamLeader(member));
     }
 }

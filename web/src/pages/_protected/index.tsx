@@ -30,6 +30,7 @@ import {
 import type { CopyKind } from '@/components/item-actions'
 import { ItemListCard } from '@/components/item-list-card'
 import { NotFoundPage } from '@/components/not-found-page'
+import { ReceivedContentTree } from '@/components/received-content-tree'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -217,6 +218,9 @@ function WorkspaceBrowser({
         pathUnavailable={pathUnavailable}
         workspaceId={workspaceId}
       />
+      {!collectionId && permissions.can('item', 'read') ? (
+        <ReceivedContentTree workspaceId={workspaceId} />
+      ) : null}
       {permissions.can('item', 'read') ? (
         <ItemsSection
           archived={archived}

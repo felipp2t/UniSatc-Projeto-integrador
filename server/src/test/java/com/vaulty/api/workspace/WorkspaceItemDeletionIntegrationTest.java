@@ -15,12 +15,11 @@ import com.vaulty.api.PostgresIntegrationTest;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceMember;
-import com.vaulty.api.entity.WorkspaceRole;
+import com.vaulty.api.enums.GlobalRole;
 import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.repository.UserRepository;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
-import com.vaulty.api.repository.WorkspaceRoleRepository;
 import com.vaulty.api.service.JwtService;
 import com.vaulty.api.service.WorkspaceItemService;
 import com.vaulty.api.storage.ObjectStorage;
@@ -44,7 +43,6 @@ class WorkspaceItemDeletionIntegrationTest extends PostgresIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private UserRepository userRepository;
     @Autowired private WorkspaceRepository workspaceRepository;
-    @Autowired private WorkspaceRoleRepository roleRepository;
     @Autowired private WorkspaceMemberRepository memberRepository;
     @Autowired private WorkspaceMapper workspaceMapper;
     @Autowired private JwtService jwtService;
@@ -61,9 +59,7 @@ class WorkspaceItemDeletionIntegrationTest extends PostgresIntegrationTest {
             workspace.setOwner(admin);
             workspaceRepository.saveAndFlush(workspace);
             memberRepository.deleteAll();
-            WorkspaceRole ownerRole = roleRepository.findByWorkspaceIdAndName(
-                    workspace.getId(), WorkspaceRole.OWNER_ROLE_NAME).orElseThrow();
-            memberRepository.saveAndFlush(workspaceMapper.toMember(admin, workspace, ownerRole));
+            memberRepository.saveAndFlush(workspaceMapper.toMember(admin, workspace));
         });
     }
 
@@ -111,25 +107,32 @@ class WorkspaceItemDeletionIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void hidesSecretWithoutSecretReadAndRequiresSecretDeletePermission() throws Exception {
+    void maintainerCanReadButCannotDeleteSecretWhileAdminCanDeleteIt() throws Exception {
         User owner = user("owner");
         UUID workspaceId = workspace(owner);
         User member = user("member");
         UUID itemId = createSecret(owner, workspaceId, "Hidden secret", "private-value");
-        UUID roleId = addMember(member, workspaceId);
-        jdbc.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'item', 'delete')", roleId);
+        addMember(member, workspaceId);
+        var membership = memberRepository.findByUserId(member.getId()).orElseThrow();
+        membership.setGlobalRole(GlobalRole.MAINTAINER);
+        memberRepository.saveAndFlush(membership);
         jdbc.update("UPDATE item SET archived_at = now() WHERE id = ?", itemId);
 
-        mockMvc.perform(delete("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
-                        .cookie(cookie(member)).param("confirm", "true"))
-                .andExpect(status().isNotFound());
-
-        jdbc.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'secret', 'read')", roleId);
+        mockMvc.perform(get("/workspaces/{workspaceId}/items/{itemId}/secret", workspaceId, itemId)
+                        .cookie(cookie(member)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.value").value("private-value"));
         mockMvc.perform(delete("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
                         .cookie(cookie(member)).param("confirm", "true"))
                 .andExpect(status().isForbidden());
         assertThat(count("item", itemId)).isOne();
-        assertThat(count("item_secret", itemId)).isOne();
+
+        membership.setGlobalRole(GlobalRole.ADMIN);
+        memberRepository.saveAndFlush(membership);
+        mockMvc.perform(delete("/workspaces/{workspaceId}/items/{itemId}", workspaceId, itemId)
+                        .cookie(cookie(member)).param("confirm", "true"))
+                .andExpect(status().isNoContent());
+        assertThat(count("item", itemId)).isZero();
+        assertThat(count("item_secret", itemId)).isZero();
     }
 
     @Test
@@ -241,32 +244,20 @@ class WorkspaceItemDeletionIntegrationTest extends PostgresIntegrationTest {
         workspace.setOwner(owner);
         workspaceRepository.saveAndFlush(workspace);
         memberRepository.deleteAll();
-        jdbc.update("DELETE FROM role_permission WHERE role_id IN (SELECT id FROM workspace_role WHERE workspace_id = ?)",
-                workspace.getId());
-        WorkspaceRole role = roleRepository.findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.OWNER_ROLE_NAME)
-                .orElseThrow();
-        memberRepository.saveAndFlush(workspaceMapper.toMember(owner, workspace, role));
-        WorkspaceRole memberRole = roleRepository.findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
-                .orElseThrow();
-        jdbc.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'item', 'read')", memberRole.getId());
-        jdbc.update("INSERT INTO role_permission (role_id, resource, action) VALUES (?, 'collection', 'read')",
-                memberRole.getId());
+        memberRepository.saveAndFlush(workspaceMapper.toMember(owner, workspace));
         return workspace.getId();
     }
 
-    private UUID addMember(User user, UUID workspaceId) {
+    private void addMember(User user, UUID workspaceId) {
         Workspace workspace = workspaceRepository.findById(workspaceId).orElseThrow();
-        WorkspaceRole role = roleRepository.findByWorkspaceIdAndName(workspaceId, WorkspaceRole.MEMBER_ROLE_NAME)
-                .orElseThrow();
-        WorkspaceMember member = workspaceMapper.toMember(user, workspace, role);
+        WorkspaceMember member = workspaceMapper.toMember(user, workspace);
         memberRepository.saveAndFlush(member);
-        return role.getId();
     }
 
     private Cookie cookie(User user) {
         WorkspaceMember membership = memberRepository.findByUserId(user.getId()).orElseThrow();
         return new Cookie("accessToken", jwtService.generateAccessToken(
-                user.getId(), membership.getId(), membership.getRole().getName()));
+                user.getId(), membership.getId(), null));
     }
 
     private UUID createText(User owner, UUID workspaceId, String title, String text) throws Exception {

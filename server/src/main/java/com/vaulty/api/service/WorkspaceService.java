@@ -5,7 +5,6 @@ import com.vaulty.api.dto.workspace.WorkspaceResponse;
 import com.vaulty.api.entity.User;
 import com.vaulty.api.entity.Workspace;
 import com.vaulty.api.entity.WorkspaceMember;
-import com.vaulty.api.entity.WorkspaceRole;
 import com.vaulty.api.enums.ActivityAction;
 import com.vaulty.api.enums.ActivityActorContext;
 import com.vaulty.api.enums.ActivityResourceType;
@@ -13,7 +12,6 @@ import com.vaulty.api.exception.ResourceNotFoundException;
 import com.vaulty.api.mapper.WorkspaceMapper;
 import com.vaulty.api.repository.WorkspaceMemberRepository;
 import com.vaulty.api.repository.WorkspaceRepository;
-import com.vaulty.api.repository.WorkspaceRoleRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
-    private final WorkspaceRoleRepository workspaceRoleRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceMapper workspaceMapper;
     private final ActivityLogService activityLogService;
@@ -40,11 +37,7 @@ public class WorkspaceService {
         Workspace workspace = singleton();
         workspace = workspaceRepository.findByIdForUpdate(workspace.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
-        WorkspaceRole memberRole = workspaceRoleRepository
-                .findByWorkspaceIdAndName(workspace.getId(), WorkspaceRole.MEMBER_ROLE_NAME)
-                .orElseThrow(() -> new ResourceNotFoundException("Papel padrão do workspace não encontrado"));
-
-        WorkspaceMember member = workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace, memberRole));
+        WorkspaceMember member = workspaceMemberRepository.save(workspaceMapper.toMember(user, workspace));
         notificationService.accessChanged(List.of(user.getId()));
         return member;
     }
@@ -54,6 +47,11 @@ public class WorkspaceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
     }
 
+    @Transactional
+    public void lockSingletonForUpdate() {
+        lockWorkspace(singleton().getId());
+    }
+
     @Transactional(readOnly = true)
     public Workspace requireOwner(UUID userId) {
         Workspace workspace = singleton();
@@ -61,15 +59,48 @@ public class WorkspaceService {
     }
 
     @Transactional(readOnly = true)
+    public Workspace requireInviteManager(UUID userId) {
+        Workspace workspace = singleton();
+        authorization.require(userId, workspace, "member", "invite");
+        return workspace;
+    }
+
+    @Transactional
+    public Workspace requireInviteManagerForUpdate(UUID userId) {
+        Workspace workspace = singleton();
+        workspace = workspaceRepository.findByIdForUpdate(workspace.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Workspace não encontrado"));
+        authorization.require(userId, workspace, "member", "invite");
+        return workspace;
+    }
+
+    @Transactional(readOnly = true)
+    public Workspace requireMemberManager(UUID userId, UUID workspaceId) {
+        Workspace workspace = authorization.requireWorkspace(userId, workspaceId);
+        authorization.require(userId, workspace, "member", "manage");
+        return workspace;
+    }
+
+    @Transactional(readOnly = true)
     public UUID singletonId() {
         return singleton().getId();
     }
 
-    // Usuários anteriores ao vínculo obrigatório podem não ter papel no workspace.
     @Transactional(readOnly = true)
     public String getRoleName(UUID userId) {
         return workspaceMemberRepository.findByUserId(userId)
-                .map(member -> member.getRole().getName())
+                .map(member -> {
+                    if (authorization.isOwner(userId, member.getWorkspace())) {
+                        return "Owner";
+                    }
+                    if (member.getGlobalRole() != null) {
+                        return member.getGlobalRole().displayName();
+                    }
+                    if (member.getTeam() == null) {
+                        return null;
+                    }
+                    return authorization.isTeamLeader(member) ? "Leader" : "Member";
+                })
                 .orElse(null);
     }
 

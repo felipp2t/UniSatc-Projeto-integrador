@@ -5,6 +5,7 @@ import type {
   UpdateAttachmentMetadataRequest,
   UpdateItemRequest,
 } from '@/api/types'
+import { receivedContentKeys } from '@/api/workspace-keys'
 
 interface ItemVariables {
   itemId: string
@@ -21,7 +22,12 @@ function useItemMutation<Variables extends ItemVariables, Result>(
     gcTime: 0,
     mutationFn,
     onSettled: (_data, _error, { workspaceId }) =>
-      queryClient.invalidateQueries({ queryKey: itemKeys.all(workspaceId) }),
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: itemKeys.all(workspaceId) }),
+        queryClient.invalidateQueries({
+          queryKey: receivedContentKeys.all(workspaceId),
+        }),
+      ]),
   })
 }
 

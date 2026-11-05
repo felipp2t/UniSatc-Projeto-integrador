@@ -1,10 +1,12 @@
 package com.vaulty.api.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -185,7 +187,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         assertThat(workspaceRefresh.getValue()).isNotEmpty();
         assertThat(jwtService.validateAccessToken(workspaceAccess.getValue()).orElseThrow().accountOnly()).isFalse();
         mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId).cookie(workspaceAccess))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -253,14 +255,15 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         entityManager.clear();
         mockMvc.perform(get("/workspaces/{workspaceId}/collections/{collectionId}/path", workspaceId, collectionId)
                         .cookie(authCookie(successor)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
         notificationRepository.deleteAll();
 
         var ownerMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, owner.getId())
                 .orElseThrow();
-        mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspaceId, ownerMembership.getId())
-                        .cookie(authCookie(owner)).param("confirmMemberId", ownerMembership.getId().toString()))
-                .andExpect(status().isNoContent());
+        mockMvc.perform(put("/workspaces/{workspaceId}/members/transfer-owner", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + successorMembership.getId() + "\"}"))
+                .andExpect(status().isOk());
 
         assertThat(notificationRepository.findAll()).filteredOn(n -> n.getRecipient().getId().equals(successor.getId()))
                 .hasSize(1);
@@ -281,7 +284,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
     @Autowired private PlatformTransactionManager transactionManager;
 
     @Test
-    void ownerGetsEffectivePermissionsIncludingSharingButNotSecretRead() throws Exception {
+    void ownerGetsAllWorkspacePermissionsIncludingSecretRead() throws Exception {
         User owner = createUser("Proprietário");
         WorkspaceResponse workspace = configureWorkspace(owner);
 
@@ -289,14 +292,13 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isOwner").value(true))
                 .andExpect(jsonPath("$.roleName").value("Owner"))
-                .andExpect(jsonPath("$.permissions.length()").value(32))
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'group' && @.action == 'manage')]").isNotEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'secret' && @.action == 'read')]").isEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'sharing' && @.action == 'manage')]").isNotEmpty());
+                .andExpect(jsonPath("$.permissions.length()").isNumber())
+                .andExpect(jsonPath("$.permissions[?(@.resource == 'secret' && @.action == 'read')]").isNotEmpty())
+                .andExpect(jsonPath("$.isOwner").value(true));
     }
 
     @Test
-    void memberGetsOnlyRolePermissions() throws Exception {
+    void unassignedMemberHasNoPermissions() throws Exception {
         User owner = createUser("Proprietário");
         User member = createUser("Membro");
         WorkspaceResponse workspace = configureWorkspace(owner);
@@ -305,15 +307,14 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id()).cookie(authCookie(member)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isOwner").value(false))
-                .andExpect(jsonPath("$.roleName").value("Member"))
-                .andExpect(jsonPath("$.permissions.length()").value(2))
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'read')]").isNotEmpty())
+                .andExpect(jsonPath("$.roleName").isEmpty())
+                .andExpect(jsonPath("$.permissions.length()").value(0))
                 .andExpect(jsonPath("$.permissions[?(@.resource == 'group')]").isEmpty())
                 .andExpect(jsonPath("$.permissions[?(@.action == 'create')]").isEmpty());
     }
 
     @Test
-    void allPermissionExpandsToEveryActionForResource() throws Exception {
+    void legacyCustomRoleDoesNotGrantWorkspacePermissions() throws Exception {
         User owner = createUser("Proprietário");
         User member = createUser("Membro");
         WorkspaceResponse workspace = configureWorkspace(owner);
@@ -339,13 +340,8 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
 
         mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspace.id()).cookie(authCookie(member)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions.length()").value(6))
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'read')]").isNotEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'create')]").isNotEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'update')]").isNotEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'delete')]").isNotEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'collection' && @.action == 'invite')]").isNotEmpty())
-                .andExpect(jsonPath("$.permissions[?(@.resource == 'group' && @.action == 'manage')]").isNotEmpty());
+                .andExpect(jsonPath("$.roleName").isEmpty())
+                .andExpect(jsonPath("$.permissions.length()").value(0));
     }
 
     @Test
@@ -373,7 +369,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
                 .andExpect(jsonPath("$[0].userId").value(owner.getId().toString()))
                 .andExpect(jsonPath("$[0].name").value("Proprietário"))
                 .andExpect(jsonPath("$[0].email").value(owner.getEmail()))
-                .andExpect(jsonPath("$[0].roleId").isString())
+                .andExpect(jsonPath("$[0].globalRole").isEmpty())
                 .andExpect(jsonPath("$[0].roleName").value("Owner"));
     }
 
@@ -412,7 +408,7 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         assertThat(members).anySatisfy(memberJson -> assertThat(memberJson)
                 .containsEntry("userId", member.getId().toString())
                 .containsEntry("name", "Membro")
-                .containsEntry("roleName", "Member"));
+                .containsEntry("roleName", null));
     }
 
     @Test
@@ -555,15 +551,12 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
                         .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + target.getEmail() + "\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.roleName").value("Member"))
+                .andExpect(jsonPath("$.roleName").isEmpty())
                 .andReturn();
         UUID newMembershipId = UUID.fromString(objectMapper.readTree(response.getResponse().getContentAsString())
                 .get("id").asText());
         assertThat(newMembershipId).isNotEqualTo(oldMembership.getId());
-        assertThat(jdbcTemplate.queryForObject("""
-                SELECT role.name FROM workspace_member member
-                JOIN workspace_role role ON role.id = member.role_id WHERE member.id = ?
-                """, String.class, newMembershipId)).isEqualTo(WorkspaceRole.MEMBER_ROLE_NAME);
+        assertThat(workspaceMemberRepository.findById(newMembershipId).orElseThrow().getRole()).isNull();
         var readmissionActivity = jdbcTemplate.queryForMap("""
                 SELECT actor_id, actor_name, actor_context, action, resource_type, resource_id, snapshot
                 FROM activity_log WHERE action = 'member_joined' AND resource_id = ?
@@ -590,24 +583,20 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(get("/workspaces/{workspaceId}/me/permissions", workspaceId)
                         .cookie(freshLogin.getResponse().getCookie("accessToken")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.roleName").value("Member"))
-                .andExpect(jsonPath("$.permissions.length()").value(2));
+                .andExpect(jsonPath("$.roleName").isEmpty())
+                .andExpect(jsonPath("$.permissions.length()").value(0));
     }
 
     @Test
-    void anotherOwnerCanRemoveMemberWhileRegularMemberCannot() throws Exception {
+    void onlyCurrentOwnerCanRemoveWorkspaceMember() throws Exception {
         User owner = createUser("Proprietário canônico");
         User otherOwner = createUser("Outro proprietário");
         User target = createUser("Membro alvo");
         UUID workspaceId = configureWorkspace(owner).id();
         addMember(otherOwner, workspaceId);
         addMember(target, workspaceId);
-        var ownerRole = workspaceRoleRepository
-                .findByWorkspaceIdAndName(workspaceId, WorkspaceRole.OWNER_ROLE_NAME).orElseThrow();
         var otherOwnerMembership = workspaceMemberRepository
                 .findByWorkspaceIdAndUserId(workspaceId, otherOwner.getId()).orElseThrow();
-        otherOwnerMembership.setRole(ownerRole);
-        workspaceMemberRepository.saveAndFlush(otherOwnerMembership);
         var targetMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, target.getId())
                 .orElseThrow();
         var targetPath = "/workspaces/" + workspaceId + "/members/" + targetMembership.getId();
@@ -615,6 +604,10 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         mockMvc.perform(delete(targetPath).cookie(authCookie(target))
                         .param("confirmMemberId", targetMembership.getId().toString()))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(put("/workspaces/{workspaceId}/members/transfer-owner", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + otherOwnerMembership.getId() + "\"}"))
+                .andExpect(status().isOk());
         mockMvc.perform(delete(targetPath).cookie(authCookie(otherOwner))
                         .param("confirmMemberId", targetMembership.getId().toString()))
                 .andExpect(status().isNoContent());
@@ -693,14 +686,15 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
         addMember(successor, workspaceId);
         var successorMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, successor.getId())
                 .orElseThrow();
-        successorMembership.setRole(workspaceRoleRepository
-                .findByWorkspaceIdAndName(workspaceId, WorkspaceRole.OWNER_ROLE_NAME).orElseThrow());
-        workspaceMemberRepository.saveAndFlush(successorMembership);
+        mockMvc.perform(put("/workspaces/{workspaceId}/members/transfer-owner", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + successorMembership.getId() + "\"}"))
+                .andExpect(status().isOk());
         var ownerMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, owner.getId())
                 .orElseThrow();
 
         mockMvc.perform(delete("/workspaces/{workspaceId}/members/{membershipId}", workspaceId, ownerMembership.getId())
-                        .cookie(authCookie(owner)).param("confirmMemberId", ownerMembership.getId().toString()))
+                        .cookie(authCookie(successor)).param("confirmMemberId", ownerMembership.getId().toString()))
                 .andExpect(status().isNoContent());
         entityManager.flush();
         entityManager.clear();
@@ -745,55 +739,26 @@ class WorkspaceMemberIntegrationTest extends WorkspaceIntegrationSupport {
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void workspaceRenameWaitsForOwnerRemovalAndCannotRestoreTheRemovedOwner() throws Exception {
+    void workspaceRenameAuthorityFollowsTheExplicitOwnerTransfer() throws Exception {
         User owner = createUser("Dono original");
         User successor = createUser("Dono restante");
         UUID workspaceId = configureWorkspace(owner).id();
         addMember(successor, workspaceId);
         var successorMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, successor.getId())
                 .orElseThrow();
-        successorMembership.setRole(workspaceRoleRepository
-                .findByWorkspaceIdAndName(workspaceId, WorkspaceRole.OWNER_ROLE_NAME).orElseThrow());
-        workspaceMemberRepository.saveAndFlush(successorMembership);
-        var ownerMembership = workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, owner.getId())
-                .orElseThrow();
-        CountDownLatch removalApplied = new CountDownLatch(1);
-        CountDownLatch allowRemovalCommit = new CountDownLatch(1);
-        CountDownLatch updateStarted = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        try {
-            var removeOwner = executor.submit(() -> transaction.execute(status -> {
-                workspaceMemberService.remove(owner.getId(), workspaceId, ownerMembership.getId(),
-                        ownerMembership.getId());
-                removalApplied.countDown();
-                await(allowRemovalCommit);
-                return null;
-            }));
-            assertThat(removalApplied.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-            var rename = executor.submit(() -> {
-                updateStarted.countDown();
-                try {
-                    workspaceService.update(owner.getId(), workspaceId,
-                            new UpdateWorkspaceRequest("Renomeado", "Descrição"));
-                    return null;
-                } catch (RuntimeException exception) {
-                    return exception;
-                }
-            });
-            assertThat(updateStarted.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-            awaitDatabaseLockWait();
-            allowRemovalCommit.countDown();
-            removeOwner.get();
-            assertThat(rename.get()).isInstanceOf(ResourceNotFoundException.class);
-        } finally {
-            allowRemovalCommit.countDown();
-            executor.shutdownNow();
-        }
+        mockMvc.perform(put("/workspaces/{workspaceId}/members/transfer-owner", workspaceId)
+                        .cookie(authCookie(owner)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + successorMembership.getId() + "\"}"))
+                .andExpect(status().isOk());
+        assertThatThrownBy(() -> workspaceService.update(owner.getId(), workspaceId,
+                new UpdateWorkspaceRequest("Renomeado", "Descrição")))
+                .isInstanceOf(ResourceNotFoundException.class);
+        workspaceService.update(successor.getId(), workspaceId,
+                new UpdateWorkspaceRequest("Renomeado", "Descrição"));
         var workspace = workspaceRepository.findById(workspaceId).orElseThrow();
         assertThat(workspace.getOwner().getId()).isEqualTo(successor.getId());
         assertThat(workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, successor.getId())).isPresent();
-        assertThat(workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, owner.getId())).isEmpty();
+        assertThat(workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, owner.getId())).isPresent();
     }
 
     private void awaitDatabaseLockWait() throws InterruptedException {

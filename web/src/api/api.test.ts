@@ -136,18 +136,22 @@ describe('endpoint helpers', () => {
     vi.spyOn(apiClient, 'get').mockResolvedValue({
       data: [
         {
+          globalRole: null,
           id: 'membership-1',
+          isTeamLeader: false,
           name: 'Ana Owner',
-          roleId: 'role-owner',
           roleName: 'owner',
+          teamId: null,
           userId: 'user-1',
         },
         {
           email: 'bia@example.com',
+          globalRole: null,
           id: 'membership-2',
+          isTeamLeader: false,
           name: 'Bia Member',
-          roleId: 'role-member',
           roleName: 'member',
+          teamId: null,
           userId: 'user-2',
         },
       ],
@@ -157,19 +161,22 @@ describe('endpoint helpers', () => {
 
     expect(data).toEqual([
       {
-        email: undefined,
+        globalRole: null,
         id: 'membership-1',
+        isTeamLeader: false,
         name: 'Ana Owner',
-        roleId: 'role-owner',
         roleName: 'owner',
+        teamId: null,
         userId: 'user-1',
       },
       {
         email: 'bia@example.com',
+        globalRole: null,
         id: 'membership-2',
+        isTeamLeader: false,
         name: 'Bia Member',
-        roleId: 'role-member',
         roleName: 'member',
+        teamId: null,
         userId: 'user-2',
       },
     ])

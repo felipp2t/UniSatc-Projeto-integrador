@@ -40,6 +40,7 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
       list: shared.workspaceApiMocks.list,
       listMembers: shared.workspaceApiMocks.listMembers,
       listRoles: shared.workspaceApiMocks.listRoles,
+      permissions: shared.workspaceApiMocks.permissions,
       update: shared.workspaceApiMocks.update,
     },
   }
@@ -52,6 +53,16 @@ const generalPath = '/configuracoes-workspace/geral'
 
 describe('workspace general settings', () => {
   it('allows only the owner to access the backup action', async () => {
+    workspaceApiMocks.permissions.mockResolvedValue({
+      data: {
+        globalRole: null,
+        isOwner: false,
+        isTeamLeader: false,
+        permissions: [],
+        roleName: 'Member',
+        teamId: null,
+      },
+    })
     await renderWorkspaceSettings('member-2', generalPath)
 
     await screen.findByRole('textbox', { name: 'Nome do workspace' })

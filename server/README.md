@@ -1,11 +1,12 @@
 # Vaulty API (Java/Spring Boot)
 
-Port em Java/Spring Boot do backend do [Vaulty](../../vaulty). Cada instalação representa uma
-única empresa, com um workspace único — sem cadastro público: contas só nascem quando o **dono
-do workspace** convida um e-mail; o convite chega por e-mail (JavaMail) com um link que libera a
-tela de cadastro, e o aceite já vincula a conta ao workspace com o papel `Member` (acesso
-inicial, ainda sem RBAC granular). Senha esquecida também é resolvida por e-mail, com um token
-de redefinição de uso único.
+Port em Java/Spring Boot do backend do Vaulty. Cada instalação atende uma empresa em um único workspace, sem cadastro público. Owner e Admin podem convidar e-mails; aceitar cria uma membresia sem papel global, sem time e sem acesso a conteúdo até atribuição de papel global ou associação a um time. A recuperação de senha usa token de uso único enviado por e-mail.
+
+## Modelo de acesso atual
+
+O backend usa papéis fixos globais Owner/Admin/Maintainer, membros de time e Líderes vinculados a uma coleção raiz. Um membro comum está em no máximo um time; associação dá acesso uniforme à coleção, enquanto convite não dá acesso a conteúdo. Publicações para outros times são projeções somente leitura atualizadas pelo backend. Não há autorização por grupos ACL, concessões por pasta/item ou herança. As rotas legadas `/workspaces/{workspaceId}/groups` respondem `410 Gone`.
+
+O seed de demonstração **trunca os dados da aplicação** antes de recriá-los. Use-o apenas no banco local `vaulty`, sem dados que precise preservar. Ele cria dez contas e conteúdo de exemplo (itens textuais/segredos/links e pastas), mas não semeia anexos nem documentos; tokens de sessão, convite e recuperação também não são preservados. As contas e a senha estão listadas na seção [Seed local de demonstração](#seed-local-de-demonstração) abaixo.
 
 ## Stack
 
@@ -50,12 +51,57 @@ de redefinição de uso único.
    mvn spring-boot:run
    ```
 
-   Em um banco vazio, o Flyway cria as tabelas de autenticação, convite e recuperação de senha.
-   A migration `V2` também insere o usuário inicial `admin@gmail.com`. Como não existe cadastro
-   público, solicite a redefinição de senha desse e-mail para definir a primeira senha e então
-   enviar o primeiro convite.
+   Em um banco vazio, o Flyway cria o schema e insere a conta inicial `admin@gmail.com`. Para
+   recriar os dados de desenvolvimento com contas de demonstração, use o seed descrito abaixo.
 
 A API sobe em `http://localhost:8080`.
+
+### Seed local de demonstração
+
+O seed executa `TRUNCATE ... RESTART IDENTITY CASCADE` nas tabelas da aplicação no banco **local** `vaulty` e recria o workspace e dados de demonstração. Essa operação apaga os dados preexistentes dessas tabelas; não a execute em banco que contenha dados a preservar. O seed recusa URLs de banco que não sejam loopback ou cujo nome não seja `vaulty`. Não cria anexos/documentos nem tokens temporários de sessão, convite ou recuperação.
+
+Pare a API e rode, dentro de `server`:
+
+```bash
+APP_DEV_SEED_ENABLED=true SERVER_PORT=0 mvn spring-boot:run
+```
+
+O servidor inicia em uma porta aleatória para não conflitar com outra aplicação local. Depois da
+mensagem `Development database seeded`, encerre o processo com `Ctrl+C`.
+
+Todas as 27 contas abaixo usam a senha `vaulty123`:
+
+| E-mail | Perfil / time |
+|---|---|
+| `owner@vaulty.local` | Owner global |
+| `admin@vaulty.local` | Admin global |
+| `maintainer@vaulty.local` | Maintainer global |
+| `marcelo.serpa@vaulty.local` | Líder Financeiro |
+| `andrew.senra@vaulty.local` | Líder IOT |
+| `matheus.silveira@vaulty.local` | Líder OsMangas |
+| `rafael.augusto@vaulty.local` | Líder DropTable_OsMangas |
+| `anderson.rodrigues@vaulty.local` | Líder Administração |
+| `felipe.assuncao@vaulty.local` | Membro Administração |
+| `emily.nataly@vaulty.local` | Membro Administração |
+| `rafael.serpa@vaulty.local` | Membro Administração |
+| `giovani.martings@vaulty.local` | Membro Administração |
+| `felipe.rossetto@vaulty.local` | Membro DropTable_OsMangas |
+| `gabriel.sumara@vaulty.local` | Membro DropTable_OsMangas |
+| `leonardo.dalponte@vaulty.local` | Membro DropTable_OsMangas |
+| `rodrigo.martinhago@vaulty.local` | Membro DropTable_OsMangas |
+| `leonardo.kulkamp@vaulty.local` | Membro OsMangas |
+| `carlos.fontana@vaulty.local` | Membro OsMangas |
+| `isabelle.machado@vaulty.local` | Membro OsMangas |
+| `mizael.cancelier@vaulty.local` | Membro OsMangas |
+| `cibele.batista@vaulty.local` | Membro Financeiro |
+| `joao.lucas.pantaleao@vaulty.local` | Membro IOT |
+| `eric.ribeiro@vaulty.local` | Líder Infra |
+| `denis.couto@vaulty.local` | Membro Infra |
+| `paloma.melo@vaulty.local` | Membro Infra |
+| `member@vaulty.local` | Membro sem time |
+| `team.member@vaulty.local` | Membro Financeiro |
+
+O seed é transacional e pode ser executado novamente para restaurar o mesmo conjunto de dados.
 
 A documentação interativa OpenAPI está disponível em `http://localhost:8080/swagger-ui.html`; a
 especificação JSON pode ser acessada em `http://localhost:8080/v3/api-docs`.
@@ -88,10 +134,7 @@ refresh tokens existentes são associados ao vínculo atual pela V20, e os sem v
 descartados. Login de usuário sem vínculo não emite sessão; um refresh migrado de membro atual pode
 rotacionar e emitir um novo par.
 
-A V20 mantém a política existente de workspace, membros e proprietário. O papel é consultado no
-banco por requisição, mas grupos, concessões e herança de permissões não existem nesta branch e
-seguem para as issues #132/#133. Isso não representa atendimento integral ao RNF04 nem validação
-completa de conteúdo granular.
+A V20 associa as sessões à membresia atual do workspace. O modelo de times e publicações descrito no início deste README é o atual. O texto e as tabelas de endpoints nesta seção foram escritos para o modelo anterior de grupos ACL; onde citarem concessões, raiz pública ou herança, leia-os somente como referência histórica. As rotas legadas de grupos e endpoints ACL/herança/origens de `/sharing` retornam 410. Consulte `docs/API.md` e os controllers atuais para as rotas disponíveis.
 
 | RF | Método | Rota | Auth | Request body | Sucesso | Erros |
 |---|---|---|---|---|---|---|
@@ -126,16 +169,12 @@ resposta inclui `id`, `email`, `invitedByUserId`, `invitedByName`, `createdAt` e
 persistidos podem ser recuperados consultando a lista ao conectar e reconectar; a emissão SSE é
 best effort e acontece após o commit.
 
-Os eventos atuais cobrem atualização de perfil e troca de senha. Há um ponto de integração
-`accessChanged(Collection<UUID>)` para futuros produtores de mudanças de acesso, mas os CRUDs de
-papéis, grupos, compartilhamentos e herança ainda não estão implementados. A issue #42 não completa
-o fan-out de permissões nem eventos role-permission de ponta a ponta (CA01); a integração futura está
-prevista na issue #130 e no trabalho de gestão de papéis. Os avisos usam título e texto fixos, sem
+Os eventos atuais incluem atualização de perfil, troca de senha e mudanças de acesso associadas a membros, times e publicações. A descrição de issues e integrações futuras neste parágrafo pertence ao desenho anterior e não representa o estado atual das notificações. Os avisos usam título e texto fixos, sem
 referências ou dados de recursos e sem segredos, e não verificam acesso. A migration `V18` cria a
 tabela e seu índice; `V19` está reservada para outra issue. Consulte [`docs/API.md`](docs/API.md)
 para formatos e respostas completos.
 
-## Workspace (em andamento)
+## Workspace e conteúdo (snapshot de API legado)
 
 Cada instalação representa uma única empresa e tem **exatamente um workspace**, provisionado uma
 vez pela migration `V5__enforce_workspace_singleton.sql`. Em instalações vazias, ela cria o
@@ -207,8 +246,4 @@ Camadas técnicas em `src/main/java/com/vaulty/api`: `controller`, `service`, `r
 `entity`, `dto`, `config` (Spring Security + filtro JWT), `exception` (hierarquia de erros +
 `@RestControllerAdvice`).
 
-Entidades mapeadas até agora: `User`, `RefreshToken`, `UserInvite`, `PasswordResetToken`,
-`EmailOutbox`, `Workspace`, `WorkspaceRole`, `WorkspaceMember`, `WorkspaceCollection`,
-`WorkspaceItem`, `WorkspaceItemSecret`, `WorkspaceItemFile`, `WorkspaceItemMedia` e `RolePermission`.
-Anexos e histórico de atividades estão implementados. Compartilhamento granular de conteúdo e gestão
-de papéis ainda não foram implementados.
+Entidades incluem `WorkspaceTeam`, `ContentPublication`, `WorkspaceMember`, `WorkspaceCollection`, projeções/cobertura de conteúdo recebido e as entidades de conteúdo e autenticação. Migrações Flyway V30–V34 introduzem times, papéis globais fixos, eventos de time, publicações e projeções recebidas. As rotas de times ficam em `/workspaces/{workspaceId}/teams`; publicações em `/workspaces/{workspaceId}/sharing`; conteúdo recebido em `/workspaces/{workspaceId}/received`.

@@ -1,16 +1,11 @@
-import {
-  FileIcon,
-  FileSearchIcon,
-  ImageIcon,
-  KeyIcon,
-  LinkIcon,
-} from '@phosphor-icons/react'
+import { FileSearchIcon } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
-import { collectionsApi, itemsApi } from '@/api/endpoints'
-import { itemKeys } from '@/api/item-keys'
-import type { ItemResponse, ItemType } from '@/api/types'
+import { collectionsApi, itemsApi, receivedContentApi } from '@/api/endpoints'
+import type { ItemResponse, ItemType, ReceivedItemResponse } from '@/api/types'
+import { receivedContentKeys } from '@/api/workspace-keys'
 import { EditItemDialog } from '@/components/edit-item-dialog'
+import { ReceivedItemDialog } from '@/components/received-item-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -26,20 +21,15 @@ import { LoadingState } from '@/components/ui/loading-state'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 const PAGE_SIZE = 20
-const typeLabels: Record<ItemType, string> = {
+const contentTypeLabels = {
   file: 'Arquivo',
   image: 'Imagem',
   link: 'Link',
   secret: 'Segredo',
   text: 'Texto',
-}
-const typeIcons = {
-  file: FileIcon,
-  image: ImageIcon,
-  link: LinkIcon,
-  secret: KeyIcon,
-  text: FileIcon,
-} satisfies Record<ItemType, typeof FileIcon>
+} as const
+const typeLabel = (type: ItemType) =>
+  type === 'folder' ? 'Pasta' : contentTypeLabels[type]
 
 export function GlobalItemSearch() {
   const workspace = useCurrentWorkspace()
@@ -48,9 +38,11 @@ export function GlobalItemSearch() {
   const [term, setTerm] = useState('')
   const [includeArchived, setIncludeArchived] = useState(false)
   const [page, setPage] = useState(0)
+  const [receivedPage, setReceivedPage] = useState(0)
   const [selectedItemId, setSelectedItemId] = useState<string>()
+  const [selectedReceivedId, setSelectedReceivedId] = useState<string>()
   const query = term.trim()
-  const results = useQuery({
+  const items = useQuery({
     enabled: Boolean(open && workspaceId && query),
     queryFn: async ({ signal }) => {
       if (!workspaceId) throw new Error('Workspace indisponível.')
@@ -62,50 +54,68 @@ export function GlobalItemSearch() {
         )
       ).data
     },
-    queryKey: workspaceId
-      ? itemKeys.search(workspaceId, {
-          includeArchived,
-          page,
-          q: query,
-          size: PAGE_SIZE,
-        })
-      : ['items', 'search-disabled'],
-    refetchOnMount: 'always',
-    staleTime: 0,
+    queryKey: ['item-search', workspaceId, query, page, includeArchived],
   })
-  const searchScopeKey = [
-    query,
-    includeArchived,
-    page,
-    results.dataUpdatedAt,
-  ] as const
-
-  const openSearch = useCallback(() => setOpen(true), [])
-  const closeSelectedItem = useCallback(() => setSelectedItemId(undefined), [])
-  const handleTermChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setTerm(event.target.value.slice(0, 255))
-      setPage(0)
+  const received = useQuery({
+    enabled: Boolean(open && workspaceId && query),
+    queryFn: async ({ signal }) => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      return (
+        await receivedContentApi.list(
+          workspaceId,
+          { contentOnly: true, page: receivedPage, q: query, size: PAGE_SIZE },
+          signal
+        )
+      ).data
     },
-    []
+    queryKey: receivedContentKeys.list(workspaceId, {
+      contentOnly: true,
+      page: receivedPage,
+      q: query,
+      size: PAGE_SIZE,
+    }),
+  })
+  const onRetry = useCallback(
+    () => Promise.all([items.refetch(), received.refetch()]),
+    [items.refetch, received.refetch]
   )
-  const handleArchivedChange = useCallback(
-    (checked: boolean | 'indeterminate') => {
-      setIncludeArchived(checked === true)
-      setPage(0)
-    },
-    []
-  )
-  const onNext = useCallback(() => setPage((current) => current + 1), [])
-  const onPrevious = useCallback(
-    () => setPage((current) => Math.max(0, current - 1)),
-    []
-  )
-  const onOpenItem = useCallback((item: ItemResponse) => {
+  const openItem = useCallback((item: ItemResponse) => {
     setSelectedItemId(item.id)
     setOpen(false)
   }, [])
-  const onRetry = useCallback(() => results.refetch(), [results.refetch])
+  const openReceived = useCallback((item: ReceivedItemResponse) => {
+    setSelectedReceivedId(item.id)
+    setOpen(false)
+  }, [])
+  const closeItem = useCallback(() => setSelectedItemId(undefined), [])
+  const closeReceived = useCallback(() => setSelectedReceivedId(undefined), [])
+  const changeTerm = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setTerm(event.target.value.slice(0, 255))
+      setPage(0)
+      setReceivedPage(0)
+    },
+    []
+  )
+  const openSearch = useCallback(() => setOpen(true), [])
+  const changeArchived = useCallback((checked: boolean | 'indeterminate') => {
+    setIncludeArchived(checked === true)
+    setPage(0)
+    setReceivedPage(0)
+  }, [])
+  const nextPage = useCallback(() => setPage((current) => current + 1), [])
+  const previousPage = useCallback(
+    () => setPage((current) => Math.max(0, current - 1)),
+    []
+  )
+  const nextReceivedPage = useCallback(
+    () => setReceivedPage((current) => current + 1),
+    []
+  )
+  const previousReceivedPage = useCallback(
+    () => setReceivedPage((current) => Math.max(0, current - 1)),
+    []
+  )
 
   return (
     <>
@@ -122,62 +132,76 @@ export function GlobalItemSearch() {
           <DialogHeader>
             <DialogTitle>Buscar itens</DialogTitle>
             <DialogDescription>
-              Pesquise títulos em todo o workspace.
+              Pesquise títulos nas coleções e nos compartilhamentos recebidos.
             </DialogDescription>
           </DialogHeader>
-          <div className='space-y-4'>
-            <label
-              className='block space-y-1.5 font-mono text-xs'
-              htmlFor='global-item-search'
-            >
-              <span>Nome do item</span>
-              <Input
-                autoComplete='off'
-                id='global-item-search'
-                maxLength={255}
-                onChange={handleTermChange}
-                placeholder='Ex.: chave produção'
-                type='search'
-                value={term}
-              />
-            </label>
-            <label
-              className='flex min-h-11 items-center gap-2 font-mono text-xs'
-              htmlFor='include-archived-items'
-            >
-              <Checkbox
-                checked={includeArchived}
-                id='include-archived-items'
-                onCheckedChange={handleArchivedChange}
-              />
-              Incluir itens arquivados
-            </label>
-            {query && open ? (
-              <SearchResults
-                error={results.isError}
-                fetching={results.isFetching}
-                items={results.data?.items}
-                onNext={onNext}
-                onOpenItem={onOpenItem}
-                onPrevious={onPrevious}
-                onRetry={onRetry}
-                page={page}
-                searchScopeKey={searchScopeKey}
-                totalItems={results.data?.totalItems ?? 0}
-                totalPages={results.data?.totalPages ?? 0}
-                workspaceId={workspaceId}
-              />
-            ) : null}
-          </div>
+          <label
+            className='block space-y-1.5 text-xs'
+            htmlFor='global-item-search'
+          >
+            <span>Nome do item</span>
+            <Input
+              autoComplete='off'
+              id='global-item-search'
+              maxLength={255}
+              onChange={changeTerm}
+              placeholder='Ex.: chave produção'
+              type='search'
+              value={term}
+            />
+          </label>
+          <label
+            className='flex min-h-11 items-center gap-2 text-xs'
+            htmlFor='include-archived-items'
+          >
+            <Checkbox
+              checked={includeArchived}
+              id='include-archived-items'
+              onCheckedChange={changeArchived}
+            />
+            Incluir itens arquivados
+          </label>
+          {query && open ? (
+            <SearchResults
+              error={items.isError || received.isError}
+              fetching={items.isFetching || received.isFetching}
+              itemPage={page}
+              items={items.data?.items}
+              itemTotalItems={items.data?.totalItems ?? 0}
+              itemTotalPages={items.data?.totalPages ?? 0}
+              onNext={nextPage}
+              onNextReceived={nextReceivedPage}
+              onOpenItem={openItem}
+              onOpenReceived={openReceived}
+              onPrevious={previousPage}
+              onPreviousReceived={previousReceivedPage}
+              onRetry={onRetry}
+              receivedItems={
+                received.data?.items.filter((item) => item.type !== 'folder') ??
+                []
+              }
+              receivedPage={receivedPage}
+              receivedTotalItems={received.data?.totalItems ?? 0}
+              receivedTotalPages={received.data?.totalPages ?? 0}
+              workspaceId={workspaceId ?? ''}
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
       {selectedItemId && workspaceId ? (
         <EditItemDialog
           itemId={selectedItemId}
-          onClose={closeSelectedItem}
+          onClose={closeItem}
           readOnly
           showAttachmentPreview
           unavailableOnAccessError
+          workspaceId={workspaceId}
+        />
+      ) : null}
+      {selectedReceivedId && workspaceId ? (
+        <ReceivedItemDialog
+          itemId={selectedReceivedId}
+          onClose={closeReceived}
           workspaceId={workspaceId}
         />
       ) : null}
@@ -189,163 +213,229 @@ function SearchResults({
   error,
   fetching,
   items,
+  itemPage,
+  itemTotalItems,
+  itemTotalPages,
   onNext,
+  onNextReceived,
   onOpenItem,
+  onOpenReceived,
   onPrevious,
+  onPreviousReceived,
   onRetry,
-  page,
-  searchScopeKey,
-  totalItems,
-  totalPages,
+  receivedPage,
+  receivedItems,
+  receivedTotalItems,
+  receivedTotalPages,
   workspaceId,
 }: {
   error: boolean
   fetching: boolean
   items: ItemResponse[] | undefined
+  itemPage: number
+  itemTotalItems: number
+  itemTotalPages: number
   onNext: () => void
+  onNextReceived: () => void
   onOpenItem: (item: ItemResponse) => void
+  onOpenReceived: (item: ReceivedItemResponse) => void
   onPrevious: () => void
+  onPreviousReceived: () => void
   onRetry: () => void
-  page: number
-  searchScopeKey: readonly (string | boolean | number)[]
-  totalItems: number
-  totalPages: number
-  workspaceId: string | undefined
+  receivedPage: number
+  receivedItems: ReceivedItemResponse[]
+  receivedTotalItems: number
+  receivedTotalPages: number
+  workspaceId: string
 }) {
-  const empty = !items || items.length === 0
-  const announcement =
-    fetching || error
-      ? ''
-      : empty
-        ? 'Nenhum item encontrado'
-        : `${totalItems} ${totalItems === 1 ? 'resultado encontrado' : 'resultados encontrados'}`
-
-  return (
-    <>
+  if (fetching) return <LoadingState label='Buscando itens…' />
+  if (error) {
+    return (
+      <div className='space-y-2' role='alert'>
+        <p className='text-destructive text-sm'>
+          Não foi possível pesquisar itens.
+        </p>
+        <Button onClick={onRetry} size='sm' variant='outline'>
+          Tentar novamente
+        </Button>
+      </div>
+    )
+  }
+  if (itemTotalItems + receivedTotalItems === 0)
+    return (
       <p
-        aria-live='polite'
-        className={
-          empty && !fetching && !error
-            ? 'py-4 text-center text-muted-foreground text-sm'
-            : 'sr-only'
-        }
+        className='py-4 text-center text-muted-foreground text-sm'
         role='status'
       >
-        {announcement}
+        Nenhum item encontrado
       </p>
-      {fetching ? <LoadingState label='Buscando itens…' /> : null}
-      {error && !fetching ? (
-        <div className='space-y-2' role='alert'>
-          <p className='text-destructive text-sm'>
-            Não foi possível pesquisar itens.
-          </p>
-          <Button onClick={onRetry} size='sm' variant='outline'>
-            Tentar novamente
-          </Button>
-        </div>
-      ) : null}
-      {fetching || error || empty ? null : (
-        <div className='space-y-3'>
-          <ul
-            aria-label='Resultados da busca'
-            className='divide-y divide-border border-border border-y'
-          >
-            {items.map((item) => (
-              <SearchResult
-                item={item}
-                key={item.id}
-                onOpenItem={onOpenItem}
-                searchScopeKey={searchScopeKey}
-                workspaceId={workspaceId}
-              />
-            ))}
-          </ul>
-          {totalPages > 1 ? (
-            <div className='flex items-center justify-between gap-2'>
-              <span className='font-mono text-muted-foreground text-xs'>
-                Página {page + 1} de {totalPages}
-              </span>
-              <div className='flex gap-2'>
-                <Button
-                  disabled={page === 0 || fetching}
-                  onClick={onPrevious}
-                  size='sm'
-                  variant='outline'
-                >
-                  Anterior
-                </Button>
-                <Button
-                  disabled={page + 1 >= totalPages || fetching}
-                  onClick={onNext}
-                  size='sm'
-                  variant='outline'
-                >
-                  Próxima
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </>
+    )
+
+  return (
+    <div className='space-y-3'>
+      <p aria-live='polite' className='sr-only' role='status'>
+        {itemTotalItems + receivedTotalItems}{' '}
+        {itemTotalItems + receivedTotalItems === 1
+          ? 'resultado encontrado'
+          : 'resultados encontrados'}
+      </p>
+      <SearchSection
+        items={
+          items?.map((item) => (
+            <SearchItemRow
+              item={item}
+              key={item.id}
+              onOpenItem={onOpenItem}
+              workspaceId={workspaceId}
+            />
+          )) ?? []
+        }
+        label='Itens do workspace'
+        onNext={onNext}
+        onPrevious={onPrevious}
+        page={itemPage}
+        totalItems={itemTotalItems}
+        totalPages={itemTotalPages}
+      />
+      <SearchSection
+        items={receivedItems.map((item) => (
+          <ReceivedSearchRow
+            item={item}
+            key={item.id}
+            onOpen={onOpenReceived}
+          />
+        ))}
+        label='Compartilhamentos recebidos'
+        onNext={onNextReceived}
+        onPrevious={onPreviousReceived}
+        page={receivedPage}
+        totalItems={receivedTotalItems}
+        totalPages={receivedTotalPages}
+      />
+    </div>
   )
 }
 
-function SearchResult({
+function SearchSection({
+  items,
+  label,
+  onNext,
+  onPrevious,
+  page,
+  totalItems,
+  totalPages,
+}: {
+  items: React.ReactNode[]
+  label: string
+  onNext: () => void
+  onPrevious: () => void
+  page: number
+  totalItems: number
+  totalPages: number
+}) {
+  if (totalItems === 0) return null
+  return (
+    <section aria-label={label} className='space-y-2'>
+      <h3 className='font-semibold text-sm'>
+        {label} ({totalItems})
+      </h3>
+      <ul className='divide-y divide-border border-y'>{items}</ul>
+      {totalPages > 1 ? (
+        <div className='flex items-center justify-between gap-2'>
+          <span className='text-muted-foreground text-xs'>
+            Página {page + 1} de {totalPages}
+          </span>
+          <span className='flex gap-2'>
+            <Button
+              disabled={page === 0}
+              onClick={onPrevious}
+              size='sm'
+              variant='outline'
+            >
+              Anterior
+            </Button>
+            <Button
+              disabled={page + 1 >= totalPages}
+              onClick={onNext}
+              size='sm'
+              variant='outline'
+            >
+              Próxima
+            </Button>
+          </span>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function SearchItemRow({
   item,
   onOpenItem,
-  searchScopeKey,
   workspaceId,
 }: {
   item: ItemResponse
   onOpenItem: (item: ItemResponse) => void
-  searchScopeKey: readonly (string | boolean | number)[]
-  workspaceId: string | undefined
+  workspaceId: string
 }) {
+  const open = useCallback(() => onOpenItem(item), [item, onOpenItem])
   const path = useQuery({
-    enabled: Boolean(workspaceId && item.collectionId),
-    gcTime: 0,
+    enabled: Boolean(item.collectionId),
     queryFn: async () => {
-      if (!(workspaceId && item.collectionId)) return []
+      if (!item.collectionId) return []
       return (await collectionsApi.path(workspaceId, item.collectionId)).data
     },
-    queryKey: [
-      'search-item-collection-path',
-      workspaceId,
-      item.collectionId,
-      item.id,
-      ...searchScopeKey,
-    ],
-    refetchOnMount: 'always',
-    staleTime: 0,
+    queryKey: ['search-item-path', workspaceId, item.collectionId],
   })
-  const Icon = typeIcons[item.type]
-  const handleOpen = useCallback(() => onOpenItem(item), [item, onOpenItem])
   return (
     <li>
       <button
         className='flex min-h-14 w-full items-center gap-3 px-2 py-3 text-left outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring'
-        onClick={handleOpen}
+        onClick={open}
         type='button'
       >
-        <Icon
-          aria-hidden='true'
-          className='size-4 shrink-0 text-muted-foreground'
-        />
         <span className='min-w-0 flex-1'>
-          <span className='block truncate font-mono font-semibold text-sm'>
+          <span className='block truncate font-semibold text-sm'>
             {item.title}
           </span>
-          {path.isSuccess && !path.isFetching && path.data.length > 0 ? (
+          {path.data?.length ? (
             <span className='block truncate text-muted-foreground text-xs'>
-              {path.data.map((entry) => entry.name).join(' / ')}
+              {path.data.map(({ name }) => name).join(' / ')}
             </span>
           ) : null}
         </span>
-        <span className='flex shrink-0 items-center gap-1.5'>
-          {item.archivedAt ? <Badge variant='outline'>Arquivado</Badge> : null}
-          <Badge variant='secondary'>{typeLabels[item.type]}</Badge>
+        {item.archivedAt ? <Badge variant='outline'>Arquivado</Badge> : null}
+        <Badge variant='secondary'>{typeLabel(item.type)}</Badge>
+      </button>
+    </li>
+  )
+}
+
+function ReceivedSearchRow({
+  item,
+  onOpen,
+}: {
+  item: ReceivedItemResponse
+  onOpen: (item: ReceivedItemResponse) => void
+}) {
+  const open = useCallback(() => onOpen(item), [item, onOpen])
+  return (
+    <li>
+      <button
+        className='flex min-h-14 w-full items-center gap-3 px-2 py-3 text-left outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring'
+        onClick={open}
+        type='button'
+      >
+        <span className='min-w-0 flex-1'>
+          <span className='block truncate font-semibold text-sm'>
+            {item.title}
+          </span>
+          <span className='block truncate text-muted-foreground text-xs'>
+            {item.sourceTeamName} / {item.path}
+          </span>
         </span>
+        <Badge variant='outline'>Somente leitura</Badge>
+        <Badge variant='secondary'>{typeLabel(item.type)}</Badge>
       </button>
     </li>
   )
