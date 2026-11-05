@@ -201,7 +201,7 @@ function ItemDestinationFields({
           </FieldLabel>
           <Select onValueChange={onWorkspaceChange} value={workspaceId ?? ''}>
             <SelectTrigger
-              className='h-[30px] rounded-none border-border bg-black px-2 text-xs'
+              className='h-[30px] rounded-none border-border bg-background px-2 text-xs'
               id={`${titleId}-workspace`}
             >
               <SelectValue placeholder='Selecione um workspace' />
@@ -231,7 +231,7 @@ function ItemDestinationFields({
             value={location}
           >
             <SelectTrigger
-              className='h-[30px] rounded-none border-border bg-black px-2 text-xs'
+              className='h-[30px] rounded-none border-border bg-background px-2 text-xs'
               id={`${titleId}-location`}
             >
               <SelectValue placeholder='Raiz do workspace ou pasta' />
@@ -612,7 +612,7 @@ export function CreateItemDialog({
           Novo item
         </Button>
       </DialogTrigger>
-      <DialogContent className='max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto rounded-none border-border bg-black p-6 text-white shadow-none sm:max-w-sm'>
+      <DialogContent className='max-h-[calc(100svh-2rem)] gap-0 overflow-y-auto rounded-none border-border bg-card p-7 text-foreground shadow-none sm:max-w-[30rem]'>
         <DialogHeader>
           <DialogTitle className='font-bold font-mono text-xs uppercase'>
             <span aria-hidden='true' className='text-primary'>
@@ -641,7 +641,7 @@ export function CreateItemDialog({
               }
               aria-invalid={titleInvalid || undefined}
               autoComplete='off'
-              className='h-[30px] rounded-none border-border bg-black px-2 focus-visible:border-primary/50 focus-visible:ring-0'
+              className='h-[30px] rounded-none border-border bg-background px-2 focus-visible:border-primary/50 focus-visible:ring-0'
               id={`${titleId}-title`}
               maxLength={TITLE_MAX}
               name='title'

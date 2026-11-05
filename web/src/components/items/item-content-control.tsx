@@ -70,7 +70,7 @@ export function ItemContentControl({
         aria-describedby={describedBy}
         aria-invalid={invalid || undefined}
         autoComplete='url'
-        className='h-[30px] rounded-none border-border bg-black px-2 focus-visible:border-primary/50 focus-visible:ring-0'
+        className='h-[30px] rounded-none border-border bg-background px-2 focus-visible:border-primary/50 focus-visible:ring-0'
         id={id}
         maxLength={URL_MAX}
         name='content'
