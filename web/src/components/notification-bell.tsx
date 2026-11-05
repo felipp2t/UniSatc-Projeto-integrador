@@ -129,7 +129,7 @@ export function NotificationBell({
             Marcar todas como lidas
           </Button>
         ) : null}
-        <ScrollArea className='mt-3 max-h-80'>
+        <ScrollArea className='mt-3 h-80'>
           <NotificationListContent
             error={query.error}
             isError={query.isError && suppliedNotifications === undefined}
