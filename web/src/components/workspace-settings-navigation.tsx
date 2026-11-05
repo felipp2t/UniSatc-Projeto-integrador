@@ -16,7 +16,7 @@ export function WorkspaceSettingsNavigation({
       ? [
           {
             icon: ShieldIcon,
-            label: 'Cargos e permissões',
+            label: 'Cargos',
             to: '/configuracoes-workspace/cargos',
           },
         ]
@@ -25,7 +25,7 @@ export function WorkspaceSettingsNavigation({
       ? [
           {
             icon: UsersThreeIcon,
-            label: 'Grupos',
+            label: 'Times',
             to: '/configuracoes-workspace/grupos',
           },
         ]

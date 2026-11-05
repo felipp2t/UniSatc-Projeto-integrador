@@ -72,9 +72,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(JwtService.AccessTokenClaims claims, WorkspaceMember member) {
-        List<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority("WORKSPACE_MEMBER"),
-                new SimpleGrantedAuthority(member.getRole().getName()));
+        List<GrantedAuthority> authorities = member.getRole() == null
+                ? List.of(new SimpleGrantedAuthority("WORKSPACE_MEMBER"))
+                : List.of(new SimpleGrantedAuthority("WORKSPACE_MEMBER"),
+                        new SimpleGrantedAuthority(member.getRole().getName()));
         var authentication = new UsernamePasswordAuthenticationToken(claims.userId(), null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }

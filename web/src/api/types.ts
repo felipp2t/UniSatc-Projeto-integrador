@@ -54,7 +54,7 @@ export interface CollectionPageResponse {
   totalItems: number
   totalPages: number
 }
-export type ItemType = 'file' | 'image' | 'link' | 'secret' | 'text'
+export type ItemType = 'file' | 'folder' | 'image' | 'link' | 'secret' | 'text'
 export type UpdateItemRequest =
   | { textContent: string; title: string }
   | { linkUrl: string; title: string }
@@ -111,6 +111,7 @@ export type ActivityAction =
   | 'member_invite_declined'
   | 'workspace_renamed'
   | 'role_created'
+  | 'role_renamed'
   | 'role_deleted'
   | 'role_permissions_changed'
   | 'group_created'
@@ -118,6 +119,14 @@ export type ActivityAction =
   | 'group_deleted'
   | 'group_member_added'
   | 'group_member_removed'
+  | 'team_created'
+  | 'team_renamed'
+  | 'team_deleted'
+  | 'team_member_added'
+  | 'team_member_removed'
+  | 'team_leader_changed'
+  | 'content_published'
+  | 'content_publication_revoked'
 export type ActivityResourceType =
   | 'folder'
   | 'item'
@@ -125,6 +134,8 @@ export type ActivityResourceType =
   | 'workspace'
   | 'role'
   | 'group'
+  | 'team'
+  | 'publication'
 export interface ActivityEntry {
   action: ActivityAction
   actorContext: string
@@ -191,34 +202,63 @@ export type UpdateWorkspaceRequest =
   components['schemas']['UpdateWorkspaceRequest']
 export type UserResponse = components['schemas']['UserResponse']
 export type WorkspaceMemberDto =
-  components['schemas']['WorkspaceMemberResponse']
+  import('./workspace-members').WorkspaceMemberResponse
 export type {
   WorkspaceMemberResponse,
-  WorkspaceRolePermission,
   WorkspaceRoleResponse,
 } from './workspace-members'
 export type WorkspaceResponse = components['schemas']['WorkspaceResponse']
-export interface AccessGroupResponse {
+export type GlobalRole = 'ADMIN' | 'MAINTAINER'
+export interface TeamResponse {
+  id: string
+  leaderMemberId: string
+  leaderName: string
+  memberCount: number
+  name: string
+  rootCollectionId: string
+  rootCollectionName: string
+}
+export interface TeamMemberResponse {
   id: string
   name: string
-}
-export interface CollectionSharingConfiguration {
-  grantedGroups: AccessGroupResponse[]
-  groups: AccessGroupResponse[]
-  inheritAccess: boolean
-  publicGrant: boolean
-}
-export interface SharingMemberGrant {
-  id: string
-  name: string
-}
-export interface ItemSharingConfiguration {
-  eligibleMembers: SharingMemberGrant[]
-  grantedMembers: SharingMemberGrant[]
-}
-export interface AccessGroupMemberResponse {
-  email?: string
-  name: string
+  roleName: string
   userId: string
-  workspaceMemberId: string
 }
+export type PublicationType = 'COLLECTION' | 'ITEM'
+export interface CreatePublicationRequest {
+  destinationTeamId: string
+  originalId: string
+  originalType: PublicationType
+}
+export interface PublicationResponse {
+  capturedPath: string
+  createdAt: string
+  destinationCollectionId: string
+  id: string
+  originalId: string
+  originalType: PublicationType
+  sourceCollectionId: string
+  sourceTeamName: string
+}
+export interface PublicationConfiguration {
+  destinationTeams: { id: string; name: string; collectionId: string }[]
+  publications: PublicationResponse[]
+  sourceCollectionId: string
+}
+export interface ReceivedItemResponse {
+  id: string
+  path: string
+  readOnly: boolean
+  received: boolean
+  sourceTeamName: string
+  title: string
+  type: ItemType
+}
+export interface ReceivedContentPage {
+  items: ReceivedItemResponse[]
+  page: number
+  size: number
+  totalItems: number
+  totalPages: number
+}
+export type ReceivedItemPath = ReceivedItemResponse

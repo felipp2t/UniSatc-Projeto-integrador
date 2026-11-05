@@ -1,6 +1,7 @@
 package com.vaulty.api.dto.workspace;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.vaulty.api.enums.GlobalRole;
 import java.util.UUID;
 
 public record WorkspaceMemberResponse(
@@ -9,5 +10,7 @@ public record WorkspaceMemberResponse(
         String name,
         @JsonInclude(JsonInclude.Include.NON_NULL)
         String email,
-        UUID roleId,
+        GlobalRole globalRole,
+        UUID teamId,
+        boolean isTeamLeader,
         String roleName) {}

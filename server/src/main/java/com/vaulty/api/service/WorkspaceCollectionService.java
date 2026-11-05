@@ -15,6 +15,8 @@ import com.vaulty.api.exception.ValidationException;
 import com.vaulty.api.repository.PersistenceConstraints;
 import com.vaulty.api.repository.WorkspaceCollectionRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
+import com.vaulty.api.repository.WorkspaceTeamRepository;
+import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,24 +35,29 @@ public class WorkspaceCollectionService {
 
     private final WorkspaceCollectionRepository collectionRepository;
     private final WorkspaceItemRepository itemRepository;
+    private final WorkspaceTeamRepository teamRepository;
     private final WorkspaceContentAuthorization authorization;
     private final EffectiveContentAccess contentAccess;
     private final ActivityLogService activityLogService;
+    private final WorkspaceItemAttachmentService attachmentService;
+    private final WorkspaceAccessNotifications accessNotifications;
+    private final EntityManager entityManager;
 
     @Transactional
     public CollectionResponse create(UUID userId, UUID workspaceId, CreateCollectionRequest request) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "collection", "create");
         var parent = (request.parentId() == null)
                 ? null
                 : collectionRepository.findByIdAndWorkspaceId(request.parentId(), workspaceId)
                         .orElseThrow(() -> new ResourceNotFoundException("Pasta pai não encontrada"));
-        if (parent != null) contentAccess.requireCollection(userId, workspace, parent.getId());
+        contentAccess.requireCollectionWrite(userId, workspace, parent == null ? null : parent.getId());
 
         var collection = new WorkspaceCollection();
         collection.setWorkspace(workspace);
         collection.setParent(parent);
         collection.setName(request.name());
+        collection.setId(UUID.randomUUID());
 
         try {
             collection = collectionRepository.saveAndFlush(collection);
@@ -69,11 +76,11 @@ public class WorkspaceCollectionService {
     @Transactional
     public CollectionResponse rename(UUID userId, UUID workspaceId, UUID collectionId,
                                      RenameCollectionRequest request) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "collection", "update");
         var collection = collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
-        contentAccess.requireCollection(userId, workspace, collectionId);
+        contentAccess.requireCollectionWrite(userId, workspace, collectionId);
         String previousName = collection.getName();
         collection.setName(request.name());
         try {
@@ -92,31 +99,41 @@ public class WorkspaceCollectionService {
 
     @Transactional
     public void delete(UUID userId, UUID workspaceId, UUID collectionId) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "collection", "delete");
-        var collection = collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
+        var collection = collectionRepository.findByIdAndWorkspaceIdForUpdate(collectionId, workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
-        contentAccess.requireCollection(userId, workspace, collectionId);
-        if (collectionRepository.existsByParentIdAndWorkspaceId(collectionId, workspaceId)
-                || itemRepository.existsByCollectionIdAndWorkspaceId(collectionId, workspaceId)) {
-            throw new ConflictException("Pasta não está vazia");
+        contentAccess.requireCollectionWrite(userId, workspace, collectionId);
+        if (teamRepository.existsByWorkspaceIdAndRootCollectionId(workspaceId, collectionId)) {
+            throw new ConflictException("Coleção vinculada a um time não pode ser excluída diretamente");
         }
+        var subtree = collectionRepository.findSubtreeForDelete(workspaceId, collectionId);
+        var collectionIds = subtree.stream().map(WorkspaceCollection::getId).toList();
+        var items = itemRepository.findAllByWorkspaceIdAndCollectionIdIn(workspaceId, collectionIds);
+        items.stream().filter(item -> "file".equals(item.getType()) || "image".equals(item.getType()))
+                .forEach(item -> attachmentService.deleteObjectAfterCommit(item.getId()));
         activityLogService.record(workspaceId, userId, ActivityActorContext.USER,
                 ActivityAction.FOLDER_DELETED, ActivityResourceType.FOLDER, collectionId,
                 Map.of("name", collection.getName()));
         try {
-            collectionRepository.delete(collection);
-            collectionRepository.flush();
+            itemRepository.deleteAll(items);
+            itemRepository.flush();
+            for (var descendant : subtree) {
+                collectionRepository.delete(descendant);
+                collectionRepository.flush();
+            }
         } catch (DataIntegrityViolationException exception) {
-            if (PersistenceConstraints.causedBy(exception, "fk_collection_parent_workspace", "fk_item_collection_workspace")) {
-                throw new ConflictException("Pasta não está vazia");
+            if (PersistenceConstraints.causedBy(exception, "fk_collection_parent_workspace",
+                    "fk_item_collection_workspace", "fk_workspace_team_root_collection")) {
+                throw new ConflictException("A coleção está vinculada a outro recurso");
             }
             throw exception;
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public CollectionPageResponse list(UUID userId, UUID workspaceId, UUID parentId, int page, int size) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "collection", "read");
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE || (long) page * size > Integer.MAX_VALUE) {
@@ -141,8 +158,9 @@ public class WorkspaceCollectionService {
                 .map(this::toResponse));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<CollectionPathEntry> path(UUID userId, UUID workspaceId, UUID collectionId) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
         authorization.require(userId, workspace, "collection", "read");
         var path = collectionRepository.findPath(workspaceId, collectionId);
@@ -151,6 +169,11 @@ public class WorkspaceCollectionService {
         }
         contentAccess.requireCollection(userId, workspace, collectionId);
         return path.stream().map(entry -> new CollectionPathEntry(entry.getId(), entry.getName())).toList();
+    }
+
+    private void lockWorkspace(UUID workspaceId) {
+        accessNotifications.lockWorkspace(workspaceId);
+        entityManager.clear();
     }
 
     private CollectionResponse toResponse(WorkspaceCollection collection) {

@@ -61,21 +61,12 @@ class WorkspaceItemArchivedListingIntegrationTest extends WorkspaceIntegrationSu
     }
 
     @Test
-    void memberWithoutSharingDoesNotSeeArchivedItemsOfForeignFolderButOwnerDoes() throws Exception {
+    void unassignedMemberCannotSeeArchivedItemsAndOwnerCan() throws Exception {
         User owner = createUser();
         User member = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
         addMember(member, workspaceId);
         UUID privateFolder = createFolder(owner, workspaceId, "Privada");
-        mockMvc.perform(put("/workspaces/{workspaceId}/sharing/collections/{collectionId}/inheritance",
-                        workspaceId, privateFolder).cookie(authCookie(owner)).param("enabled", "false"))
-                .andExpect(status().isNoContent());
-        mockMvc.perform(put("/workspaces/{workspaceId}/sharing/collections/{collectionId}/everyone",
-                        workspaceId, privateFolder).cookie(authCookie(owner)))
-                .andExpect(status().isNoContent());
-        mockMvc.perform(delete("/workspaces/{workspaceId}/sharing/collections/{collectionId}/everyone",
-                        workspaceId, privateFolder).cookie(authCookie(owner)))
-                .andExpect(status().isNoContent());
         UUID hidden = createItem(owner, workspaceId, "text", "Oculto", privateFolder, "x", null, null);
         UUID rootArchived = createItem(owner, workspaceId, "text", "Raiz arquivada", null, "y", null, null);
         archive(owner, workspaceId, hidden);
@@ -86,23 +77,26 @@ class WorkspaceItemArchivedListingIntegrationTest extends WorkspaceIntegrationSu
         mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId)
                         .cookie(authCookie(member)).param("collectionId", privateFolder.toString())
                         .param("archived", "true"))
-                .andExpect(status().isNotFound());
-        assertThat(listIds(member, workspaceId, null, "true")).containsExactly(rootArchived);
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId)
+                        .cookie(authCookie(member)).param("archived", "true"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    void archivedSecretIsHiddenWithoutSecretReadAndNeverExposesValue() throws Exception {
+    void maintainerCanReadArchivedSecretsButListingNeverExposesValue() throws Exception {
         User owner = createUser();
         User member = createUser();
         UUID workspaceId = configureWorkspace(owner).id();
         addMember(member, workspaceId);
+        assignRole(member, workspaceId, "Maintainer");
         UUID secretId = createItem(owner, workspaceId, "secret", "Token", null, null, null, "valor-super-secreto");
         UUID textId = createItem(owner, workspaceId, "text", "Nota", null, "n", null, null);
         archive(owner, workspaceId, secretId);
         archive(owner, workspaceId, textId);
 
         assertThat(listIds(owner, workspaceId, null, "true")).containsExactlyInAnyOrder(secretId, textId);
-        assertThat(listIds(member, workspaceId, null, "true")).containsExactly(textId);
+        assertThat(listIds(member, workspaceId, null, "true")).containsExactlyInAnyOrder(secretId, textId);
         String ownerBody = mockMvc.perform(get("/workspaces/{workspaceId}/items", workspaceId)
                         .cookie(authCookie(owner)).param("archived", "true"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();

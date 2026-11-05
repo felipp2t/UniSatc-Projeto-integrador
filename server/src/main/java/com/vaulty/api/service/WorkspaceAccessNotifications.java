@@ -65,7 +65,7 @@ public class WorkspaceAccessNotifications {
         notifyChanged(before, after, explicitlyAffected, null);
     }
 
-    private void notifyChanged(Map<UUID, Set<String>> before, Map<UUID, Set<String>> after,
+    public void notifyChanged(Map<UUID, Set<String>> before, Map<UUID, Set<String>> after,
             Collection<UUID> explicitlyAffected, NotificationResourceReference reference) {
         Set<UUID> affected = new HashSet<>();
         Set<UUID> users = new HashSet<>(before.keySet());

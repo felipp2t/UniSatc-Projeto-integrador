@@ -19,6 +19,7 @@ import com.vaulty.api.repository.WorkspaceItemMediaRepository;
 import com.vaulty.api.repository.WorkspaceItemRepository;
 import com.vaulty.api.storage.ObjectStorage;
 import com.vaulty.api.storage.StorageOperationException;
+import jakarta.persistence.EntityManager;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -67,17 +68,19 @@ public class WorkspaceItemAttachmentService {
     private final EffectiveContentAccess contentAccess;
     private final ObjectProvider<ObjectStorage> storageProvider;
     private final ActivityLogService activityLogService;
+    private final WorkspaceAccessNotifications accessNotifications;
+    private final EntityManager entityManager;
 
     @Transactional
     public AttachmentResponse create(UUID userId, UUID workspaceId, String title, String description,
                                     UUID collectionId, MultipartFile file) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "item", "create");
         var upload = validate(file);
         var collection = collectionId == null ? null
                 : collectionRepository.findByIdAndWorkspaceId(collectionId, workspaceId)
                         .orElseThrow(() -> new ResourceNotFoundException("Pasta não encontrada"));
-        if (collection != null) contentAccess.requireCollection(userId, workspace, collection.getId());
+        contentAccess.requireCollectionWrite(userId, workspace, collection == null ? null : collection.getId());
         validateTitle(title);
 
         var item = new WorkspaceItem();
@@ -115,10 +118,12 @@ public class WorkspaceItemAttachmentService {
 
     @Transactional
     public AttachmentResponse replace(UUID userId, UUID workspaceId, UUID itemId, MultipartFile file) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "item", "update");
         var item = attachmentItemForUpdate(workspaceId, itemId);
         contentAccess.requireItem(userId, workspace, itemId);
+        contentAccess.requireCollectionWrite(userId, workspace,
+                item.getCollection() == null ? null : item.getCollection().getId());
         var oldFile = fileRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Anexo não encontrado"));
         var upload = validate(file);
@@ -159,10 +164,12 @@ public class WorkspaceItemAttachmentService {
 
     @Transactional
     public void updateMetadata(UUID userId, UUID workspaceId, UUID itemId, UpdateItemMetadataRequest request) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "item", "update");
         var item = attachmentItemForUpdate(workspaceId, itemId);
         contentAccess.requireItem(userId, workspace, itemId);
+        contentAccess.requireCollectionWrite(userId, workspace,
+                item.getCollection() == null ? null : item.getCollection().getId());
         validateTitle(request.title());
         String description = normalizeDescription(request.description());
         var file = fileRepository.findById(itemId)
@@ -185,14 +192,25 @@ public class WorkspaceItemAttachmentService {
 
     @Transactional
     public AttachmentDownload download(UUID userId, UUID workspaceId, UUID itemId) {
+        lockWorkspace(workspaceId);
         var workspace = authorization.requireWorkspace(userId, workspaceId);
-        authorization.require(userId, workspace, "item", "read");
         var item = attachmentItemForRead(workspaceId, itemId);
         contentAccess.requireItem(userId, workspace, itemId);
         var file = fileRepository.findById(item.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Anexo não encontrado"));
         return new AttachmentDownload(requireStorage().get(file.getStorageKey()), file.getOriginalName(), file.getMimeType(),
                 "application/pdf".equals(file.getMimeType()) || file.getMimeType().startsWith("image/"));
+    }
+
+    public AttachmentDownload downloadReceived(UUID itemId) {
+        var item = itemRepository.findById(itemId)
+                .filter(found -> "file".equals(found.getType()) || "image".equals(found.getType()))
+                .orElseThrow(() -> new ResourceNotFoundException("Anexo recebido indisponível"));
+        var file = fileRepository.findById(item.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Anexo recebido indisponível"));
+        return new AttachmentDownload(requireStorage().get(file.getStorageKey()), file.getOriginalName(),
+                file.getMimeType(), "application/pdf".equals(file.getMimeType())
+                        || file.getMimeType().startsWith("image/"));
     }
 
     public void deleteObjectAfterCommit(UUID itemId) {
@@ -410,6 +428,11 @@ public class WorkspaceItemAttachmentService {
             throw new StorageUnavailableException();
         }
         return storage;
+    }
+
+    private void lockWorkspace(UUID workspaceId) {
+        accessNotifications.lockWorkspace(workspaceId);
+        entityManager.clear();
     }
 
     private record Upload(String key, String fileName, String format, String mimeType, byte[] content,

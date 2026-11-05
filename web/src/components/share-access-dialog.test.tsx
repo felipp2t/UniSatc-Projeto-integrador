@@ -1,67 +1,128 @@
 // @vitest-environment happy-dom
 
 import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { sharingApi, workspaceApi } from '@/api/endpoints'
+import {
+  collectionsApi,
+  publicationApi,
+  workspaceApi,
+  workspaceTeamsApi,
+} from '@/api/endpoints'
 import { renderWithProviders } from '@/test/render'
 import { ShareAccessDialog } from './share-access-dialog'
 
 vi.mock('@/api/endpoints', () => ({
-  sharingApi: { collectionConfiguration: vi.fn(), origins: vi.fn() },
+  collectionsApi: { path: vi.fn() },
+  publicationApi: {
+    configuration: vi.fn(),
+    publish: vi.fn(),
+    revoke: vi.fn(),
+  },
   workspaceApi: { permissions: vi.fn() },
+  workspaceTeamsApi: { list: vi.fn() },
 }))
 
 afterEach(() => vi.resetAllMocks())
 
-function renderDialog(permissions: { resource: string; action: string }[]) {
+function renderDialog({ isOwner = false, isTeamLeader = false } = {}) {
   vi.mocked(workspaceApi.permissions).mockResolvedValue({
     data: {
-      isOwner: false,
-      permissions,
-      roleId: 'role-1',
+      globalRole: null,
+      isOwner,
+      isTeamLeader,
+      permissions: [],
       roleName: 'Member',
+      teamId: null,
     },
   } as never)
-  vi.mocked(sharingApi.collectionConfiguration).mockResolvedValue({
+  vi.mocked(collectionsApi.path).mockResolvedValue({
+    data: [{ id: 'source-collection', name: 'Folder' }],
+  } as never)
+  vi.mocked(publicationApi.configuration).mockResolvedValue({
     data: {
-      grantedGroups: [],
-      groups: [],
-      inheritAccess: true,
-      publicGrant: false,
+      destinationTeams: [
+        { collectionId: 'team-root', id: 'team-1', name: 'Produto' },
+      ],
+      publications: [],
+      sourceCollectionId: 'source-collection',
     },
   } as never)
-  vi.mocked(sharingApi.origins).mockResolvedValue({ data: [] } as never)
+  vi.mocked(workspaceTeamsApi.list).mockResolvedValue({ data: [] } as never)
+  vi.mocked(publicationApi.publish).mockResolvedValue({ data: {} } as never)
+  vi.mocked(publicationApi.revoke).mockResolvedValue(undefined as never)
+  const user = userEvent.setup()
   renderWithProviders(
     <ShareAccessDialog
       onClose={vi.fn()}
       open
-      target={{ id: 'folder-1', kind: 'collection', name: 'Folder' }}
+      target={{ id: 'source-collection', kind: 'collection', name: 'Folder' }}
       workspaceId='workspace-1'
     />
   )
+  return user
 }
 
-describe('sharing permission gates', () => {
-  it('does not load sharing controls without sharing manage', async () => {
-    renderDialog([])
-    expect(
-      await screen.findByText(
-        'Você não tem permissão para gerenciar o compartilhamento deste conteúdo.'
-      )
-    ).toBeInTheDocument()
-    expect(sharingApi.origins).not.toHaveBeenCalled()
-    expect(sharingApi.collectionConfiguration).not.toHaveBeenCalled()
+describe('publication controls', () => {
+  it('lets a team leader publish to an available destination team', async () => {
+    const user = renderDialog({ isTeamLeader: true })
+
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Time destinatário' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'Produto' }))
+    await user.click(screen.getByRole('button', { name: 'Publicar' }))
+
+    await waitFor(() =>
+      expect(publicationApi.publish).toHaveBeenCalledWith('workspace-1', {
+        destinationTeamId: 'team-1',
+        originalId: 'source-collection',
+        originalType: 'COLLECTION',
+      })
+    )
   })
 
-  it('allows public sharing without requesting groups the member cannot manage', async () => {
-    renderDialog([{ action: 'manage', resource: 'sharing' }])
+  it('does not offer publication to a member without team leadership', async () => {
+    renderDialog()
+
     expect(
-      await screen.findByRole('button', { name: 'Conceder acesso a todos' })
-    ).toBeEnabled()
-    await waitFor(() =>
-      expect(sharingApi.collectionConfiguration).toHaveBeenCalledOnce()
+      await screen.findByText('Este conteúdo ainda não foi publicado.')
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Publicar' })).toBeNull()
+    expect(publicationApi.publish).not.toHaveBeenCalled()
+  })
+
+  it('lets the owner revoke an active publication after confirmation', async () => {
+    const user = renderDialog({ isOwner: true })
+    vi.mocked(publicationApi.configuration).mockResolvedValueOnce({
+      data: {
+        destinationTeams: [],
+        publications: [
+          {
+            capturedPath: 'Folder/Secret',
+            createdAt: '2026-11-05T10:00:00Z',
+            destinationCollectionId: 'team-root',
+            id: 'publication-1',
+            originalId: 'source-collection',
+            originalType: 'COLLECTION',
+            sourceCollectionId: 'source-collection',
+            sourceTeamName: 'Financeiro',
+          },
+        ],
+        sourceCollectionId: 'source-collection',
+      },
+    } as never)
+
+    await user.click(await screen.findByRole('button', { name: 'Revogar' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar revogação' })
     )
-    await waitFor(() => expect(sharingApi.origins).toHaveBeenCalledOnce())
-    expect(screen.queryByText('Grupos de acesso')).toBeNull()
+
+    await waitFor(() =>
+      expect(publicationApi.revoke).toHaveBeenCalledWith(
+        'workspace-1',
+        'publication-1'
+      )
+    )
   })
 })

@@ -1,102 +1,68 @@
 package com.vaulty.api.controller;
 
+import com.vaulty.api.dto.sharing.CreatePublicationRequest;
+import com.vaulty.api.dto.sharing.PublicationConfiguration;
+import com.vaulty.api.dto.sharing.PublicationResponse;
 import com.vaulty.api.service.WorkspaceSharingService;
-import com.vaulty.api.dto.sharing.CollectionSharingConfiguration;
-import com.vaulty.api.dto.sharing.ItemSharingConfiguration;
-import java.util.List;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/workspaces/{workspaceId}/sharing")
 @RequiredArgsConstructor
 public class WorkspaceSharingController {
+
     private final WorkspaceSharingService sharing;
-
-    @GetMapping("/collections/{collectionId}/configuration")
-    public ResponseEntity<CollectionSharingConfiguration> collectionConfiguration(
-            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-            @PathVariable UUID collectionId) {
-        return ResponseEntity.ok(sharing.collectionConfiguration(userId, workspaceId, collectionId));
+    @PostMapping("/publications")
+    public ResponseEntity<PublicationResponse> publish(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID workspaceId, @Valid @RequestBody CreatePublicationRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(sharing.publish(userId, workspaceId, request));
     }
 
-    @GetMapping("/items/{itemId}/configuration")
-    public ResponseEntity<ItemSharingConfiguration> itemConfiguration(
-            @AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-            @PathVariable UUID itemId) {
-        return ResponseEntity.ok(sharing.itemConfiguration(userId, workspaceId, itemId));
-    }
-
-    @PutMapping("/collections/{collectionId}/groups/{groupId}")
-    public ResponseEntity<Void> grantGroup(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                           @PathVariable UUID collectionId, @PathVariable UUID groupId) {
-        sharing.grantGroup(userId, workspaceId, collectionId, groupId);
+    @DeleteMapping("/publications/{publicationId}")
+    public ResponseEntity<Void> revoke(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID workspaceId, @PathVariable UUID publicationId) {
+        sharing.revoke(userId, workspaceId, publicationId);
         return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping("/collections/{collectionId}/groups/{groupId}")
-    public ResponseEntity<Void> revokeGroup(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                            @PathVariable UUID collectionId, @PathVariable UUID groupId) {
-        sharing.revokeGroup(userId, workspaceId, collectionId, groupId);
-        return ResponseEntity.noContent().build();
+    @GetMapping("/publications/configuration")
+    public ResponseEntity<PublicationConfiguration> configuration(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID workspaceId, @RequestParam UUID sourceCollectionId) {
+        return ResponseEntity.ok(sharing.configuration(userId, workspaceId, sourceCollectionId));
     }
 
-    @PutMapping("/collections/{collectionId}/everyone")
-    public ResponseEntity<Void> grantEveryone(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                              @PathVariable UUID collectionId) {
-        sharing.grantEveryone(userId, workspaceId, collectionId);
-        return ResponseEntity.noContent().build();
+    // Legacy ACL, inheritance, grant and origin APIs are intentionally retired.
+    @GetMapping({"/collections/{id}/configuration", "/items/{id}/configuration",
+            "/items/{id}/origins", "/collections/{id}/origins"})
+    public ResponseEntity<Void> retiredReadApi() {
+        return ResponseEntity.status(HttpStatus.GONE).build();
     }
 
-    @DeleteMapping("/collections/{collectionId}/everyone")
-    public ResponseEntity<Void> revokeEveryone(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                               @PathVariable UUID collectionId) {
-        sharing.revokeEveryone(userId, workspaceId, collectionId);
-        return ResponseEntity.noContent().build();
+    @PutMapping({"/collections/{collectionId}/groups/{groupId}", "/collections/{collectionId}/everyone",
+            "/collections/{collectionId}/inheritance", "/items/{itemId}/members/{memberId}",
+            "/roles/{roleId}/manager"})
+    public ResponseEntity<Void> retiredWriteApi() {
+        return ResponseEntity.status(HttpStatus.GONE).build();
     }
 
-    @PutMapping("/collections/{collectionId}/inheritance")
-    public ResponseEntity<Void> setInheritance(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                               @PathVariable UUID collectionId, @RequestParam boolean enabled) {
-        sharing.setInheritance(userId, workspaceId, collectionId, enabled);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PutMapping("/items/{itemId}/members/{memberId}")
-    public ResponseEntity<Void> grantMember(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                            @PathVariable UUID itemId, @PathVariable UUID memberId) {
-        sharing.grantMember(userId, workspaceId, itemId, memberId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @DeleteMapping("/items/{itemId}/members/{memberId}")
-    public ResponseEntity<Void> revokeMember(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                             @PathVariable UUID itemId, @PathVariable UUID memberId) {
-        sharing.revokeMember(userId, workspaceId, itemId, memberId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/items/{itemId}/origins")
-    public ResponseEntity<List<String>> origins(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                                @PathVariable UUID itemId,
-                                                @RequestParam(required = false) UUID memberId) {
-        return ResponseEntity.ok(sharing.origins(userId, workspaceId, itemId, memberId));
-    }
-
-    @GetMapping("/collections/{collectionId}/origins")
-    public ResponseEntity<List<String>> collectionOrigins(@AuthenticationPrincipal UUID userId,
-                                                          @PathVariable UUID workspaceId,
-                                                          @PathVariable UUID collectionId) {
-        return ResponseEntity.ok(sharing.collectionOrigins(userId, workspaceId, collectionId));
-    }
-
-    @PutMapping("/roles/{roleId}/manager")
-    public ResponseEntity<Void> setRoleSharing(@AuthenticationPrincipal UUID userId, @PathVariable UUID workspaceId,
-                                               @PathVariable UUID roleId, @RequestParam boolean enabled) {
-        sharing.setRoleSharingPermission(userId, workspaceId, roleId, enabled);
-        return ResponseEntity.noContent().build();
+    @DeleteMapping({"/collections/{collectionId}/groups/{groupId}", "/collections/{collectionId}/everyone",
+            "/collections/{collectionId}/inheritance", "/items/{itemId}/members/{memberId}",
+            "/roles/{roleId}/manager", "/items/{itemId}/acl", "/collections/{collectionId}/acl"})
+    public ResponseEntity<Void> retiredDeleteApi() {
+        return ResponseEntity.status(HttpStatus.GONE).build();
     }
 }

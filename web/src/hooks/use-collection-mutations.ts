@@ -5,7 +5,9 @@ import {
 } from '@tanstack/react-query'
 import { collectionKeys } from '@/api/collection-keys'
 import { collectionsApi } from '@/api/endpoints'
+import { itemKeys } from '@/api/item-keys'
 import type { CollectionPageResponse } from '@/api/types'
+import { publicationKeys, receivedContentKeys } from '@/api/workspace-keys'
 
 interface CreateCollectionVariables {
   request: { name: string; parentId?: string }
@@ -83,6 +85,9 @@ export function useCollectionMutations() {
         queryClient.invalidateQueries({
           queryKey: collectionKeys.paths(workspaceId),
         }),
+        queryClient.invalidateQueries({
+          queryKey: receivedContentKeys.all(workspaceId),
+        }),
       ]),
   })
 
@@ -118,10 +123,21 @@ export function useCollectionMutations() {
 
       return { snapshots }
     },
-    onSettled: (_data, _error, { parentId, workspaceId }) =>
-      queryClient.invalidateQueries({
-        queryKey: collectionKeys.lists(workspaceId, parentId),
-      }),
+    onSettled: (_data, _error, { workspaceId }) =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: collectionKeys.workspace(workspaceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: itemKeys.all(workspaceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: receivedContentKeys.all(workspaceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: publicationKeys.all(workspaceId),
+        }),
+      ]),
     onSuccess: (_data, { collectionId, workspaceId }) => {
       queryClient.removeQueries({
         queryKey: collectionKeys.lists(workspaceId, collectionId),

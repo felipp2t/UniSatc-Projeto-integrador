@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { appToast } from '@/components/ui/toast'
 import { useArchiveItem, useRestoreItem } from '@/hooks/use-item-mutations'
+import { usePublicationManagementAccess } from '@/hooks/use-publication-management-access'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 import { getItemActions, type ItemAction } from '@/lib/item-permissions'
 
@@ -40,7 +41,11 @@ export function ItemActions({
   onCopy: (text: string, kind: CopyKind) => void
 }) {
   const permissions = useWorkspacePermissions(workspaceId)
-  const actions = getItemActions(item, permissions)
+  const canManageSharing = usePublicationManagementAccess(
+    workspaceId,
+    item.collectionId ?? undefined
+  )
+  const actions = getItemActions(item, permissions, canManageSharing)
   const [dialog, setDialog] = useState<'view' | 'edit' | 'delete' | 'share'>()
   const closeDialog = useCallback(() => setDialog(undefined), [])
   const archive = useArchiveItem()
@@ -126,7 +131,12 @@ export function ItemActions({
         <ShareAccessDialog
           onClose={closeDialog}
           open
-          target={{ id: item.id, kind: 'item', name: item.title }}
+          target={{
+            collectionId: item.collectionId ?? '',
+            id: item.id,
+            kind: 'item',
+            name: item.title,
+          }}
           workspaceId={workspaceId}
         />
       ) : null}

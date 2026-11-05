@@ -5,7 +5,7 @@ import { Button } from './button'
 export interface ErrorStateProps {
   error?: unknown
   message?: string
-  onRetry?: () => void | Promise<void>
+  onRetry?: () => unknown
   variant?: 'page' | 'compact'
 }
 

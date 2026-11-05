@@ -11,20 +11,37 @@ import org.springframework.data.repository.query.Param;
 public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember, UUID> {
 
     @Query("""
-            select member from WorkspaceMember member join fetch member.role
+            select member from WorkspaceMember member
+            left join fetch member.role
+            left join fetch member.team
             where member.id = :membershipId and member.user.id = :userId
             """)
     Optional<WorkspaceMember> findByIdAndUserId(
             @Param("membershipId") UUID membershipId, @Param("userId") UUID userId);
 
     @Query("""
-            select member from WorkspaceMember member join fetch member.role
+            select member from WorkspaceMember member
+            left join fetch member.role
+            left join fetch member.team
+            join fetch member.workspace workspace
+            join fetch workspace.owner
             where member.workspace.id = :workspaceId and member.user.id = :userId
             """)
     Optional<WorkspaceMember> findByWorkspaceIdAndUserId(
             @Param("workspaceId") UUID workspaceId, @Param("userId") UUID userId);
 
     Optional<WorkspaceMember> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
+
+    @Query("select member from WorkspaceMember member join fetch member.user left join fetch member.role where member.id = :id and member.workspace.id = :workspaceId")
+    Optional<WorkspaceMember> findWithUserByIdAndWorkspaceId(
+            @Param("id") UUID id, @Param("workspaceId") UUID workspaceId);
+
+    @Query("select member from WorkspaceMember member join fetch member.user left join fetch member.role left join fetch member.team where member.id = :id and member.workspace.id = :workspaceId")
+    Optional<WorkspaceMember> findWithTeamByIdAndWorkspaceId(
+            @Param("id") UUID id, @Param("workspaceId") UUID workspaceId);
+
+    @Query("select member from WorkspaceMember member join fetch member.user left join fetch member.role where member.team.id = :teamId order by member.createdAt, member.id")
+    List<WorkspaceMember> findAllByTeamId(@Param("teamId") UUID teamId);
 
     boolean existsByRoleId(UUID roleId);
 
@@ -49,8 +66,10 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
 
     @Query("""
             select member from WorkspaceMember member
-            join fetch member.role
-            join fetch member.workspace
+            left join fetch member.role
+            left join fetch member.team
+            join fetch member.workspace workspace
+            join fetch workspace.owner
             where member.user.id = :userId
             """)
     Optional<WorkspaceMember> findByUserId(@Param("userId") UUID userId);
@@ -61,7 +80,9 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
             join membership.workspace workspace
             join WorkspaceMember sibling on sibling.workspace = workspace
             join fetch sibling.user
-            join fetch sibling.role
+            left join fetch sibling.role
+            left join fetch sibling.team team
+            left join fetch team.leader
             where membership.user.id = :userId
               and workspace.id = :workspaceId
             order by sibling.createdAt asc

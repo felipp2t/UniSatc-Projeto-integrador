@@ -21,5 +21,22 @@ export function useWorkspacePermissions(workspaceId: string | undefined) {
     query.isError || !query.data
       ? denyAllPermissions
       : createPermissionChecker(query.data.permissions, query.data.isOwner)
-  return { ...query, can: checker.can, isOwner: query.data?.isOwner ?? false }
+  const permissions = query.isError ? undefined : query.data
+  const isOwner = permissions?.isOwner ?? false
+  const globalRole = permissions?.globalRole ?? null
+  const isAdmin = globalRole === 'ADMIN'
+  const isLeader = permissions?.isTeamLeader ?? false
+  return {
+    ...query,
+    can: checker.can,
+    canInvite:
+      checker.can('member', 'invite') || checker.can('member', 'manage'),
+    canManageTeams:
+      checker.can('team', 'manage') || checker.can('team', 'create'),
+    globalRole,
+    isAdmin,
+    isLeader,
+    isOwner,
+    teamId: permissions?.teamId ?? null,
+  }
 }

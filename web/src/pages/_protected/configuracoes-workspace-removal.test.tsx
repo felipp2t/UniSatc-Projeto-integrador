@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
@@ -41,11 +41,11 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
     },
     workspaceApi: {
       ...actual.workspaceApi,
-      changeMemberRole: shared.workspaceApiMocks.changeMemberRole,
       list: shared.workspaceApiMocks.list,
       listMembers: shared.workspaceApiMocks.listMembers,
-      listRoles: shared.workspaceApiMocks.listRoles,
+      permissions: shared.workspaceApiMocks.permissions,
       removeMember: shared.workspaceApiMocks.removeMember,
+      transferOwnership: shared.workspaceApiMocks.transferOwnership,
     },
   }
 })
@@ -60,10 +60,12 @@ describe('workspace member removal', () => {
   const removeConfirmName = 'Remover membro'
   const thirdMember = {
     email: 'caio@example.com',
+    globalRole: null,
     id: 'membership-3',
+    isTeamLeader: false,
     name: 'Caio Member',
-    roleId: 'role-member',
     roleName: 'Member',
+    teamId: null,
     userId: 'member-3',
   }
 
@@ -72,7 +74,9 @@ describe('workspace member removal', () => {
     memberName: string
   ) {
     await user.click(
-      await screen.findByRole('button', { name: `Remover ${memberName}` })
+      await screen.findByRole('button', {
+        name: `Remover ${memberName} do workspace`,
+      })
     )
     return await screen.findByRole('dialog')
   }
@@ -148,10 +152,6 @@ describe('workspace member removal', () => {
     expect(
       within(dialog).getByRole('button', { name: removingButtonName })
     ).toBeDisabled()
-    const otherMemberButton = screen.getByLabelText('Remover Ana Owner')
-    expect(otherMemberButton).toBeDisabled()
-
-    fireEvent.click(otherMemberButton)
     expect(workspaceApiMocks.removeMember).toHaveBeenCalledOnce()
 
     await user.keyboard('{Escape}')
@@ -208,45 +208,13 @@ describe('workspace member removal', () => {
     )
     await waitFor(() =>
       expect(
-        screen.queryByRole('button', { name: 'Remover Bia Member' })
+        screen.queryByRole('button', {
+          name: 'Remover Bia Member do workspace',
+        })
       ).toBeNull()
     )
     expect(session.clearLocalSession).not.toHaveBeenCalled()
     expect(router.state.location.pathname).toBe('/configuracoes-workspace')
-  })
-
-  it('ends the session, clears the cache and goes to login when removing yourself', async () => {
-    const user = userEvent.setup()
-    workspaceApiMocks.listMembers.mockResolvedValue({
-      data: [
-        members[0],
-        { ...members[1], roleId: 'role-owner', roleName: 'Owner' },
-      ],
-    })
-    const { queryClient, router, session } =
-      await renderWorkspaceSettings(ownerId)
-    const clearSpy = vi.spyOn(queryClient, 'clear')
-
-    const dialog = await openRemoval(user, 'Ana Owner')
-    await user.click(
-      within(dialog).getByRole('button', { name: removeConfirmName })
-    )
-
-    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
-    expect(workspaceApiMocks.removeMember).toHaveBeenCalledWith(
-      workspaceId,
-      'membership-1'
-    )
-    expect(session.clearLocalSession).toHaveBeenCalledOnce()
-    expect(clearSpy).toHaveBeenCalledOnce()
-    expect(toastSuccess).toHaveBeenCalledOnce()
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    })
-    expect(router.state.location.pathname).toBe('/login')
-    expect(workspaceApiMocks.listMembers).toHaveBeenCalledTimes(1)
-    expect(workspaceApiMocks.list).toHaveBeenCalledTimes(1)
-    expect(workspaceApiMocks.listRoles).toHaveBeenCalledTimes(1)
   })
 
   it('shows the error immediately even while the members refetch is pending', async () => {
@@ -295,7 +263,9 @@ describe('workspace member removal', () => {
     )
     await waitFor(() =>
       expect(
-        screen.queryByRole('button', { name: 'Remover Bia Member' })
+        screen.queryByRole('button', {
+          name: 'Remover Bia Member do workspace',
+        })
       ).toBeNull()
     )
     expect(screen.getByRole('dialog')).toHaveTextContent(

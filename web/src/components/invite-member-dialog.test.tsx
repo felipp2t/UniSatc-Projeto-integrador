@@ -95,7 +95,7 @@ describe('InviteMemberDialog', () => {
 
   it.each([
     [409, {}, 'Este e-mail já possui uma conta.'],
-    [403, {}, 'Apenas o dono do workspace pode executar esta ação.'],
+    [403, {}, 'Somente Owner ou Admin pode convidar integrantes.'],
     [
       undefined,
       { networkError: true },

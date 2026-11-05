@@ -14,7 +14,7 @@ O Vaulty tem como problema central a dificuldade de encontrar e preservar inform
 
 **Conteúdo compartilhado entre equipes:** a empresa possui duas equipes de desenvolvimento, além da infraestrutura, e uma equipe pode compartilhar informações com a outra. Não há responsável obrigatório por conteúdo. Usuários podem consultar, cadastrar, editar ou remover conteúdo conforme suas permissões. Esse esclarecimento substitui a decisão anterior de atribuir a responsabilidade de manutenção ao TL; não estabelece, por si só, cadastro de equipes ou permissões por equipe no sistema.
 
-**Acesso ao conteúdo (modelo atualizado em 04/11/2026):** membros comuns pertencem a no máximo um time e têm acesso uniforme à coleção desse time; não existem concessões independentes por pasta ou item nem raiz pública. Owner, Admin e Maintainer são papéis globais sem participação em time, com os alcances definidos nesta página. Esse modelo substitui a decisão anterior de grupos, concessões individuais e herança de permissões por pasta; os documentos de requisitos, modelo conceitual e issues ainda precisam ser alinhados.
+**Acesso ao conteúdo (modelo atualizado em 04/11/2026):** membros comuns pertencem a no máximo um time e têm acesso uniforme à coleção desse time; não existem concessões independentes por pasta ou item nem raiz pública. Owner, Admin e Maintainer são papéis globais sem participação em time, com os alcances definidos nesta página. Esse modelo substitui a decisão anterior de grupos ACL, concessões individuais e herança de permissões por pasta. Os documentos de requisitos e modelo conceitual já marcam esses trechos como históricos superados; veja também a ADR 0002.
 
 **Tipos de conteúdo da primeira entrega:** links, documentos, segredos e textos atendem às informações que o projeto precisa centralizar inicialmente. Os detalhamentos acordados estão na especificação; vídeos ficam fora da entrega à banca.
 
@@ -36,7 +36,7 @@ O Vaulty tem como problema central a dificuldade de encontrar e preservar inform
 
 ## Especificação e rastreabilidade
 
-O objetivo ON01, os requisitos de usuário RU01–RU06, os detalhamentos funcionais, as regras e seus critérios de aceite estão em [docs/REQUISITOS.md](./docs/REQUISITOS.md). Esse documento é referência para os requisitos ainda vigentes; o modelo de autorização por pasta, herança e raiz pública foi substituído pelas decisões registradas nesta página e precisa ser alinhado no [modelo conceitual](./docs/MODELO-CONCEITUAL.md), na especificação, na revisão de requisitos e nas issues. O plano de entregas local organiza a execução.
+O objetivo ON01, os requisitos de usuário RU01–RU06, os detalhamentos funcionais, as regras e seus critérios de aceite estão em [docs/REQUISITOS.md](./docs/REQUISITOS.md). A especificação preserva o levantamento e os critérios históricos, e sua seção inicial identifica o modelo atual implementado; os requisitos de autorização por pasta, herança, grupos ACL e raiz pública estão superados. O modelo e a revisão conceitual registram a mesma distinção. O plano de entregas local organiza a execução.
 
 ## Contexto de uso e público prioritário
 
@@ -108,31 +108,31 @@ Conjunto de permissões de um membro limitado a uma coleção específica.
 **Membro do workspace**:
 Pessoa que aceitou um convite ao workspace. Contas globais (Owner, Admin ou Maintainer) não pertencem a times; as demais podem ficar sem time até serem associadas a exatamente um.
 
-**Membro de coleção (proposta)**:
+**Membro de coleção (modelo fixo implementado)**:
 Papel de coleção com leitura, criação, edição e exclusão de conteúdo em toda a coleção, sem administrar seus integrantes nem compartilhar conteúdo com outras equipes.
 
 **Líder de coleção**:
 Único membro que ocupa o papel de liderança de uma coleção; esse papel inclui todas as permissões de Membro, além de administrar os integrantes e compartilhar conteúdo com outras equipes. Owner e Admin também podem administrar membros dos times, e o Líder atual ou Owner/Admin transfere a liderança antes da remoção do Líder atual.
 
-**Owner global (proposta aprovada)**:
+**Owner global (papel fixo implementado)**:
 Papel global único por workspace, sem participação em time, que inclui todas as capacidades de Admin, com acesso a todo o conteúdo e segredos de todas as coleções, podendo criar, editar e excluir conteúdo, atribuir os papéis globais existentes e transferir a titularidade; as permissões dos papéis são fixas.
 
-**Admin global (proposta aprovada)**:
+**Admin global (papel fixo implementado)**:
 Papel global sem participação em time, com acesso a todo o conteúdo e segredos de todas as coleções, podendo criar, editar e excluir conteúdo; administra convites, membros dos times e criação ou exclusão de times e coleções, sem poder atribuir papéis globais ou transferir a titularidade.
 
-**Maintainer global (proposta)**:
+**Maintainer global (papel fixo implementado)**:
 Papel global sem participação em time, somente de leitura de todos os conteúdos e segredos em todas as coleções, sem permissão para criar, editar, excluir ou compartilhar conteúdo. Os papéis globais e de coleção têm permissões fixas, não personalizáveis.
 
 **Conta de manutenção**:
 Identidade global usada para manter o Vaulty, separada da conta empresarial usada pela mesma pessoa em uma equipe.
 
-**Grupo de acesso**:
-Conjunto de membros que representa uma equipe e está associado à sua coleção principal; a associação concede o papel Membro da coleção.
+**Grupo de acesso (modelo anterior, superado)**:
+Conjunto de membros usado como público de concessões ACL; esse mecanismo não participa da autorização implementada. A equipe atual é representada por um time associado a uma coleção raiz.
 
 **Compartilhamento**:
 Publicação por um Líder de coleção que cria uma cópia sincronizada do item na coleção de uma ou mais equipes destinatárias; cada equipe recebe uma única cópia por original, atualizações e renomeações do original sincronizam, o Líder atual da coleção pode revogar publicações anteriores, e Owner ou Admin pode revogar compartilhamentos de uma coleção sem time associado.
 
-**Compartilhamentos recebidos (proposta)**:
+**Compartilhamentos recebidos (projeção implementada)**:
 Pasta gerenciada dentro da coleção destinatária que organiza cópias sincronizadas e somente leitura pelo nome do time que as publicou e pelo caminho original capturado ao compartilhar; o nome do time é preservado mesmo após renomear ou excluir o time de origem ou reassociar sua coleção. A cópia mantém esse caminho em Compartilhamentos quando o original é movido dentro da coleção de origem. O destinatário não pode editar, remover, duplicar ou compartilhar novamente a cópia; a origem pode revogá-la apenas para aquele destinatário, sem afetar outros. Cópias são removidas quando a concessão termina ou o original é excluído.
 
 **Permissão de Compartilhamento**:
@@ -223,9 +223,9 @@ Aviso pessoal persistido para informar ao destinatário uma mudança em seu aces
 - Público prioritário confirmado: desenvolvedores, incluindo aqueles que exercem funções de DevOps na startup.
 - A situação de procura por chaves foi descrita pelo proponente; critérios adicionais de confiabilidade e a medição do benefício ainda precisam ser definidos.
 - Responsabilidade por conteúdo revista: não existe responsável obrigatório; a atribuição anteriormente sugerida ao TL foi substituída pelo esclarecimento sobre compartilhamento entre equipes.
-- Equipes são representadas para fins de compartilhamento por **Grupos de acesso**, sem exigir cadastro da estrutura organizacional da empresa.
-- **Modelo de autorização e compartilhamento em definição:** decisões consolidadas nesta sessão: papéis globais fixos Owner, Admin e Maintainer são exclusivos e não pertencem a times; há exatamente um Owner, e somente ele atribui Admin/Maintainer ou transfere a titularidade, após o que passa a Admin; Owner inclui todas as capacidades de Admin, e ambos administram times, coleções, convites, membros e conteúdo globalmente; Maintainer só lê conteúdo e segredos; remover um papel global deixa a conta sem time e sem acesso até associação a um time; cada membro comum pertence a no máximo um time, recebe papel Membro, pode ler/criar/editar/excluir conteúdo de modo uniforme na coleção e não pode sair por conta própria; cada time tem uma coleção e exatamente um Líder, designado na criação, com todas as permissões de Membro e administração do time; remover ou transferir um membro revoga o acesso antigo imediatamente e mantém o conteúdo na coleção de origem; excluir um time remove integrantes, mas preserva coleção e compartilhamentos sincronizados, acessíveis apenas a papéis globais até reassociação; excluir coleção só é permitido sem time e remove conteúdo/cópias; Owner/Admin convidam ao workspace sem papel ou acesso inicial, e Owner atribui papéis globais depois do aceite; compartilhar é exclusivo do Líder e cria cópias independentes por destinatário, sincronizadas, somente leitura, não removíveis, duplicáveis ou republicáveis pelo destinatário, com nome de origem e caminho capturados, nome/conteúdo sincronizados, local estável e revogação independente por destino. O modelo substitui raiz pública, concessões por pasta/item e herança; especificações e artefatos relacionados ainda precisam ser alinhados.
-- A especificação e artefatos anteriores de grupos, compartilhamentos por pasta/item e herança ainda precisam ser alinhados ao modelo de autorização decidido nesta sessão.
+- O modelo implementado representa equipes por **times** com coleção raiz e Líder; grupos de acesso pertencem ao modelo anterior, hoje retirado.
+- **Modelo de autorização e compartilhamento implementado nas etapas 1–13:** decisões consolidadas nesta sessão: papéis globais fixos Owner, Admin e Maintainer são exclusivos e não pertencem a times; há exatamente um Owner, e somente ele atribui Admin/Maintainer ou transfere a titularidade, após o que passa a Admin; Owner inclui todas as capacidades de Admin, e ambos administram times, coleções, convites, membros e conteúdo globalmente; Maintainer só lê conteúdo e segredos; remover um papel global deixa a conta sem time e sem acesso até associação a um time; cada membro comum pertence a no máximo um time, recebe papel Membro, pode ler/criar/editar/excluir conteúdo de modo uniforme na coleção e não pode sair por conta própria; cada time tem uma coleção e exatamente um Líder, designado na criação, com todas as permissões de Membro e administração do time; remover ou transferir um membro revoga o acesso antigo imediatamente e mantém o conteúdo na coleção de origem; excluir um time remove integrantes, mas preserva coleção e compartilhamentos sincronizados, acessíveis apenas a papéis globais até reassociação; excluir coleção só é permitido sem time e remove conteúdo/cópias; Owner/Admin convidam ao workspace sem papel ou acesso inicial, e Owner atribui papéis globais depois do aceite; compartilhar é exclusivo do Líder e cria cópias independentes por destinatário, sincronizadas, somente leitura, não removíveis, duplicáveis ou republicáveis pelo destinatário, com nome de origem e caminho capturados, nome/conteúdo sincronizados, local estável e revogação independente por destino. O modelo substitui raiz pública, concessões por pasta/item e herança; os documentos de requisitos, modelo conceitual, revisão e ADR registram a substituição e preservam o levantamento anterior como histórico.
+- Os critérios anteriores de grupos ACL, compartilhamentos por pasta/item e herança permanecem no levantamento como histórico e estão marcados como superados; não representam comportamento implementado.
 - Permissão de **Compartilhamento** restrita ao Líder de coleção; não é concedida por editar conteúdo nem delegável a outros papéis de coleção.
 - Papel do TL esclarecido no cenário de uso: avaliar a justificativa, aprovar a solicitação e intermediar a entrega da chave.
 - O fluxo de solicitação de chave é um cenário de uso; não implica que o Vaulty deva criar credenciais ou automatizar aprovações.

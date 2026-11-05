@@ -210,7 +210,9 @@ describe('workspace collection navigation', () => {
     )
     await user.click(await screen.findByRole('menuitem', { name: 'Excluir' }))
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveTextContent('“Folder A” será excluída')
+    expect(dialog).toHaveTextContent(
+      'Esta ação remove permanentemente “Folder A”, todo o seu conteúdo e as publicações relacionadas.'
+    )
     await user.click(within(dialog).getByRole('button', { name: 'Excluir' }))
 
     await waitFor(() =>
@@ -221,7 +223,7 @@ describe('workspace collection navigation', () => {
     })
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Esta pasta contém itens ou subpastas e não pode ser excluída.'
+      'Esta coleção ainda está associada a um time e não pode ser excluída.'
     )
     await waitFor(() => {
       expect(

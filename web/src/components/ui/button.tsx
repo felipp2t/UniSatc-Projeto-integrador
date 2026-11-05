@@ -1,6 +1,6 @@
 import { CircleNotchIcon } from '@phosphor-icons/react'
 import { cn } from 'cn'
-import type { ButtonHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, Ref } from 'react'
 
 const buttonVariants = {
   default: 'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -25,6 +25,7 @@ export type ButtonSize = keyof typeof buttonSizes
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean
+  ref?: Ref<HTMLButtonElement>
   size?: ButtonSize
   variant?: ButtonVariant
 }
