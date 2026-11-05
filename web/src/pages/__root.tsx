@@ -3,7 +3,7 @@ import {
   HeadContent,
   Outlet,
 } from '@tanstack/react-router'
-import { NotFoundPage } from '@/components/not-found-page'
+import { NotFoundPage } from '@/components/layout/not-found-page'
 import { Toaster } from '@/components/ui/toast'
 import type { RouterContext } from '@/config/routes/router-context'
 

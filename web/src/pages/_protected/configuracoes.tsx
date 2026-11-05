@@ -7,9 +7,9 @@ import {
   workspaceMembersQueryKey,
   workspacesQueryKey,
 } from '@/api/workspace-keys'
-import { InviteMemberDialog } from '@/components/invite-member-dialog'
-import { PendingInvitesSection } from '@/components/pending-invites-section'
-import { RemoveMemberDialog } from '@/components/remove-member-dialog'
+import { InviteMemberDialog } from '@/components/workspace/invite-member-dialog'
+import { PendingInvitesSection } from '@/components/workspace/pending-invites-section'
+import { RemoveMemberDialog } from '@/components/workspace/remove-member-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { appToast } from '@/components/ui/toast'
-import { WorkspaceSettingsLayout } from '@/components/workspace-settings-layout'
+import { WorkspaceSettingsLayout } from '@/components/workspace/workspace-settings-layout'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useRemoveMember } from '@/hooks/use-remove-member'
 import { useWorkspaceMembers } from '@/hooks/use-workspace-members'

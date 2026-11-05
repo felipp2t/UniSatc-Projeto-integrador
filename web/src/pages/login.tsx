@@ -22,7 +22,7 @@ import {
   authLinkClassName,
   authSecretContainerClassName,
   authSecretInputClassName,
-} from '@/components/auth-form-styles'
+} from '@/components/auth/auth-form-styles'
 import { Button } from '@/components/ui/button'
 import {
   Field,

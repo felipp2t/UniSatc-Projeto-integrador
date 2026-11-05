@@ -6,7 +6,7 @@ import { workspaceRolesQueryKey } from '@/api/workspace-keys'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
-import { WorkspaceSettingsLayout } from '@/components/workspace-settings-layout'
+import { WorkspaceSettingsLayout } from '@/components/workspace/workspace-settings-layout'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 

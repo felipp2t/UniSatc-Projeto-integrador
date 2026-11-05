@@ -58,7 +58,7 @@ vi.mock('@/hooks/use-notification-toast', () => ({
   useNotificationToast: vi.fn(),
 }))
 
-vi.mock('@/components/create-item-dialog', () => ({
+vi.mock('@/components/items/create-item-dialog', () => ({
   CreateItemDialog: ({ onItemCreated }: { onItemCreated: () => void }) =>
     createElement(
       'button',

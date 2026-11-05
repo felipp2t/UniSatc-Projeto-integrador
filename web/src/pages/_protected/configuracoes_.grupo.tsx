@@ -39,7 +39,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { appToast } from '@/components/ui/toast'
-import { WorkspaceSettingsLayout } from '@/components/workspace-settings-layout'
+import { WorkspaceSettingsLayout } from '@/components/workspace/workspace-settings-layout'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useWorkspaceMembers } from '@/hooks/use-workspace-members'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'

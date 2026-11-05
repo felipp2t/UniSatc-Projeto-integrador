@@ -30,7 +30,7 @@ vi.mock('@/hooks/use-notification-toast', () => ({
   useNotificationToast: vi.fn(),
 }))
 
-vi.mock('@/components/header', () => ({
+vi.mock('@/components/layout/header', () => ({
   Header: (props: {
     onLogout?: () => Promise<void>
     userEmail?: string
@@ -44,7 +44,7 @@ vi.mock('@/components/header', () => ({
   },
 }))
 
-vi.mock('@/components/not-found-page', () => ({ NotFoundPage: () => null }))
+vi.mock('@/components/layout/not-found-page', () => ({ NotFoundPage: () => null }))
 vi.mock('@/components/ui/grid-pattern', () => ({ GridPattern: () => null }))
 vi.mock('@/components/ui/scroll-area', () => ({
   ScrollArea: ({ children }: { children: React.ReactNode }) =>

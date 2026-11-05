@@ -18,19 +18,19 @@ import type {
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
-import { CreateCollectionButton } from '@/components/collection-management'
-import { CreateItemDialog } from '@/components/create-item-dialog'
-import { EditItemDialog } from '@/components/edit-item-dialog'
+import { CreateCollectionButton } from '@/components/workspace/collection-management'
+import { CreateItemDialog } from '@/components/items/create-item-dialog'
+import { EditItemDialog } from '@/components/items/edit-item-dialog'
 import {
   InlineCodeContent,
   InlineCodeRoot,
   InlineCodeSeparator,
   InlineCodeText,
-} from '@/components/inline-code'
-import type { CopyKind } from '@/components/item-actions'
-import { ItemListCard } from '@/components/item-list-card'
-import { NotFoundPage } from '@/components/not-found-page'
-import { ReceivedContentTree } from '@/components/received-content-tree'
+} from '@/components/items/inline-code'
+import type { CopyKind } from '@/components/items/item-actions'
+import { ItemListCard } from '@/components/items/item-list-card'
+import { NotFoundPage } from '@/components/layout/not-found-page'
+import { ReceivedContentTree } from '@/components/workspace/received-content-tree'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +51,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   PaginationControls,
   WorkspaceCollections,
-} from '@/components/workspace-collections'
+} from '@/components/workspace/workspace-collections'
 import { useCollectionPath } from '@/hooks/use-collection-path'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'

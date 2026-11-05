@@ -3,7 +3,7 @@
 import { onlineManager } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { OfflineBanner } from '@/components/offline-banner'
+import { OfflineBanner } from '@/components/layout/offline-banner'
 import '@/test/dom-setup'
 import { syncOnlineStatus } from './use-online-status'
 

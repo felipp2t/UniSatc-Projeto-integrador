@@ -10,7 +10,7 @@ import type {
   ActivityResourceType,
 } from '@/api/types'
 import { workspaceMembersQueryKey } from '@/api/workspace-keys'
-import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { AppBreadcrumb } from '@/components/layout/app-breadcrumb'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { PaginationControls } from '@/components/workspace-collections'
+import { PaginationControls } from '@/components/workspace/workspace-collections'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 const PAGE_SIZE = 20
