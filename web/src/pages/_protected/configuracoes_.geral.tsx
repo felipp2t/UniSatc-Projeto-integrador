@@ -19,7 +19,7 @@ import { useWorkspaceMembers } from '@/hooks/use-workspace-members'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute(
-  '/_protected/configuracoes-workspace_/geral'
+  '/_protected/configuracoes_/geral'
 )({
   component: WorkspaceGeneralSettingsPage,
   head: () => ({

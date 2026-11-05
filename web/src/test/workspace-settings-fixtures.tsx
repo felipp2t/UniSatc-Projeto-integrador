@@ -92,7 +92,7 @@ export function setupWorkspaceSettingsMocks() {
 
 export async function renderWorkspaceSettings(
   userId: string,
-  initialPath = '/configuracoes-workspace'
+  initialPath = '/configuracoes'
 ) {
   const queryClient = new QueryClient({
     defaultOptions: {

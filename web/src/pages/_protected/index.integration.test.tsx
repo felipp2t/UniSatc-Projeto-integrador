@@ -43,7 +43,7 @@ describe('workspace settings entry', () => {
       await screen.findByRole('menuitem', {
         name: 'Configurações do workspace',
       })
-    ).toHaveAttribute('href', '/configuracoes-workspace/geral')
+    ).toHaveAttribute('href', '/configuracoes/geral')
   })
 })
 

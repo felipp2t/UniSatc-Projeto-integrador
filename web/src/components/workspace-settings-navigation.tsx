@@ -10,14 +10,14 @@ export function WorkspaceSettingsNavigation({
   canManageRoles: boolean
 }) {
   const sections = [
-    { icon: GearIcon, label: 'Geral', to: '/configuracoes-workspace/geral' },
-    { icon: UsersThreeIcon, label: 'Membros', to: '/configuracoes-workspace' },
+    { icon: GearIcon, label: 'Geral', to: '/configuracoes/geral' },
+    { icon: UsersThreeIcon, label: 'Membros', to: '/configuracoes' },
     ...(canManageRoles
       ? [
           {
             icon: ShieldIcon,
             label: 'Cargos',
-            to: '/configuracoes-workspace/cargos',
+            to: '/configuracoes/cargos',
           },
         ]
       : []),
@@ -26,7 +26,7 @@ export function WorkspaceSettingsNavigation({
           {
             icon: UsersThreeIcon,
             label: 'Times',
-            to: '/configuracoes-workspace/grupos',
+            to: '/configuracoes/grupo',
           },
         ]
       : []),

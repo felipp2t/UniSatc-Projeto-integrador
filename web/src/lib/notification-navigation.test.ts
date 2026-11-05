@@ -3,8 +3,8 @@ import { getNotificationHref } from './notification-navigation'
 
 describe('notification destinations', () => {
   it.each([
-    ['PROFILE_UPDATED', '/configuracoes'],
-    ['PASSWORD_CHANGED', '/configuracoes'],
+    ['PROFILE_UPDATED', '/configuracoes/conta'],
+    ['PASSWORD_CHANGED', '/configuracoes/conta'],
     ['ACCESS_CHANGED', '/'],
   ])('maps %s to a fixed internal destination', (event, expected) => {
     expect(

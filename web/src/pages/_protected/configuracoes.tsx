@@ -1,209 +1,404 @@
-import { UserGearIcon, UserIcon } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useCallback, useId, useState } from 'react'
-import { z } from 'zod'
-import { userApi } from '@/api/endpoints'
-import { getApiErrorMessage } from '@/api/get-api-error-message'
-import { AppBreadcrumb } from '@/components/app-breadcrumb'
-import { ChangePasswordForm } from '@/components/change-password-form'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute } from '@tanstack/react-router'
+import { useCallback, useMemo, useState } from 'react'
+import { globalRoleApi, workspaceApi } from '@/api/endpoints'
+import type { WorkspaceMemberResponse } from '@/api/types'
+import {
+  workspaceMembersQueryKey,
+  workspacesQueryKey,
+} from '@/api/workspace-keys'
+import { InviteMemberDialog } from '@/components/invite-member-dialog'
+import { PendingInvitesSection } from '@/components/pending-invites-section'
+import { RemoveMemberDialog } from '@/components/remove-member-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
-import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { LoadingState } from '@/components/ui/loading-state'
-import { Separator } from '@/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { appToast } from '@/components/ui/toast'
-
-const profileNameSchema = z
-  .string()
-  .trim()
-  .min(3, 'O nome deve ter pelo menos 3 caracteres.')
-  .max(100, 'O nome deve ter no máximo 100 caracteres.')
+import { WorkspaceSettingsLayout } from '@/components/workspace-settings-layout'
+import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
+import { useRemoveMember } from '@/hooks/use-remove-member'
+import { useWorkspaceMembers } from '@/hooks/use-workspace-members'
+import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute('/_protected/configuracoes')({
-  component: AccountSettingsPage,
-  head: () => ({ meta: [{ title: 'Configurações da conta | Vaulty' }] }),
+  component: WorkspaceSettingsPage,
+  head: () => ({ meta: [{ title: 'Configurações do workspace | Vaulty' }] }),
 })
 
-function AccountSettingsPage() {
+function WorkspaceSettingsPage() {
   const { session } = Route.useRouteContext()
-  const navigate = useNavigate({ from: '/configuracoes' })
-  const nameId = useId()
-  const [name, setName] = useState<string>()
-  const [nameError, setNameError] = useState<string>()
-  const profile = useQuery({
-    queryFn: async () => (await userApi.getMe()).data,
-    queryKey: ['profile'],
+  const [search, setSearch] = useState('')
+  const [transferTarget, setTransferTarget] =
+    useState<WorkspaceMemberResponse | null>(null)
+  const workspaces = useCurrentWorkspace()
+  const workspaceId = workspaces.data?.id
+  const { members } = useWorkspaceMembers(workspaceId, session.user?.id)
+  const permissions = useWorkspacePermissions(workspaceId)
+  const queryClient = useQueryClient()
+  const removal = useRemoveMember({
+    currentUserId: session.user?.id,
+    session,
+    workspaceId,
   })
-  const currentName = profile.data?.name ?? ''
-  const editedName = name ?? currentName
-  const isNameValid = profileNameSchema.safeParse(editedName).success
-  const isNameChanged = editedName !== currentName
-
-  const retryProfile = useCallback(async () => {
-    await profile.refetch()
-  }, [profile.refetch])
-  const finishPasswordChange = useCallback(async () => {
-    session.clearLocalSession()
-    appToast.success('Senha alterada. Entre novamente com sua nova senha.')
-    await navigate({
-      replace: true,
-      search: { redirect: undefined },
-      to: '/login',
-    })
-  }, [navigate, session])
-  const changeName = useCallback((value: string) => {
-    setName(value)
-    setNameError(undefined)
-  }, [])
-  const saveName = useCallback(
-    async (event: React.SubmitEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      const result = profileNameSchema.safeParse(editedName)
-      if (!result.success) {
-        setNameError(result.error.issues[0]?.message)
-        return
-      }
-
-      setNameError(undefined)
-      try {
-        await userApi.updateProfile({ name: result.data })
-        session.updateUser({
-          ...session.user,
-          name: result.data,
-        })
-        setName(undefined)
-        appToast.success('Nome atualizado com sucesso.')
-      } catch (error) {
-        setNameError(
-          getApiErrorMessage(error, {
-            fallback: 'Não foi possível salvar o nome. Tente novamente.',
-          })
-        )
-      }
+  const invalidateWorkspaceData = useCallback(
+    async (includeWorkspaces = false) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: workspaceMembersQueryKey(workspaceId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-permissions', workspaceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-teams', workspaceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-team-members', workspaceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-root-collections', workspaceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['workspace-received', workspaceId],
+        }),
+        ...(includeWorkspaces
+          ? [queryClient.invalidateQueries({ queryKey: workspacesQueryKey })]
+          : []),
+      ])
     },
-    [editedName, session]
+    [queryClient, workspaceId]
+  )
+  const role = useMutation({
+    mutationFn: ({
+      member,
+      value,
+    }: {
+      member: WorkspaceMemberResponse
+      value: string
+    }) => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      const nextRole =
+        value === 'NONE' ? null : (value as 'ADMIN' | 'MAINTAINER')
+      return globalRoleApi.assign(workspaceId, member.id, nextRole)
+    },
+    onError: () => appToast.error('Não foi possível atualizar o papel global.'),
+    onSuccess: async () => {
+      await invalidateWorkspaceData()
+      appToast.success('Papel global atualizado.')
+    },
+  })
+  const transfer = useMutation({
+    mutationFn: (memberId: string) => {
+      if (!workspaceId) throw new Error('Workspace indisponível.')
+      return workspaceApi.transferOwnership(workspaceId, memberId)
+    },
+    onError: () => appToast.error('Não foi possível transferir a propriedade.'),
+    onSuccess: async () => {
+      await invalidateWorkspaceData(true)
+      appToast.success('Propriedade transferida. Você agora é administrador.')
+    },
+  })
+  const retryMembers = useCallback(async () => {
+    await members.refetch()
+  }, [members.refetch])
+  const handleRoleChange = useCallback(
+    (member: WorkspaceMemberResponse, value: string) => {
+      role.mutate({ member, value })
+    },
+    [role.mutate]
+  )
+  const handleTransfer = useCallback((member: WorkspaceMemberResponse) => {
+    setTransferTarget(member)
+  }, [])
+  const confirmTransfer = useCallback(() => {
+    if (!transferTarget) return
+    transfer.mutate(transferTarget.id)
+    setTransferTarget(null)
+  }, [transfer.mutate, transferTarget])
+  const handleTransferDialogChange = useCallback((open: boolean) => {
+    if (!open) setTransferTarget(null)
+  }, [])
+  const cancelTransfer = useCallback(() => setTransferTarget(null), [])
+  const handleRemove = useCallback(
+    (member: WorkspaceMemberResponse) => {
+      removal.request(member)
+    },
+    [removal.request]
+  )
+  const filtered = useMemo(
+    () =>
+      (members.data ?? []).filter((member) =>
+        member.name
+          .toLocaleLowerCase()
+          .includes(search.trim().toLocaleLowerCase())
+      ),
+    [members.data, search]
   )
 
-  return (
-    <main className='container mx-auto space-y-6 px-4 py-8 md:px-8 md:py-12'>
-      <header className='flex flex-col gap-6'>
-        <AppBreadcrumb
-          items={[{ label: 'Início', to: '/' }, { label: 'Conta' }]}
+  if (removal.signedOut) return null
+  if (workspaces.isPending)
+    return <LoadingState label='Carregando workspace…' />
+  if (workspaces.isError)
+    return (
+      <ErrorState
+        error={workspaces.error}
+        message='Não foi possível carregar seu workspace.'
+        onRetry={workspaces.refetch}
+      />
+    )
+  if (!workspaceId)
+    return (
+      <main className='container mx-auto px-4 py-8 md:px-8 md:py-12'>
+        <EmptyState
+          description='Você precisa estar vinculado a um workspace para consultar os membros.'
+          title='Nenhum workspace disponível'
         />
-        <div className='flex items-center gap-4'>
-          <UserGearIcon
-            aria-hidden='true'
-            className='size-6 shrink-0 text-primary'
-          />
-          <h1 className='font-bold font-mono text-2xl md:text-3xl'>CONTA</h1>
-        </div>
-      </header>
+      </main>
+    )
+  if (permissions.isPending)
+    return <LoadingState label='Verificando permissão…' />
+  if (permissions.isError)
+    return (
+      <ErrorState
+        error={permissions.error}
+        message='Não foi possível confirmar sua permissão.'
+        onRetry={permissions.refetch}
+      />
+    )
 
-      <div className='flex min-w-0 flex-col gap-8 sm:flex-row'>
-        <nav
-          aria-label='Configurações da conta'
-          className='flex w-full shrink-0 flex-col gap-1 sm:w-52'
-        >
-          <Link
-            activeProps={{
-              className: 'border-primary bg-primary/10 text-primary',
-            }}
-            className='flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-left font-mono font-semibold text-xs uppercase tracking-wide transition-colors'
-            inactiveProps={{
-              className:
-                'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground',
-            }}
-            to='/configuracoes'
-          >
-            <UserIcon aria-hidden='true' className='size-3.5 shrink-0' />
-            Perfil
-          </Link>
-        </nav>
-
-        <Separator className='hidden h-auto sm:block' orientation='vertical' />
-        <Separator className='sm:hidden' />
-
-        <div className='min-w-0 flex-1'>
-          <div className='max-w-md space-y-8'>
-            <section aria-labelledby='profile-title' className='space-y-4'>
-              <div>
-                <h2
-                  className='font-bold font-mono text-sm uppercase tracking-wide'
-                  id='profile-title'
-                >
-                  Perfil
-                </h2>
-                <p className='mt-1 text-muted-foreground text-xs'>
-                  Consulte seus dados e atualize seu nome.
-                </p>
-              </div>
-              {profile.isPending ? (
-                <LoadingState label='Carregando perfil…' />
+  return (
+    <WorkspaceSettingsLayout
+      breadcrumbLabel='Configurações do workspace'
+      canManageGroups={permissions.canManageTeams}
+      canManageRoles={permissions.isOwner}
+    >
+      <section
+        aria-label='Configurações do workspace'
+        className='min-w-0 flex-1'
+      >
+        <Tabs defaultValue='members'>
+          <div className='flex flex-wrap items-center justify-between gap-3'>
+            <TabsList>
+              <TabsTrigger value='members'>
+                Membros ({members.data?.length ?? 0})
+              </TabsTrigger>
+              {permissions.isOwner ? (
+                <TabsTrigger value='invites'>Convites</TabsTrigger>
               ) : null}
-              {profile.isError ? (
-                <ErrorState
-                  error={profile.error}
-                  message='Não foi possível carregar seu perfil. Verifique sua conexão.'
-                  onRetry={retryProfile}
-                />
-              ) : null}
-              {profile.data ? (
-                <form className='space-y-4' noValidate onSubmit={saveName}>
-                  <Field invalid={Boolean(nameError)}>
-                    <FieldLabel htmlFor={nameId}>Nome</FieldLabel>
-                    <Input
-                      aria-describedby={
-                        nameError ? `${nameId}-error` : undefined
-                      }
-                      aria-invalid={Boolean(nameError)}
-                      autoComplete='name'
-                      id={nameId}
-                      maxLength={100}
-                      onValueChange={changeName}
-                      value={editedName}
-                    />
-                    <FieldError id={`${nameId}-error`}>{nameError}</FieldError>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor={`${nameId}-email`}>E-mail</FieldLabel>
-                    <Input
-                      id={`${nameId}-email`}
-                      readOnly
-                      value={profile.data.email ?? ''}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor={`${nameId}-created`}>
-                      Conta criada em
-                    </FieldLabel>
-                    <Input
-                      id={`${nameId}-created`}
-                      readOnly
-                      value={
-                        profile.data.createdAt
-                          ? new Intl.DateTimeFormat('pt-BR', {
-                              dateStyle: 'long',
-                            }).format(new Date(profile.data.createdAt))
-                          : '—'
-                      }
-                    />
-                  </Field>
-                  <Button
-                    disabled={!(isNameChanged && isNameValid)}
-                    type='submit'
-                  >
-                    Salvar nome
-                  </Button>
-                </form>
-              ) : null}
-            </section>
-            <Separator />
-            <ChangePasswordForm onSuccess={finishPasswordChange} />
+            </TabsList>
+            {permissions.canInvite ? <InviteMemberDialog /> : null}
           </div>
-        </div>
+          <TabsContent className='mt-4 space-y-4' value='members'>
+            <label className='sr-only' htmlFor='member-search'>
+              Buscar membro por nome
+            </label>
+            <Input
+              id='member-search'
+              onValueChange={setSearch}
+              placeholder='Buscar por nome'
+              value={search}
+            />
+            {members.isPending ? (
+              <LoadingState label='Carregando membros…' />
+            ) : members.isError ? (
+              <ErrorState
+                error={members.error}
+                message='Não foi possível carregar os membros.'
+                onRetry={retryMembers}
+              />
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                description={
+                  search
+                    ? 'Ajuste a busca e tente novamente.'
+                    : 'Este workspace ainda não tem membros.'
+                }
+                title='Nenhum membro encontrado'
+              />
+            ) : (
+              <ul
+                aria-label='Membros do workspace'
+                className='mt-3 divide-y divide-border rounded-md border border-border'
+              >
+                {filtered.map((member) => (
+                  <MemberRow
+                    canManageRoles={permissions.isOwner}
+                    currentUserId={session.user?.id}
+                    isRemoving={removal.isPending}
+                    isRolePending={role.isPending}
+                    isTransferring={transfer.isPending}
+                    key={member.id}
+                    member={member}
+                    onRemove={handleRemove}
+                    onRoleChange={handleRoleChange}
+                    onTransfer={handleTransfer}
+                  />
+                ))}
+              </ul>
+            )}
+          </TabsContent>
+          {permissions.isOwner ? (
+            <TabsContent className='mt-4' value='invites'>
+              <PendingInvitesSection />
+            </TabsContent>
+          ) : null}
+        </Tabs>
+      </section>
+      <RemoveMemberDialog removal={removal} />
+      <TransferOwnershipDialog
+        isPending={transfer.isPending}
+        onCancel={cancelTransfer}
+        onConfirm={confirmTransfer}
+        onOpenChange={handleTransferDialogChange}
+        target={transferTarget}
+      />
+    </WorkspaceSettingsLayout>
+  )
+}
+
+function TransferOwnershipDialog({
+  isPending,
+  onCancel,
+  onConfirm,
+  onOpenChange,
+  target,
+}: {
+  isPending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+  onOpenChange: (open: boolean) => void
+  target: WorkspaceMemberResponse | null
+}) {
+  return (
+    <Dialog onOpenChange={onOpenChange} open={target !== null}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Transferir propriedade do workspace?</DialogTitle>
+          <DialogDescription>
+            {target
+              ? `${target.name} será o novo dono. Você passará a ser administrador.`
+              : null}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button onClick={onCancel} variant='outline'>
+            Cancelar
+          </Button>
+          <Button disabled={isPending} loading={isPending} onClick={onConfirm}>
+            Transferir propriedade
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function MemberRow({
+  canManageRoles,
+  currentUserId,
+  isRemoving,
+  isRolePending,
+  isTransferring,
+  member,
+  onRemove,
+  onRoleChange,
+  onTransfer,
+}: {
+  canManageRoles: boolean
+  currentUserId: string | undefined
+  isRemoving: boolean
+  isRolePending: boolean
+  isTransferring: boolean
+  member: WorkspaceMemberResponse
+  onRemove: (member: WorkspaceMemberResponse) => void
+  onRoleChange: (member: WorkspaceMemberResponse, value: string) => void
+  onTransfer: (member: WorkspaceMemberResponse) => void
+}) {
+  const handleRoleChange = useCallback(
+    (value: string) => onRoleChange(member, value),
+    [member, onRoleChange]
+  )
+  const handleRemove = useCallback(() => onRemove(member), [member, onRemove])
+  const handleTransfer = useCallback(
+    () => onTransfer(member),
+    [member, onTransfer]
+  )
+  const roleLabel = member.isTeamLeader
+    ? 'Líder'
+    : member.globalRole === 'MAINTAINER'
+      ? 'Maintainer'
+      : member.globalRole === 'ADMIN'
+        ? 'Admin'
+        : (member.roleName ?? 'Sem time/papel')
+
+  return (
+    <li className='flex flex-wrap items-center gap-3 p-3'>
+      <div className='min-w-0 flex-1'>
+        <p className='truncate font-semibold text-sm'>{member.name}</p>
+        <p className='text-muted-foreground text-xs'>
+          {member.email ?? member.roleName ?? 'Sem time/papel'}
+        </p>
       </div>
-    </main>
+      <span className='font-mono text-muted-foreground text-xs'>
+        {roleLabel}
+      </span>
+      {canManageRoles && member.userId !== currentUserId ? (
+        <>
+          <Select
+            disabled={isRolePending}
+            onValueChange={handleRoleChange}
+            value={member.globalRole ?? 'NONE'}
+          >
+            <SelectTrigger
+              aria-label={`Papel global de ${member.name}`}
+              className='w-36'
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='NONE'>Sem papel global</SelectItem>
+              <SelectItem value='ADMIN'>Admin</SelectItem>
+              <SelectItem value='MAINTAINER'>Maintainer</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            aria-label={`Transferir propriedade para ${member.name}`}
+            disabled={isTransferring}
+            onClick={handleTransfer}
+            size='sm'
+            variant='outline'
+          >
+            Transferir propriedade
+          </Button>
+          <Button
+            aria-label={`Remover ${member.name} do workspace`}
+            disabled={isRemoving}
+            onClick={handleRemove}
+            size='sm'
+            variant='outline'
+          >
+            Remover
+          </Button>
+        </>
+      ) : null}
+    </li>
   )
 }

@@ -11,7 +11,7 @@ import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute(
-  '/_protected/configuracoes-workspace_/cargos'
+  '/_protected/configuracoes_/cargos'
 )({
   component: WorkspaceRolesPage,
   head: () => ({

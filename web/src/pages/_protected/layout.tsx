@@ -72,7 +72,7 @@ function ProtectedLayout() {
       <GridPattern />
       <div className='relative z-10 flex h-full flex-col bg-background/80'>
         <Header
-          accountTo='/configuracoes'
+          accountTo='/configuracoes/conta'
           onLogout={handleLogout}
           userEmail={session.user?.email}
           userName={session.user?.name}

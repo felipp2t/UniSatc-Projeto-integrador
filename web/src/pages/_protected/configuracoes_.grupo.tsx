@@ -45,7 +45,7 @@ import { useWorkspaceMembers } from '@/hooks/use-workspace-members'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 
 export const Route = createFileRoute(
-  '/_protected/configuracoes-workspace_/grupos'
+  '/_protected/configuracoes_/grupo'
 )({
   component: TeamsPage,
   head: () => ({

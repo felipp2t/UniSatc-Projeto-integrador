@@ -214,7 +214,7 @@ describe('workspace member removal', () => {
       ).toBeNull()
     )
     expect(session.clearLocalSession).not.toHaveBeenCalled()
-    expect(router.state.location.pathname).toBe('/configuracoes-workspace')
+    expect(router.state.location.pathname).toBe('/configuracoes')
   })
 
   it('shows the error immediately even while the members refetch is pending', async () => {

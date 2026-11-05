@@ -49,7 +49,7 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
 beforeEach(setupWorkspaceSettingsMocks)
 afterEach(() => vi.restoreAllMocks())
 
-const generalPath = '/configuracoes-workspace/geral'
+const generalPath = '/configuracoes/geral'
 
 describe('workspace general settings', () => {
   it('allows only the owner to access the backup action', async () => {
@@ -408,7 +408,7 @@ describe('workspace general settings', () => {
 
     await user.click(screen.getByRole('link', { name: 'Membros' }))
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/configuracoes-workspace')
+      expect(router.state.location.pathname).toBe('/configuracoes')
     )
     expect(
       await screen.findByRole('textbox', { name: 'Buscar membro por nome' })

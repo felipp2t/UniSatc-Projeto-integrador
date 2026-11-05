@@ -51,7 +51,7 @@ vi.mock('@/api/endpoints', async (importOriginal) => {
   }
 })
 
-const teamsPath = '/configuracoes-workspace/grupos'
+const teamsPath = '/configuracoes/grupo'
 const teamId = '00000000-0000-4000-8000-000000000001'
 const collectionId = '00000000-0000-4000-8000-000000000002'
 const anotherCollectionId = '00000000-0000-4000-8000-000000000003'

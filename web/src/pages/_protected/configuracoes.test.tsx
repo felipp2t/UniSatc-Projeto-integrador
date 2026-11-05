@@ -67,7 +67,7 @@ async function renderAccountSettings() {
       queryClient,
       session,
     } satisfies RouterContext,
-    history: createMemoryHistory({ initialEntries: ['/configuracoes'] }),
+    history: createMemoryHistory({ initialEntries: ['/configuracoes/conta'] }),
     isServer: false,
     routeTree,
     ...routerDefaults,
@@ -224,7 +224,7 @@ describe('account settings', () => {
       await user.click(screen.getByRole('button', { name: 'ALTERAR SENHA' }))
 
       expect(await screen.findByText(message)).toBeInTheDocument()
-      expect(router.state.location.pathname).toBe('/configuracoes')
+      expect(router.state.location.pathname).toBe('/configuracoes/conta')
       expect(session.clearLocalSession).not.toHaveBeenCalled()
       expect(toastMocks.success).not.toHaveBeenCalled()
       for (const [label, value] of passwordValues) {
@@ -249,7 +249,7 @@ describe('account settings', () => {
     ).toBeInTheDocument()
     expect(apiMocks.changePassword).not.toHaveBeenCalled()
     expect(session.clearLocalSession).not.toHaveBeenCalled()
-    expect(router.state.location.pathname).toBe('/configuracoes')
+    expect(router.state.location.pathname).toBe('/configuracoes/conta')
     expect(screen.getByLabelText('Nova senha')).toHaveValue('new-password')
     expect(screen.getByLabelText('Confirmar nova senha')).toHaveValue(
       'other-password'
