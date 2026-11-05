@@ -387,7 +387,7 @@ function WorkspaceHeading({
                     <DropdownMenuItem asChild>
                       <Link
                         className='flex w-full items-center gap-2'
-                        to='/configuracoes-workspace'
+                        to='/configuracoes-workspace/geral'
                       >
                         <GearIcon aria-hidden='true' size={14} />
                         Configurações do workspace
