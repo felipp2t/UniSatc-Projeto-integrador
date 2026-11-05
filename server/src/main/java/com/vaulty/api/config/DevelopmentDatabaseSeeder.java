@@ -29,6 +29,7 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
     private static final UUID GIOVANI = id("20000000-0000-4000-8000-000000000008");
     private static final UUID UNASSIGNED = id("20000000-0000-4000-8000-000000000009");
     private static final UUID TEAM_MEMBER = id("20000000-0000-4000-8000-000000000010");
+    private static final UUID INFRA_TEAM = id("50000000-0000-4000-8000-000000000006");
 
     private static final UUID OWNER_MEMBER = id("40000000-0000-4000-8000-000000000001");
     private static final UUID ADMIN_MEMBER = id("40000000-0000-4000-8000-000000000002");
@@ -54,6 +55,7 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
     private static final UUID ADMIN_COLLECTION = id("60000000-0000-4000-8000-000000000005");
     private static final UUID FINANCE_OPERATIONS = id("60000000-0000-4000-8000-000000000006");
     private static final UUID UNASSIGNED_COLLECTION = id("60000000-0000-4000-8000-000000000007");
+    private static final UUID INFRA_COLLECTION = id("60000000-0000-4000-8000-000000000008");
 
     private static final UUID FINANCE_TEXT = id("70000000-0000-4000-8000-000000000001");
     private static final UUID FINANCE_LINK = id("70000000-0000-4000-8000-000000000002");
@@ -128,6 +130,30 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
         insertMember(UNASSIGNED_MEMBER, UNASSIGNED, null, null);
         insertMember(TEAM_MEMBER_MEMBER, TEAM_MEMBER, FINANCE_TEAM, null);
 
+        UUID andersonMember = insertTeamMember(
+                "Anderson Rodrigues", "anderson.rodrigues@vaulty.local", ADMIN_TEAM, passwordHash);
+        insertTeamMember("Felipe de Assunção", "felipe.assuncao@vaulty.local", ADMIN_TEAM, passwordHash);
+        insertTeamMember("Emily Nataly", "emily.nataly@vaulty.local", ADMIN_TEAM, passwordHash);
+        insertTeamMember("Rafael Serpa", "rafael.serpa@vaulty.local", ADMIN_TEAM, passwordHash);
+
+        insertTeamMember("Felipe Rossetto", "felipe.rossetto@vaulty.local", DROPTABLE_TEAM, passwordHash);
+        insertTeamMember("Gabriel Sumara", "gabriel.sumara@vaulty.local", DROPTABLE_TEAM, passwordHash);
+        insertTeamMember("Leonardo Dalponte", "leonardo.dalponte@vaulty.local", DROPTABLE_TEAM, passwordHash);
+        insertTeamMember("Rodrigo Martinhago", "rodrigo.martinhago@vaulty.local", DROPTABLE_TEAM, passwordHash);
+
+        insertTeamMember("Leonardo Kulkamp", "leonardo.kulkamp@vaulty.local", OSMANGAS_TEAM, passwordHash);
+        insertTeamMember("Carlos Fontana", "carlos.fontana@vaulty.local", OSMANGAS_TEAM, passwordHash);
+        insertTeamMember("Isabelle Machado", "isabelle.machado@vaulty.local", OSMANGAS_TEAM, passwordHash);
+        insertTeamMember("Mizael Cancelier", "mizael.cancelier@vaulty.local", OSMANGAS_TEAM, passwordHash);
+
+        insertTeamMember("Cibele Batista", "cibele.batista@vaulty.local", FINANCE_TEAM, passwordHash);
+        insertTeamMember("João Lucas Pantaleão", "joao.lucas.pantaleao@vaulty.local", IOT_TEAM, passwordHash);
+
+        UUID ericMember = insertTeamMember(
+                "Eric Ribeiro", "eric.ribeiro@vaulty.local", INFRA_TEAM, passwordHash);
+        insertTeamMember("Denis Couto", "denis.couto@vaulty.local", INFRA_TEAM, passwordHash);
+        insertTeamMember("Paloma Melo", "paloma.melo@vaulty.local", INFRA_TEAM, passwordHash);
+
         insertCollection(FINANCE, "Financeiro");
         insertCollection(IOT, "IOT");
         insertCollection(OSMANGAS, "OsMangas");
@@ -135,11 +161,13 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
         insertCollection(ADMIN_COLLECTION, "Administração");
         insertCollection(UNASSIGNED_COLLECTION, "Coleção preservada");
         insertCollection(FINANCE_OPERATIONS, "Operações", FINANCE);
+        insertCollection(INFRA_COLLECTION, "Infra");
         insertTeam(FINANCE_TEAM, "Financeiro", FINANCE, MARCELO_MEMBER);
         insertTeam(IOT_TEAM, "IOT", IOT, ANDREW_MEMBER);
         insertTeam(OSMANGAS_TEAM, "OsMangas", OSMANGAS, MATHEUS_MEMBER);
         insertTeam(DROPTABLE_TEAM, "DropTable_OsMangas", DROPTABLE, RAFAEL_MEMBER);
-        insertTeam(ADMIN_TEAM, "Administração", ADMIN_COLLECTION, GIOVANI_MEMBER);
+        insertTeam(ADMIN_TEAM, "Administração", ADMIN_COLLECTION, andersonMember);
+        insertTeam(INFRA_TEAM, "Infra", INFRA_COLLECTION, ericMember);
 
         insertItem(FINANCE_TEXT, FINANCE_OPERATIONS, "Fechamento mensal", "text",
                 "Enviar os relatórios até o último dia útil do mês.", null);
@@ -172,6 +200,14 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
     private void insertMember(UUID memberId, UUID userId, UUID teamId, String globalRole) {
         jdbc.update("INSERT INTO workspace_member (id, user_id, workspace_id, role_id, team_id, global_role) VALUES (?, ?, ?, NULL, ?, ?)",
                 memberId, userId, WORKSPACE, teamId, globalRole);
+    }
+
+    private UUID insertTeamMember(String name, String email, UUID teamId, String passwordHash) {
+        UUID userId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        insertUser(userId, name, email, passwordHash);
+        insertMember(memberId, userId, teamId, null);
+        return memberId;
     }
 
     private void insertCollection(UUID collectionId, String name) {

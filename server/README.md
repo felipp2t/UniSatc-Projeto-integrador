@@ -69,7 +69,7 @@ APP_DEV_SEED_ENABLED=true SERVER_PORT=0 mvn spring-boot:run
 O servidor inicia em uma porta aleatória para não conflitar com outra aplicação local. Depois da
 mensagem `Development database seeded`, encerre o processo com `Ctrl+C`.
 
-Todas as dez contas abaixo usam a senha `vaulty123`:
+Todas as 27 contas abaixo usam a senha `vaulty123`:
 
 | E-mail | Perfil / time |
 |---|---|
@@ -80,7 +80,24 @@ Todas as dez contas abaixo usam a senha `vaulty123`:
 | `andrew.senra@vaulty.local` | Líder IOT |
 | `matheus.silveira@vaulty.local` | Líder OsMangas |
 | `rafael.augusto@vaulty.local` | Líder DropTable_OsMangas |
-| `giovani.martings@vaulty.local` | Líder Administração |
+| `anderson.rodrigues@vaulty.local` | Líder Administração |
+| `felipe.assuncao@vaulty.local` | Membro Administração |
+| `emily.nataly@vaulty.local` | Membro Administração |
+| `rafael.serpa@vaulty.local` | Membro Administração |
+| `giovani.martings@vaulty.local` | Membro Administração |
+| `felipe.rossetto@vaulty.local` | Membro DropTable_OsMangas |
+| `gabriel.sumara@vaulty.local` | Membro DropTable_OsMangas |
+| `leonardo.dalponte@vaulty.local` | Membro DropTable_OsMangas |
+| `rodrigo.martinhago@vaulty.local` | Membro DropTable_OsMangas |
+| `leonardo.kulkamp@vaulty.local` | Membro OsMangas |
+| `carlos.fontana@vaulty.local` | Membro OsMangas |
+| `isabelle.machado@vaulty.local` | Membro OsMangas |
+| `mizael.cancelier@vaulty.local` | Membro OsMangas |
+| `cibele.batista@vaulty.local` | Membro Financeiro |
+| `joao.lucas.pantaleao@vaulty.local` | Membro IOT |
+| `eric.ribeiro@vaulty.local` | Líder Infra |
+| `denis.couto@vaulty.local` | Membro Infra |
+| `paloma.melo@vaulty.local` | Membro Infra |
 | `member@vaulty.local` | Membro sem time |
 | `team.member@vaulty.local` | Membro Financeiro |
 
