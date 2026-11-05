@@ -78,7 +78,7 @@ LANGUAGE SQL STABLE AS $$
         WHERE child.workspace_id = p_workspace_id
     )
     SELECT publication.id, publication.workspace_id, publication.destination_collection_id,
-           'ITEM'::VARCHAR, publication.original_item_id, NULL, NULL, item.title, publication.source_team_name,
+           'ITEM'::VARCHAR, publication.original_item_id, NULL::UUID, NULL::UUID, item.title, publication.source_team_name,
            publication.captured_path, publication.created_at
     FROM content_publication publication JOIN item ON item.id = publication.original_item_id
     WHERE publication.workspace_id = p_workspace_id
@@ -87,13 +87,13 @@ LANGUAGE SQL STABLE AS $$
       AND publication.original_type = 'ITEM'
     UNION ALL
     SELECT tree.publication_id, tree.workspace_id, tree.destination_collection_id,
-           'ITEM'::VARCHAR, item.id, NULL, tree.collection_id, item.title, tree.source_team_name,
+           'ITEM'::VARCHAR, item.id, NULL::UUID, tree.collection_id, item.title, tree.source_team_name,
            tree.captured_path, tree.publication_created_at
     FROM published_tree tree JOIN item ON item.collection_id = tree.collection_id
     WHERE item.workspace_id = p_workspace_id
     UNION ALL
     SELECT tree.publication_id, tree.workspace_id, tree.destination_collection_id,
-           'COLLECTION'::VARCHAR, NULL, tree.collection_id, tree.parent_collection_id, tree.name,
+           'COLLECTION'::VARCHAR, NULL::UUID, tree.collection_id, tree.parent_collection_id, tree.name,
            tree.source_team_name, tree.captured_path, tree.publication_created_at
     FROM published_tree tree
 $$;
