@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { UserCog, UserRound } from 'lucide-react'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { userApi } from '@/api/endpoints'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
+import { AccentPreferenceSection } from '@/components/account/accent-preference-section'
 import { ChangePasswordForm } from '@/components/auth/change-password-form'
 import { AppBreadcrumb } from '@/components/layout/app-breadcrumb'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,7 @@ function AccountSettingsPage() {
   const nameId = useId()
   const [name, setName] = useState<string>()
   const [nameError, setNameError] = useState<string>()
+  const [section, setSection] = useState<'profile' | 'appearance'>('profile')
   const profile = useQuery({
     queryFn: async () => (await userApi.getMe()).data,
     queryKey: ['profile'],
@@ -106,20 +108,23 @@ function AccountSettingsPage() {
           aria-label='Configurações da conta'
           className='flex w-full shrink-0 flex-col gap-1 sm:w-52'
         >
-          <Link
-            activeProps={{
-              className: 'border-primary bg-primary/10 text-primary',
-            }}
-            className='flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-left font-mono font-semibold text-xs uppercase tracking-wide transition-colors'
-            inactiveProps={{
-              className:
-                'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground',
-            }}
-            to='/configuracoes/conta'
+          <button
+            aria-current={section === 'profile' ? 'page' : undefined}
+            className={`flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-left font-mono font-semibold text-xs uppercase tracking-wide transition-colors ${section === 'profile' ? 'border-primary bg-primary/10 text-primary' : 'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground'}`}
+            onClick={() => setSection('profile')}
+            type='button'
           >
             <UserRound aria-hidden='true' className='size-3.5 shrink-0' />
             Perfil
-          </Link>
+          </button>
+          <button
+            aria-current={section === 'appearance' ? 'page' : undefined}
+            className={`flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-left font-mono font-semibold text-xs uppercase tracking-wide transition-colors ${section === 'appearance' ? 'border-primary bg-primary/10 text-primary' : 'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground'}`}
+            onClick={() => setSection('appearance')}
+            type='button'
+          >
+            Aparência
+          </button>
         </nav>
 
         <Separator className='hidden h-auto sm:block' orientation='vertical' />
@@ -127,6 +132,10 @@ function AccountSettingsPage() {
 
         <div className='min-w-0 flex-1'>
           <div className='max-w-md space-y-8'>
+            {section === 'appearance' ? (
+              <AccentPreferenceSection />
+            ) : (
+              <>
             <section aria-labelledby='profile-title' className='space-y-4'>
               <div>
                 <h2
@@ -201,6 +210,8 @@ function AccountSettingsPage() {
             </section>
             <Separator />
             <ChangePasswordForm onSuccess={finishPasswordChange} />
+              </>
+            )}
           </div>
         </div>
       </div>
