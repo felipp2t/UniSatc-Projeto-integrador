@@ -41,7 +41,7 @@ export function SelectContent({
       <SelectPrimitive.Content
         align={align}
         className={cn(
-          'z-50 min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md',
+          'z-50 w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md',
           className
         )}
         position={position}
