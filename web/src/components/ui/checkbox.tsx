@@ -1,5 +1,5 @@
-import { CheckIcon } from '@phosphor-icons/react'
 import { cn } from 'cn'
+import { Check } from 'lucide-react'
 import { Checkbox as CheckboxPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
 
@@ -16,7 +16,7 @@ export function Checkbox({
       {...props}
     >
       <CheckboxPrimitive.Indicator className='flex items-center justify-center'>
-        <CheckIcon size={12} weight='bold' />
+        <Check size={12} />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   )

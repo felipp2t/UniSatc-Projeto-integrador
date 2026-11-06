@@ -39,9 +39,13 @@ export function getItemActions(
   canPublish = false
 ): ItemAction[] {
   const archived = Boolean(item.archivedAt)
+
   const canRead = canAccessItem(checker, item.type, 'read')
+
   const canUpdate = canAccessItem(checker, item.type, 'update')
+
   const canDelete = canAccessItem(checker, item.type, 'delete')
+
   const actions: { id: ItemAction; allowed: boolean }[] = [
     { allowed: !archived && canPublish, id: 'share' },
     { allowed: canRead && canUpdate && !archived, id: 'edit' },
@@ -55,5 +59,6 @@ export function getItemActions(
     { allowed: canUpdate && archived, id: 'restore' },
     { allowed: canDelete && archived, id: 'delete' },
   ]
+
   return actions.filter(({ allowed }) => allowed).map(({ id }) => id)
 }

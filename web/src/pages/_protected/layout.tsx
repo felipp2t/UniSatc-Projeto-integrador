@@ -10,9 +10,9 @@ import {
   enforceRoutePermission,
 } from '@/auth/permissions'
 import { sanitizeInternalRedirect } from '@/auth/redirect'
-import { Header } from '@/components/header'
-import { NotFoundPage } from '@/components/not-found-page'
-import { OfflineBanner } from '@/components/offline-banner'
+import { Header } from '@/components/layout/header'
+import { NotFoundPage } from '@/components/layout/not-found-page'
+import { OfflineBanner } from '@/components/layout/offline-banner'
 import { GridPattern } from '@/components/ui/grid-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { workspacesQuery } from '@/hooks/use-current-workspace'
@@ -72,7 +72,7 @@ function ProtectedLayout() {
       <GridPattern />
       <div className='relative z-10 flex h-full flex-col bg-background/80'>
         <Header
-          accountTo='/configuracoes'
+          accountTo='/configuracoes/conta'
           onLogout={handleLogout}
           userEmail={session.user?.email}
           userName={session.user?.name}

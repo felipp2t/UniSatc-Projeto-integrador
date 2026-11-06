@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { ApiError } from '@/api/errors'
-import { AppBreadcrumb } from '@/components/app-breadcrumb'
-import { NotFoundPage } from '@/components/not-found-page'
+import { AppBreadcrumb } from '@/components/layout/app-breadcrumb'
+import { NotFoundPage } from '@/components/layout/not-found-page'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {

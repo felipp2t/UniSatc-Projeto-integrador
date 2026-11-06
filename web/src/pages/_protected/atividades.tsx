@@ -1,6 +1,6 @@
-import { ClockCounterClockwiseIcon } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { History } from 'lucide-react'
 import { useCallback, useId, useState } from 'react'
 import { workspaceApi } from '@/api/endpoints'
 import { isForbiddenOrNotFound } from '@/api/http-status'
@@ -10,7 +10,7 @@ import type {
   ActivityResourceType,
 } from '@/api/types'
 import { workspaceMembersQueryKey } from '@/api/workspace-keys'
-import { AppBreadcrumb } from '@/components/app-breadcrumb'
+import { AppBreadcrumb } from '@/components/layout/app-breadcrumb'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { PaginationControls } from '@/components/workspace-collections'
+import { PaginationControls } from '@/components/workspace/workspace-collections'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 const PAGE_SIZE = 20
@@ -211,7 +211,7 @@ function ActivityHistory({ workspaceId }: { workspaceId: string }) {
           items={[{ label: 'Início', to: '/' }, { label: 'Atividades' }]}
         />
         <div className='flex items-center gap-4'>
-          <ClockCounterClockwiseIcon
+          <History
             aria-hidden='true'
             className='size-6 shrink-0 text-primary'
           />

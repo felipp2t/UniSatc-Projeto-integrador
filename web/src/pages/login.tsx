@@ -1,4 +1,3 @@
-import { FolderIcon } from '@phosphor-icons/react'
 import { revalidateLogic, useForm, useSelector } from '@tanstack/react-form'
 import {
   createFileRoute,
@@ -6,6 +5,7 @@ import {
   useNavigate,
   useRouteContext,
 } from '@tanstack/react-router'
+import { Folder } from 'lucide-react'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { authApi } from '@/api/endpoints'
@@ -22,7 +22,7 @@ import {
   authLinkClassName,
   authSecretContainerClassName,
   authSecretInputClassName,
-} from '@/components/auth-form-styles'
+} from '@/components/auth/auth-form-styles'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -125,7 +125,7 @@ function LoginPage() {
                   href='/'
                 >
                   <div className='flex size-8 items-center justify-center rounded-md text-foreground'>
-                    <FolderIcon aria-hidden='true' size={24} />
+                    <Folder aria-hidden='true' size={24} />
                   </div>
                   <span className='sr-only'>Vaulty</span>
                 </a>

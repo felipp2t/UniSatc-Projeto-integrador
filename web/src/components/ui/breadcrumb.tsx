@@ -1,5 +1,5 @@
-import { DotsThreeIcon } from '@phosphor-icons/react'
 import { cn } from 'cn'
+import { Ellipsis } from 'lucide-react'
 import { Slot } from 'radix-ui'
 import type { ComponentProps, ReactNode } from 'react'
 
@@ -86,7 +86,7 @@ export function BreadcrumbEllipsis({
       className={cn('flex size-9 items-center justify-center', className)}
       {...props}
     >
-      <DotsThreeIcon className='size-4' />
+      <Ellipsis className='size-4' />
       <span className='sr-only'>Mais</span>
     </span>
   )
@@ -107,7 +107,7 @@ export function BreadcrumbEllipsisTrigger({
       type='button'
       {...props}
     >
-      <DotsThreeIcon aria-hidden='true' className='size-4' />
+      <Ellipsis aria-hidden='true' className='size-4' />
     </button>
   )
 }
