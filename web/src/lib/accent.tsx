@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
 export const ACCENT_OPTIONS = [
-  { value: 'green', label: 'Verde', color: '#00ff88' },
-  { value: 'blue', label: 'Azul', color: '#3b82f6' },
-  { value: 'purple', label: 'Roxo', color: '#a855f7' },
-  { value: 'orange', label: 'Laranja', color: '#f97316' },
-  { value: 'red', label: 'Vermelho', color: '#ef4444' },
-  { value: 'pink', label: 'Rosa', color: '#ec4899' },
-  { value: 'cyan', label: 'Ciano', color: '#06b6d4' },
+  { color: '#00ff88', label: 'Verde', value: 'green' },
+  { color: '#3b82f6', label: 'Azul', value: 'blue' },
+  { color: '#a855f7', label: 'Roxo', value: 'purple' },
+  { color: '#f97316', label: 'Laranja', value: 'orange' },
+  { color: '#ef4444', label: 'Vermelho', value: 'red' },
+  { color: '#ec4899', label: 'Rosa', value: 'pink' },
+  { color: '#06b6d4', label: 'Ciano', value: 'cyan' },
 ] as const
 
 export type Accent = (typeof ACCENT_OPTIONS)[number]['value']

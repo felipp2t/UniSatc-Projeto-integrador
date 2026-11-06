@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { UserCog, UserRound } from 'lucide-react'
-import { useCallback, useId, useState } from 'react'
+import { type MouseEvent, useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { userApi } from '@/api/endpoints'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
@@ -104,28 +104,7 @@ function AccountSettingsPage() {
       </header>
 
       <div className='flex min-w-0 flex-col gap-8 sm:flex-row'>
-        <nav
-          aria-label='Configurações da conta'
-          className='flex w-full shrink-0 flex-col gap-1 sm:w-52'
-        >
-          <button
-            aria-current={section === 'profile' ? 'page' : undefined}
-            className={`flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-left font-mono font-semibold text-xs uppercase tracking-wide transition-colors ${section === 'profile' ? 'border-primary bg-primary/10 text-primary' : 'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground'}`}
-            onClick={() => setSection('profile')}
-            type='button'
-          >
-            <UserRound aria-hidden='true' className='size-3.5 shrink-0' />
-            Perfil
-          </button>
-          <button
-            aria-current={section === 'appearance' ? 'page' : undefined}
-            className={`flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-left font-mono font-semibold text-xs uppercase tracking-wide transition-colors ${section === 'appearance' ? 'border-primary bg-primary/10 text-primary' : 'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground'}`}
-            onClick={() => setSection('appearance')}
-            type='button'
-          >
-            Aparência
-          </button>
-        </nav>
+        <AccountSettingsNavigation onChange={setSection} section={section} />
 
         <Separator className='hidden h-auto sm:block' orientation='vertical' />
         <Separator className='sm:hidden' />
@@ -136,85 +115,138 @@ function AccountSettingsPage() {
               <AccentPreferenceSection />
             ) : (
               <>
-            <section aria-labelledby='profile-title' className='space-y-4'>
-              <div>
-                <h2
-                  className='font-bold font-mono text-sm uppercase tracking-wide'
-                  id='profile-title'
-                >
-                  Perfil
-                </h2>
-                <p className='mt-1 text-muted-foreground text-xs'>
-                  Consulte seus dados e atualize seu nome.
-                </p>
-              </div>
-              {profile.isPending ? (
-                <LoadingState label='Carregando perfil…' />
-              ) : null}
-              {profile.isError ? (
-                <ErrorState
-                  error={profile.error}
-                  message='Não foi possível carregar seu perfil. Verifique sua conexão.'
-                  onRetry={retryProfile}
-                />
-              ) : null}
-              {profile.data ? (
-                <form className='space-y-4' noValidate onSubmit={saveName}>
-                  <Field invalid={Boolean(nameError)}>
-                    <FieldLabel htmlFor={nameId}>Nome</FieldLabel>
-                    <Input
-                      aria-describedby={
-                        nameError ? `${nameId}-error` : undefined
-                      }
-                      aria-invalid={Boolean(nameError)}
-                      autoComplete='name'
-                      id={nameId}
-                      maxLength={100}
-                      onValueChange={changeName}
-                      value={editedName}
+                <section aria-labelledby='profile-title' className='space-y-4'>
+                  <div>
+                    <h2
+                      className='font-bold font-mono text-sm uppercase tracking-wide'
+                      id='profile-title'
+                    >
+                      Perfil
+                    </h2>
+                    <p className='mt-1 text-muted-foreground text-xs'>
+                      Consulte seus dados e atualize seu nome.
+                    </p>
+                  </div>
+                  {profile.isPending ? (
+                    <LoadingState label='Carregando perfil…' />
+                  ) : null}
+                  {profile.isError ? (
+                    <ErrorState
+                      error={profile.error}
+                      message='Não foi possível carregar seu perfil. Verifique sua conexão.'
+                      onRetry={retryProfile}
                     />
-                    <FieldError id={`${nameId}-error`}>{nameError}</FieldError>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor={`${nameId}-email`}>E-mail</FieldLabel>
-                    <Input
-                      id={`${nameId}-email`}
-                      readOnly
-                      value={profile.data.email ?? ''}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor={`${nameId}-created`}>
-                      Conta criada em
-                    </FieldLabel>
-                    <Input
-                      id={`${nameId}-created`}
-                      readOnly
-                      value={
-                        profile.data.createdAt
-                          ? new Intl.DateTimeFormat('pt-BR', {
-                              dateStyle: 'long',
-                            }).format(new Date(profile.data.createdAt))
-                          : '—'
-                      }
-                    />
-                  </Field>
-                  <Button
-                    disabled={!(isNameChanged && isNameValid)}
-                    type='submit'
-                  >
-                    Salvar nome
-                  </Button>
-                </form>
-              ) : null}
-            </section>
-            <Separator />
-            <ChangePasswordForm onSuccess={finishPasswordChange} />
+                  ) : null}
+                  {profile.data ? (
+                    <form className='space-y-4' noValidate onSubmit={saveName}>
+                      <Field invalid={Boolean(nameError)}>
+                        <FieldLabel htmlFor={nameId}>Nome</FieldLabel>
+                        <Input
+                          aria-describedby={
+                            nameError ? `${nameId}-error` : undefined
+                          }
+                          aria-invalid={Boolean(nameError)}
+                          autoComplete='name'
+                          id={nameId}
+                          maxLength={100}
+                          onValueChange={changeName}
+                          value={editedName}
+                        />
+                        <FieldError id={`${nameId}-error`}>
+                          {nameError}
+                        </FieldError>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor={`${nameId}-email`}>
+                          E-mail
+                        </FieldLabel>
+                        <Input
+                          id={`${nameId}-email`}
+                          readOnly
+                          value={profile.data.email ?? ''}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor={`${nameId}-created`}>
+                          Conta criada em
+                        </FieldLabel>
+                        <Input
+                          id={`${nameId}-created`}
+                          readOnly
+                          value={
+                            profile.data.createdAt
+                              ? new Intl.DateTimeFormat('pt-BR', {
+                                  dateStyle: 'long',
+                                }).format(new Date(profile.data.createdAt))
+                              : '—'
+                          }
+                        />
+                      </Field>
+                      <Button
+                        disabled={!(isNameChanged && isNameValid)}
+                        type='submit'
+                      >
+                        Salvar nome
+                      </Button>
+                    </form>
+                  ) : null}
+                </section>
+                <Separator />
+                <ChangePasswordForm onSuccess={finishPasswordChange} />
               </>
             )}
           </div>
         </div>
       </div>
     </main>
+  )
+}
+
+type AccountSection = 'profile' | 'appearance'
+
+const accountSections: {
+  icon?: typeof UserRound
+  label: string
+  value: AccountSection
+}[] = [
+  { icon: UserRound, label: 'Perfil', value: 'profile' },
+  { label: 'Aparência', value: 'appearance' },
+]
+
+function AccountSettingsNavigation({
+  onChange,
+  section,
+}: {
+  onChange: (section: AccountSection) => void
+  section: AccountSection
+}) {
+  const handleChange = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      onChange(event.currentTarget.value as AccountSection)
+    },
+    [onChange]
+  )
+
+  return (
+    <nav
+      aria-label='Configurações da conta'
+      className='flex w-full shrink-0 flex-col gap-1 sm:w-52'
+    >
+      {accountSections.map(({ icon: Icon, label, value }) => (
+        <button
+          aria-current={section === value ? 'page' : undefined}
+          className={`flex cursor-pointer items-center gap-2.5 border-l-2 px-3 py-2 text-left font-mono font-semibold text-xs uppercase tracking-wide transition-colors ${section === value ? 'border-primary bg-primary/10 text-primary' : 'border-transparent text-muted-foreground hover:bg-muted/30 hover:text-foreground'}`}
+          key={value}
+          onClick={handleChange}
+          type='button'
+          value={value}
+        >
+          {Icon ? (
+            <Icon aria-hidden='true' className='size-3.5 shrink-0' />
+          ) : null}
+          {label}
+        </button>
+      ))}
+    </nav>
   )
 }
