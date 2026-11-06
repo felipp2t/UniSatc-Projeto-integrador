@@ -2,7 +2,7 @@ import type { AppRoute } from '@/types/navigation'
 
 export type NotificationDestination =
   | { to: '/'; search?: { collectionId: string } | { itemId: string } }
-  | { to: '/configuracoes' }
+  | { to: '/configuracoes/conta' }
 
 export function getNotificationDestination(
   metadata: Record<string, unknown>
@@ -10,15 +10,17 @@ export function getNotificationDestination(
   switch (metadata.event) {
     case 'PROFILE_UPDATED':
     case 'PASSWORD_CHANGED':
-      return { to: '/configuracoes' }
+      return { to: '/configuracoes/conta' }
     default:
       if (metadata.event !== 'ACCESS_CHANGED') return undefined
+
       if (
         typeof metadata.resourceId === 'string' &&
         metadata.resourceType === 'collection'
       ) {
         return { search: { collectionId: metadata.resourceId }, to: '/' }
       }
+
       if (
         typeof metadata.resourceId === 'string' &&
         metadata.resourceType === 'item'

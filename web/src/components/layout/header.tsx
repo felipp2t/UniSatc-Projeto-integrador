@@ -1,0 +1,192 @@
+import { Link } from '@tanstack/react-router'
+import { CircleUserRound, LogOut, Settings } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { GlobalItemSearch } from '@/components/items/global-item-search'
+import type { NotificationData } from '@/components/notifications/notification-bell'
+import { NotificationBell } from '@/components/notifications/notification-bell'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import type { AppRoute } from '@/types/navigation'
+
+interface HeaderProps extends React.ComponentProps<'header'> {
+  accountTo?: AppRoute
+  notifications?: NotificationData[]
+  onAccountSettings?: () => void | Promise<void>
+  onLogout?: () => void | Promise<void>
+  onMarkNotificationRead?: (id: string) => void | Promise<void>
+  onOpenNotification?: (notification: NotificationData) => void
+  userEmail?: string
+  userName?: string
+}
+
+export function Header({
+  accountTo,
+  notifications,
+  onAccountSettings,
+  onLogout,
+  onMarkNotificationRead,
+  onOpenNotification,
+  userEmail = 'E-mail não informado',
+  userName = 'Usuário',
+  className,
+  ...props
+}: HeaderProps) {
+  const [logoutError, setLogoutError] = useState<string>()
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const logout = useCallback(async () => {
+    setLogoutError(undefined)
+    setLoggingOut(true)
+    try {
+      await onLogout?.()
+      setLogoutDialogOpen(false)
+    } catch (error) {
+      setLogoutError(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Não foi possível sair.'
+      )
+    } finally {
+      setLoggingOut(false)
+    }
+  }, [onLogout])
+  const openLogoutDialog = useCallback(() => setLogoutDialogOpen(true), [])
+  const closeLogoutDialog = useCallback(() => setLogoutDialogOpen(false), [])
+  const hasAccountActions = accountTo || onAccountSettings || onLogout
+
+  return (
+    <header className={cnHeader(className)} {...props}>
+      <div className='container mx-auto flex min-h-14 items-center gap-4 px-4 md:px-8'>
+        <Link
+          className='shrink-0 font-bold font-mono text-lg text-primary tracking-widest'
+          to='/'
+        >
+          VAULTY
+        </Link>
+
+        <div className='flex-1' />
+
+        <div className='flex items-center gap-1'>
+          <GlobalItemSearch />
+          <NotificationBell
+            notifications={notifications}
+            onMarkRead={onMarkNotificationRead}
+            onOpen={onOpenNotification}
+          />
+
+          {hasAccountActions ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  aria-label={`Abrir menu de ${userName}`}
+                  className='rounded-full'
+                  size='icon'
+                  variant='ghost'
+                >
+                  <CircleUserRound aria-hidden='true' size={18} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end' className='w-56'>
+                <div className='flex flex-col gap-0.5 px-2 py-1.5'>
+                  <span className='font-mono font-semibold text-foreground text-sm'>
+                    {userName}
+                  </span>
+                  <span className='text-muted-foreground text-xs'>
+                    {userEmail}
+                  </span>
+                </div>
+                <DropdownMenuSeparator />
+                {accountTo ? (
+                  <DropdownMenuItem asChild>
+                    <Link
+                      className='flex w-full items-center gap-2'
+                      to={accountTo}
+                    >
+                      <Settings aria-hidden='true' size={14} />
+                      Configurações da conta
+                    </Link>
+                  </DropdownMenuItem>
+                ) : onAccountSettings ? (
+                  <DropdownMenuItem asChild>
+                    <button
+                      className='flex w-full items-center gap-2'
+                      onClick={onAccountSettings}
+                      type='button'
+                    >
+                      <Settings aria-hidden='true' size={14} />
+                      Configurações da conta
+                    </button>
+                  </DropdownMenuItem>
+                ) : null}
+                {onLogout ? (
+                  <DropdownMenuItem
+                    onSelect={openLogoutDialog}
+                    variant='destructive'
+                  >
+                    <LogOut aria-hidden='true' size={14} />
+                    Sair da conta
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+      </div>
+
+      <Dialog onOpenChange={setLogoutDialogOpen} open={logoutDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sair da conta</DialogTitle>
+            <DialogDescription>
+              Tem certeza de que deseja sair? Você precisará entrar novamente
+              para acessar o sistema.
+            </DialogDescription>
+          </DialogHeader>
+          {logoutError ? (
+            <p className='text-destructive text-xs' role='alert'>
+              {logoutError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={loggingOut}
+              onClick={closeLogoutDialog}
+              variant='outline'
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={loggingOut}
+              loading={loggingOut}
+              onClick={logout}
+              variant='destructive'
+            >
+              Sair
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </header>
+  )
+}
+
+function cnHeader(className?: string) {
+  return `sticky top-0 z-10 border-border border-b bg-background/90 backdrop-blur-sm ${className ?? ''}`
+}
+
+export type { HeaderProps }

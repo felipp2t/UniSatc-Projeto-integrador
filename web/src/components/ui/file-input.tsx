@@ -1,9 +1,5 @@
-import {
-  CheckCircleIcon,
-  UploadSimpleIcon,
-  WarningCircleIcon,
-} from '@phosphor-icons/react'
 import { cn } from 'cn'
+import { CircleAlert, CircleCheck, Upload } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
 import { ATTACHMENT_HINT } from '@/lib/item-validation'
@@ -78,7 +74,7 @@ export function FileInput({
       selectFile(event.target.files?.[0]),
     [selectFile]
   )
-  const StatusIcon = isInvalid ? WarningCircleIcon : CheckCircleIcon
+  const StatusIcon = isInvalid ? CircleAlert : CircleCheck
 
   return (
     <div
@@ -128,7 +124,7 @@ export function FileInput({
         </>
       ) : (
         <>
-          <UploadSimpleIcon
+          <Upload
             aria-hidden='true'
             className={cn(
               'size-5 text-muted-foreground',

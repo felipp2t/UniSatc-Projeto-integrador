@@ -3,12 +3,13 @@ import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createSessionService } from './auth/session'
+import { AccentProvider } from './lib/accent'
 import './globals.css'
 import { createQueryClient } from './api/query-client'
 import { sanitizeInternalRedirect } from './auth/redirect'
+import { routerDefaults } from './config/routes/router-defaults'
 import { syncOnlineStatus } from './hooks/use-online-status'
 import { routeTree } from './route-tree.gen'
-import { routerDefaults } from './router-defaults'
 
 const session = createSessionService()
 const queryClient = createQueryClient()
@@ -48,7 +49,9 @@ declare module '@tanstack/react-router' {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AccentProvider>
+        <RouterProvider router={router} />
+      </AccentProvider>
     </QueryClientProvider>
   </StrictMode>
 )

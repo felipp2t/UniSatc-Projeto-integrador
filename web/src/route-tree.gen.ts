@@ -18,11 +18,11 @@ import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
 import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
 import { Route as ProtectedAtividadesRouteImport } from './pages/_protected/atividades'
 import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
-import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
-import { Route as ProtectedConfiguracoesWorkspaceRouteImport } from './pages/_protected/configuracoes-workspace'
-import { Route as ProtectedConfiguracoesWorkspaceCargosRouteImport } from './pages/_protected/configuracoes-workspace_.cargos'
-import { Route as ProtectedConfiguracoesWorkspaceGeralRouteImport } from './pages/_protected/configuracoes-workspace_.geral'
-import { Route as ProtectedConfiguracoesWorkspaceGruposRouteImport } from './pages/_protected/configuracoes-workspace_.grupos'
+import { Route as ProtectedConfiguracoesIndexRouteImport } from './pages/_protected/configuracoes/index'
+import { Route as ProtectedConfiguracoesCargosRouteImport } from './pages/_protected/configuracoes/cargos'
+import { Route as ProtectedConfiguracoesContaRouteImport } from './pages/_protected/configuracoes/conta'
+import { Route as ProtectedConfiguracoesGeralRouteImport } from './pages/_protected/configuracoes/geral'
+import { Route as ProtectedConfiguracoesGrupoRouteImport } from './pages/_protected/configuracoes/grupo'
 
 const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
   id: '/_protected',
@@ -68,33 +68,34 @@ const ProtectedComponentsRoute = ProtectedComponentsRouteImport.update({
   path: '/components',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
-const ProtectedConfiguracoesRoute = ProtectedConfiguracoesRouteImport.update({
-  id: '/configuracoes',
-  path: '/configuracoes',
-  getParentRoute: () => ProtectedLayoutRoute,
-} as any)
-const ProtectedConfiguracoesWorkspaceRoute =
-  ProtectedConfiguracoesWorkspaceRouteImport.update({
-    id: '/configuracoes-workspace',
-    path: '/configuracoes-workspace',
+const ProtectedConfiguracoesIndexRoute =
+  ProtectedConfiguracoesIndexRouteImport.update({
+    id: '/configuracoes/',
+    path: '/configuracoes/',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
-const ProtectedConfiguracoesWorkspaceCargosRoute =
-  ProtectedConfiguracoesWorkspaceCargosRouteImport.update({
-    id: '/configuracoes-workspace_/cargos',
-    path: '/configuracoes-workspace/cargos',
+const ProtectedConfiguracoesCargosRoute =
+  ProtectedConfiguracoesCargosRouteImport.update({
+    id: '/configuracoes/cargos',
+    path: '/configuracoes/cargos',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
-const ProtectedConfiguracoesWorkspaceGeralRoute =
-  ProtectedConfiguracoesWorkspaceGeralRouteImport.update({
-    id: '/configuracoes-workspace_/geral',
-    path: '/configuracoes-workspace/geral',
+const ProtectedConfiguracoesContaRoute =
+  ProtectedConfiguracoesContaRouteImport.update({
+    id: '/configuracoes/conta',
+    path: '/configuracoes/conta',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
-const ProtectedConfiguracoesWorkspaceGruposRoute =
-  ProtectedConfiguracoesWorkspaceGruposRouteImport.update({
-    id: '/configuracoes-workspace_/grupos',
-    path: '/configuracoes-workspace/grupos',
+const ProtectedConfiguracoesGeralRoute =
+  ProtectedConfiguracoesGeralRouteImport.update({
+    id: '/configuracoes/geral',
+    path: '/configuracoes/geral',
+    getParentRoute: () => ProtectedLayoutRoute,
+  } as any)
+const ProtectedConfiguracoesGrupoRoute =
+  ProtectedConfiguracoesGrupoRouteImport.update({
+    id: '/configuracoes/grupo',
+    path: '/configuracoes/grupo',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
 
@@ -107,11 +108,11 @@ export interface FileRoutesByFullPath {
   '/$': typeof ProtectedSplatRoute
   '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
-  '/configuracoes': typeof ProtectedConfiguracoesRoute
-  '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
-  '/configuracoes-workspace/cargos': typeof ProtectedConfiguracoesWorkspaceCargosRoute
-  '/configuracoes-workspace/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
-  '/configuracoes-workspace/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
+  '/configuracoes/cargos': typeof ProtectedConfiguracoesCargosRoute
+  '/configuracoes/conta': typeof ProtectedConfiguracoesContaRoute
+  '/configuracoes/geral': typeof ProtectedConfiguracoesGeralRoute
+  '/configuracoes/grupo': typeof ProtectedConfiguracoesGrupoRoute
+  '/configuracoes/': typeof ProtectedConfiguracoesIndexRoute
 }
 export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
@@ -121,12 +122,12 @@ export interface FileRoutesByTo {
   '/$': typeof ProtectedSplatRoute
   '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
-  '/configuracoes': typeof ProtectedConfiguracoesRoute
-  '/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
   '/': typeof ProtectedIndexRoute
-  '/configuracoes-workspace/cargos': typeof ProtectedConfiguracoesWorkspaceCargosRoute
-  '/configuracoes-workspace/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
-  '/configuracoes-workspace/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
+  '/configuracoes/cargos': typeof ProtectedConfiguracoesCargosRoute
+  '/configuracoes/conta': typeof ProtectedConfiguracoesContaRoute
+  '/configuracoes/geral': typeof ProtectedConfiguracoesGeralRoute
+  '/configuracoes/grupo': typeof ProtectedConfiguracoesGrupoRoute
+  '/configuracoes': typeof ProtectedConfiguracoesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -138,12 +139,12 @@ export interface FileRoutesById {
   '/_protected/$': typeof ProtectedSplatRoute
   '/_protected/atividades': typeof ProtectedAtividadesRoute
   '/_protected/components': typeof ProtectedComponentsRoute
-  '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
-  '/_protected/configuracoes-workspace': typeof ProtectedConfiguracoesWorkspaceRoute
   '/_protected/': typeof ProtectedIndexRoute
-  '/_protected/configuracoes-workspace_/cargos': typeof ProtectedConfiguracoesWorkspaceCargosRoute
-  '/_protected/configuracoes-workspace_/geral': typeof ProtectedConfiguracoesWorkspaceGeralRoute
-  '/_protected/configuracoes-workspace_/grupos': typeof ProtectedConfiguracoesWorkspaceGruposRoute
+  '/_protected/configuracoes/cargos': typeof ProtectedConfiguracoesCargosRoute
+  '/_protected/configuracoes/conta': typeof ProtectedConfiguracoesContaRoute
+  '/_protected/configuracoes/geral': typeof ProtectedConfiguracoesGeralRoute
+  '/_protected/configuracoes/grupo': typeof ProtectedConfiguracoesGrupoRoute
+  '/_protected/configuracoes/': typeof ProtectedConfiguracoesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -156,11 +157,11 @@ export interface FileRouteTypes {
     | '/$'
     | '/atividades'
     | '/components'
-    | '/configuracoes'
-    | '/configuracoes-workspace'
-    | '/configuracoes-workspace/cargos'
-    | '/configuracoes-workspace/geral'
-    | '/configuracoes-workspace/grupos'
+    | '/configuracoes/cargos'
+    | '/configuracoes/conta'
+    | '/configuracoes/geral'
+    | '/configuracoes/grupo'
+    | '/configuracoes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/cadastro'
@@ -170,12 +171,12 @@ export interface FileRouteTypes {
     | '/$'
     | '/atividades'
     | '/components'
-    | '/configuracoes'
-    | '/configuracoes-workspace'
     | '/'
-    | '/configuracoes-workspace/cargos'
-    | '/configuracoes-workspace/geral'
-    | '/configuracoes-workspace/grupos'
+    | '/configuracoes/cargos'
+    | '/configuracoes/conta'
+    | '/configuracoes/geral'
+    | '/configuracoes/grupo'
+    | '/configuracoes'
   id:
     | '__root__'
     | '/_protected'
@@ -186,12 +187,12 @@ export interface FileRouteTypes {
     | '/_protected/$'
     | '/_protected/atividades'
     | '/_protected/components'
-    | '/_protected/configuracoes'
-    | '/_protected/configuracoes-workspace'
     | '/_protected/'
-    | '/_protected/configuracoes-workspace_/cargos'
-    | '/_protected/configuracoes-workspace_/geral'
-    | '/_protected/configuracoes-workspace_/grupos'
+    | '/_protected/configuracoes/cargos'
+    | '/_protected/configuracoes/conta'
+    | '/_protected/configuracoes/geral'
+    | '/_protected/configuracoes/grupo'
+    | '/_protected/configuracoes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -267,39 +268,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedComponentsRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes': {
-      id: '/_protected/configuracoes'
+    '/_protected/configuracoes/': {
+      id: '/_protected/configuracoes/'
       path: '/configuracoes'
-      fullPath: '/configuracoes'
-      preLoaderRoute: typeof ProtectedConfiguracoesRouteImport
+      fullPath: '/configuracoes/'
+      preLoaderRoute: typeof ProtectedConfiguracoesIndexRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes-workspace': {
-      id: '/_protected/configuracoes-workspace'
-      path: '/configuracoes-workspace'
-      fullPath: '/configuracoes-workspace'
-      preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceRouteImport
+    '/_protected/configuracoes/cargos': {
+      id: '/_protected/configuracoes/cargos'
+      path: '/configuracoes/cargos'
+      fullPath: '/configuracoes/cargos'
+      preLoaderRoute: typeof ProtectedConfiguracoesCargosRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes-workspace_/cargos': {
-      id: '/_protected/configuracoes-workspace_/cargos'
-      path: '/configuracoes-workspace/cargos'
-      fullPath: '/configuracoes-workspace/cargos'
-      preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceCargosRouteImport
+    '/_protected/configuracoes/conta': {
+      id: '/_protected/configuracoes/conta'
+      path: '/configuracoes/conta'
+      fullPath: '/configuracoes/conta'
+      preLoaderRoute: typeof ProtectedConfiguracoesContaRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes-workspace_/geral': {
-      id: '/_protected/configuracoes-workspace_/geral'
-      path: '/configuracoes-workspace/geral'
-      fullPath: '/configuracoes-workspace/geral'
-      preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceGeralRouteImport
+    '/_protected/configuracoes/geral': {
+      id: '/_protected/configuracoes/geral'
+      path: '/configuracoes/geral'
+      fullPath: '/configuracoes/geral'
+      preLoaderRoute: typeof ProtectedConfiguracoesGeralRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes-workspace_/grupos': {
-      id: '/_protected/configuracoes-workspace_/grupos'
-      path: '/configuracoes-workspace/grupos'
-      fullPath: '/configuracoes-workspace/grupos'
-      preLoaderRoute: typeof ProtectedConfiguracoesWorkspaceGruposRouteImport
+    '/_protected/configuracoes/grupo': {
+      id: '/_protected/configuracoes/grupo'
+      path: '/configuracoes/grupo'
+      fullPath: '/configuracoes/grupo'
+      preLoaderRoute: typeof ProtectedConfiguracoesGrupoRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
   }
@@ -309,27 +310,24 @@ interface ProtectedLayoutRouteChildren {
   ProtectedSplatRoute: typeof ProtectedSplatRoute
   ProtectedAtividadesRoute: typeof ProtectedAtividadesRoute
   ProtectedComponentsRoute: typeof ProtectedComponentsRoute
-  ProtectedConfiguracoesRoute: typeof ProtectedConfiguracoesRoute
-  ProtectedConfiguracoesWorkspaceRoute: typeof ProtectedConfiguracoesWorkspaceRoute
   ProtectedIndexRoute: typeof ProtectedIndexRoute
-  ProtectedConfiguracoesWorkspaceCargosRoute: typeof ProtectedConfiguracoesWorkspaceCargosRoute
-  ProtectedConfiguracoesWorkspaceGeralRoute: typeof ProtectedConfiguracoesWorkspaceGeralRoute
-  ProtectedConfiguracoesWorkspaceGruposRoute: typeof ProtectedConfiguracoesWorkspaceGruposRoute
+  ProtectedConfiguracoesCargosRoute: typeof ProtectedConfiguracoesCargosRoute
+  ProtectedConfiguracoesContaRoute: typeof ProtectedConfiguracoesContaRoute
+  ProtectedConfiguracoesGeralRoute: typeof ProtectedConfiguracoesGeralRoute
+  ProtectedConfiguracoesGrupoRoute: typeof ProtectedConfiguracoesGrupoRoute
+  ProtectedConfiguracoesIndexRoute: typeof ProtectedConfiguracoesIndexRoute
 }
 
 const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
   ProtectedSplatRoute: ProtectedSplatRoute,
   ProtectedAtividadesRoute: ProtectedAtividadesRoute,
   ProtectedComponentsRoute: ProtectedComponentsRoute,
-  ProtectedConfiguracoesRoute: ProtectedConfiguracoesRoute,
-  ProtectedConfiguracoesWorkspaceRoute: ProtectedConfiguracoesWorkspaceRoute,
   ProtectedIndexRoute: ProtectedIndexRoute,
-  ProtectedConfiguracoesWorkspaceCargosRoute:
-    ProtectedConfiguracoesWorkspaceCargosRoute,
-  ProtectedConfiguracoesWorkspaceGeralRoute:
-    ProtectedConfiguracoesWorkspaceGeralRoute,
-  ProtectedConfiguracoesWorkspaceGruposRoute:
-    ProtectedConfiguracoesWorkspaceGruposRoute,
+  ProtectedConfiguracoesCargosRoute: ProtectedConfiguracoesCargosRoute,
+  ProtectedConfiguracoesContaRoute: ProtectedConfiguracoesContaRoute,
+  ProtectedConfiguracoesGeralRoute: ProtectedConfiguracoesGeralRoute,
+  ProtectedConfiguracoesGrupoRoute: ProtectedConfiguracoesGrupoRoute,
+  ProtectedConfiguracoesIndexRoute: ProtectedConfiguracoesIndexRoute,
 }
 
 const ProtectedLayoutRouteWithChildren = ProtectedLayoutRoute._addFileChildren(

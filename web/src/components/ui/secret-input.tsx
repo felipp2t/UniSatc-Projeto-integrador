@@ -1,5 +1,5 @@
-import { EyeIcon, EyeSlashIcon } from '@phosphor-icons/react'
 import { cn } from 'cn'
+import { Eye, EyeOff } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,11 +43,7 @@ export function SecretInput({
         type='button'
         variant='ghost'
       >
-        {visible ? (
-          <EyeSlashIcon aria-hidden='true' />
-        ) : (
-          <EyeIcon aria-hidden='true' />
-        )}
+        {visible ? <EyeOff aria-hidden='true' /> : <Eye aria-hidden='true' />}
       </Button>
     </div>
   )

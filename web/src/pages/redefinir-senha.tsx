@@ -16,8 +16,8 @@ import {
   authLinkClassName,
   authSecretContainerClassName,
   authSecretInputClassName,
-} from '@/components/auth-form-styles'
-import { AuthStatus, BrandMark } from '@/components/auth-status'
+} from '@/components/auth/auth-form-styles'
+import { AuthStatus, BrandMark } from '@/components/auth/auth-status'
 import { Button } from '@/components/ui/button'
 import {
   Field,

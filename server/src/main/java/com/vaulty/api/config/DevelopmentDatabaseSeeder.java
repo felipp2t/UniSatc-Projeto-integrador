@@ -117,7 +117,7 @@ public class DevelopmentDatabaseSeeder implements ApplicationRunner {
         insertUser(TEAM_MEMBER, "Membro Financeiro", "team.member@vaulty.local", passwordHash);
 
         jdbc.update("INSERT INTO workspace (id, owner_id, name, description, singleton) VALUES (?, ?, ?, ?, TRUE)",
-                WORKSPACE, OWNER, "Vaulty Demo", "Workspace de demonstração com times e conteúdo compartilhado.");
+                WORKSPACE, OWNER, "Alcate-IA do Brasil", "Workspace de demonstração com times e conteúdo compartilhado.");
 
         insertMember(OWNER_MEMBER, OWNER, null, null);
         insertMember(ADMIN_MEMBER, ADMIN, null, "ADMIN");

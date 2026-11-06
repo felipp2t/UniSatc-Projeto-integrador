@@ -1,12 +1,6 @@
-import {
-  ClockCounterClockwiseIcon,
-  DotsThreeVerticalIcon,
-  FileIcon,
-  FolderIcon,
-  GearIcon,
-} from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { EllipsisVertical, File, Folder, History, Settings } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -18,19 +12,17 @@ import type {
   ItemPageResponse,
   ItemResponse,
 } from '@/api/types'
-import { CreateCollectionButton } from '@/components/collection-management'
-import { CreateItemDialog } from '@/components/create-item-dialog'
-import { EditItemDialog } from '@/components/edit-item-dialog'
+import { CreateItemDialog } from '@/components/items/create-item-dialog'
+import { EditItemDialog } from '@/components/items/edit-item-dialog'
 import {
   InlineCodeContent,
   InlineCodeRoot,
   InlineCodeSeparator,
   InlineCodeText,
-} from '@/components/inline-code'
-import type { CopyKind } from '@/components/item-actions'
-import { ItemListCard } from '@/components/item-list-card'
-import { NotFoundPage } from '@/components/not-found-page'
-import { ReceivedContentTree } from '@/components/received-content-tree'
+} from '@/components/items/inline-code'
+import type { CopyKind } from '@/components/items/item-actions'
+import { ItemListCard } from '@/components/items/item-list-card'
+import { NotFoundPage } from '@/components/layout/not-found-page'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,10 +40,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CreateCollectionButton } from '@/components/workspace/collection-management'
+import { ReceivedContentTree } from '@/components/workspace/received-content-tree'
 import {
   PaginationControls,
   WorkspaceCollections,
-} from '@/components/workspace-collections'
+} from '@/components/workspace/workspace-collections'
 import { useCollectionPath } from '@/hooks/use-collection-path'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
@@ -339,10 +333,7 @@ function WorkspaceHeading({
   return (
     <header className='flex flex-wrap items-center justify-between gap-5 border-border border-b pb-6'>
       <div className='flex min-w-0 items-center gap-4'>
-        <FolderIcon
-          aria-hidden='true'
-          className='size-7 shrink-0 text-primary'
-        />
+        <Folder aria-hidden='true' className='size-7 shrink-0 text-primary' />
         <div className='min-w-0'>
           <p className='mb-1 font-mono text-[10px] text-muted-foreground uppercase tracking-[0.18em]'>
             {collectionId ? 'Collection' : 'Workspace'}
@@ -362,11 +353,7 @@ function WorkspaceHeading({
                       className='flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-sm text-foreground/80 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent data-[state=open]:text-accent-foreground'
                       type='button'
                     >
-                      <DotsThreeVerticalIcon
-                        aria-hidden='true'
-                        className='size-6'
-                        weight='bold'
-                      />
+                      <EllipsisVertical aria-hidden='true' className='size-6' />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align='start'>
@@ -376,10 +363,7 @@ function WorkspaceHeading({
                           className='flex w-full items-center gap-2'
                           to='/atividades'
                         >
-                          <ClockCounterClockwiseIcon
-                            aria-hidden='true'
-                            size={14}
-                          />
+                          <History aria-hidden='true' size={14} />
                           Histórico de atividades
                         </Link>
                       </DropdownMenuItem>
@@ -387,9 +371,9 @@ function WorkspaceHeading({
                     <DropdownMenuItem asChild>
                       <Link
                         className='flex w-full items-center gap-2'
-                        to='/configuracoes-workspace'
+                        to='/configuracoes/geral'
                       >
-                        <GearIcon aria-hidden='true' size={14} />
+                        <Settings aria-hidden='true' size={14} />
                         Configurações do workspace
                       </Link>
                     </DropdownMenuItem>
@@ -759,7 +743,7 @@ function EmptyItemsContent({
     <>
       <EmptyState
         description={copy.description}
-        icon={<FileIcon aria-hidden='true' className='size-6' />}
+        icon={<File aria-hidden='true' className='size-6' />}
         title={copy.title}
         variant='compact'
       />
