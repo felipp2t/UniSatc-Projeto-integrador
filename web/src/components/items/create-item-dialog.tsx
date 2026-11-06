@@ -1,10 +1,12 @@
-import { FileText, KeyRound, Link, Text, Plus } from 'lucide-react'
+import { FileText, KeyRound, Link, Plus, Text } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { collectionsApi, itemsApi, workspaceApi } from '@/api/endpoints'
 import { toApiError } from '@/api/errors'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
 import type { CreateItemRequest, CreateItemType } from '@/api/types'
+import { AttachmentFields } from '@/components/items/attachment-fields'
 import { ItemContentField } from '@/components/items/item-content-control'
+import { UploadProgress } from '@/components/items/upload-progress'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -35,8 +37,6 @@ import {
   TITLE_MAX,
   validateAttachmentFile,
 } from '@/lib/item-validation'
-import { AttachmentFields } from '@/components/items/attachment-fields'
-import { UploadProgress } from '@/components/items/upload-progress'
 
 const itemTypes = [
   { icon: FileText, label: 'documento', value: 'file' },

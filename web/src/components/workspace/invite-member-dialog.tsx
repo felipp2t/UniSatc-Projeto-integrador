@@ -1,5 +1,5 @@
-import { UserPlus } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { UserPlus } from 'lucide-react'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { inviteApi } from '@/api/endpoints'

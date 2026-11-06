@@ -1,5 +1,5 @@
-import { Ellipsis } from 'lucide-react'
 import { cn } from 'cn'
+import { Ellipsis } from 'lucide-react'
 import { Slot } from 'radix-ui'
 import type { ComponentProps, ReactNode } from 'react'
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import { getReplaceAttachmentError } from '@/api/item-errors'
+import { UploadProgress } from '@/components/items/upload-progress'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { FileInput } from '@/components/ui/file-input'
@@ -11,7 +12,6 @@ import {
   ATTACHMENT_HINT,
   validateAttachmentFile,
 } from '@/lib/item-validation'
-import { UploadProgress } from '@/components/items/upload-progress'
 
 export function ReplaceAttachmentField({
   disabled,

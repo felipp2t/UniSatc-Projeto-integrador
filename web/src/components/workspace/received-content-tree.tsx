@@ -1,14 +1,14 @@
-import { Folder } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import { Folder } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { receivedContentApi } from '@/api/endpoints'
 import type { ReceivedItemResponse } from '@/api/types'
 import { receivedContentKeys } from '@/api/workspace-keys'
-import { ReceivedItemDialog } from '@/components/workspace/received-item-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
+import { ReceivedItemDialog } from '@/components/workspace/received-item-dialog'
 
 interface TreeNode {
   children: Map<string, TreeNode>

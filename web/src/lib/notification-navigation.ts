@@ -13,12 +13,14 @@ export function getNotificationDestination(
       return { to: '/configuracoes/conta' }
     default:
       if (metadata.event !== 'ACCESS_CHANGED') return undefined
+
       if (
         typeof metadata.resourceId === 'string' &&
         metadata.resourceType === 'collection'
       ) {
         return { search: { collectionId: metadata.resourceId }, to: '/' }
       }
+
       if (
         typeof metadata.resourceId === 'string' &&
         metadata.resourceType === 'item'

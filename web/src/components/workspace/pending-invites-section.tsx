@@ -1,10 +1,10 @@
-import { Trash2 } from 'lucide-react'
 import {
   type UseQueryResult,
   useMutation,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { inviteApi } from '@/api/endpoints'
 import { getApiErrorMessage } from '@/api/get-api-error-message'

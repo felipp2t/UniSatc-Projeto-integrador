@@ -1,11 +1,10 @@
-import { FileSearch } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import { FileSearch } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { collectionsApi, itemsApi, receivedContentApi } from '@/api/endpoints'
 import type { ItemResponse, ItemType, ReceivedItemResponse } from '@/api/types'
 import { receivedContentKeys } from '@/api/workspace-keys'
 import { EditItemDialog } from '@/components/items/edit-item-dialog'
-import { ReceivedItemDialog } from '@/components/workspace/received-item-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -18,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { LoadingState } from '@/components/ui/loading-state'
+import { ReceivedItemDialog } from '@/components/workspace/received-item-dialog'
 import { useCurrentWorkspace } from '@/hooks/use-current-workspace'
 
 const PAGE_SIZE = 20

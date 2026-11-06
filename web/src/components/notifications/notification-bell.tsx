@@ -1,6 +1,6 @@
-import { Bell, Check } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { Bell, Check } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { notificationsApi } from '@/api/endpoints'
 import { notificationKeys } from '@/api/notification-keys'

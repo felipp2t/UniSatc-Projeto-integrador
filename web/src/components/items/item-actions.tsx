@@ -5,7 +5,6 @@ import { getArchiveError, getRestoreError } from '@/api/item-errors'
 import type { ItemResponse } from '@/api/types'
 import { DeleteItemDialog } from '@/components/items/delete-item-dialog'
 import { EditItemDialog } from '@/components/items/edit-item-dialog'
-import { ShareAccessDialog } from '@/components/workspace/share-access-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { appToast } from '@/components/ui/toast'
+import { ShareAccessDialog } from '@/components/workspace/share-access-dialog'
 import { useArchiveItem, useRestoreItem } from '@/hooks/use-item-mutations'
 import { usePublicationManagementAccess } from '@/hooks/use-publication-management-access'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'

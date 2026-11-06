@@ -1,5 +1,5 @@
-import { LoaderCircle } from 'lucide-react'
 import { cn } from 'cn'
+import { LoaderCircle } from 'lucide-react'
 import type { ButtonHTMLAttributes, Ref } from 'react'
 
 const buttonVariants = {
@@ -58,11 +58,7 @@ export function Button({
       {...props}
     >
       {!!loading && (
-        <LoaderCircle
-          aria-hidden='true'
-          className='animate-spin'
-          size={14}
-        />
+        <LoaderCircle aria-hidden='true' className='animate-spin' size={14} />
       )}
       {children}
     </button>

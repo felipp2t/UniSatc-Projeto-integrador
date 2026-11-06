@@ -10,6 +10,7 @@ import {
   SERVER_UNAVAILABLE_MESSAGE,
 } from '@/api/get-api-error-message'
 import { AuthStatus, BrandMark } from '@/components/auth/auth-status'
+import { unavailableMessage } from '@/components/auth/invite-status'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -29,7 +30,6 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { SecretInput } from '@/components/ui/secret-input'
-import { unavailableMessage } from '@/components/auth/invite-status'
 
 const registrationSchema = z
   .object({

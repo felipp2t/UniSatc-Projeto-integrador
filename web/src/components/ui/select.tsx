@@ -1,5 +1,5 @@
-import { ChevronDown, Check } from 'lucide-react'
 import { cn } from 'cn'
+import { Check, ChevronDown } from 'lucide-react'
 import { Select as SelectPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
 
@@ -39,11 +39,11 @@ export function SelectContent({
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
+        align={align}
         className={cn(
           'z-50 min-w-32 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md',
           className
         )}
-        align={align}
         position={position}
         {...props}
       >

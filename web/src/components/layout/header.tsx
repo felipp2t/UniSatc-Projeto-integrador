@@ -1,5 +1,5 @@
-import { Settings, LogOut, CircleUserRound } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { CircleUserRound, LogOut, Settings } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { GlobalItemSearch } from '@/components/items/global-item-search'
 import type { NotificationData } from '@/components/notifications/notification-bell'

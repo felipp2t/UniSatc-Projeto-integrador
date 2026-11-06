@@ -1,5 +1,5 @@
-import { Settings, Shield, UsersRound } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { Settings, Shield, UsersRound } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 
 export function WorkspaceSettingsNavigation({

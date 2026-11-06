@@ -6,9 +6,9 @@ import { createSessionService } from './auth/session'
 import './globals.css'
 import { createQueryClient } from './api/query-client'
 import { sanitizeInternalRedirect } from './auth/redirect'
+import { routerDefaults } from './config/routes/router-defaults'
 import { syncOnlineStatus } from './hooks/use-online-status'
 import { routeTree } from './route-tree.gen'
-import { routerDefaults } from './config/routes/router-defaults'
 
 const session = createSessionService()
 const queryClient = createQueryClient()

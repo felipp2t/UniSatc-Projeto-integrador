@@ -1,22 +1,22 @@
-import { Folder } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { Folder } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { isUnavailableCollectionError } from '@/api/collection-errors'
 import { collectionKeys } from '@/api/collection-keys'
 import { collectionsApi } from '@/api/endpoints'
 import type { CollectionPageResponse, CollectionResponse } from '@/api/types'
-import {
-  CollectionCard,
-  CollectionDialogHost,
-  type CollectionDialogState,
-} from '@/components/workspace/collection-management'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { LoadingState } from '@/components/ui/loading-state'
 import { appToast } from '@/components/ui/toast'
+import {
+  CollectionCard,
+  CollectionDialogHost,
+  type CollectionDialogState,
+} from '@/components/workspace/collection-management'
 import { useCollectionMutations } from '@/hooks/use-collection-mutations'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 

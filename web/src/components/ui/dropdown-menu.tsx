@@ -1,5 +1,5 @@
-import { ChevronRight, Check } from 'lucide-react'
 import { cn } from 'cn'
+import { Check, ChevronRight } from 'lucide-react'
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 import type { ComponentProps } from 'react'
 

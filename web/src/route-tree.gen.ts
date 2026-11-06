@@ -18,11 +18,11 @@ import { Route as ProtectedIndexRouteImport } from './pages/_protected/index'
 import { Route as ProtectedSplatRouteImport } from './pages/_protected/$'
 import { Route as ProtectedAtividadesRouteImport } from './pages/_protected/atividades'
 import { Route as ProtectedComponentsRouteImport } from './pages/_protected/components'
-import { Route as ProtectedConfiguracoesRouteImport } from './pages/_protected/configuracoes'
-import { Route as ProtectedConfiguracoesCargosRouteImport } from './pages/_protected/configuracoes_.cargos'
-import { Route as ProtectedConfiguracoesContaRouteImport } from './pages/_protected/configuracoes_.conta'
-import { Route as ProtectedConfiguracoesGeralRouteImport } from './pages/_protected/configuracoes_.geral'
-import { Route as ProtectedConfiguracoesGrupoRouteImport } from './pages/_protected/configuracoes_.grupo'
+import { Route as ProtectedConfiguracoesIndexRouteImport } from './pages/_protected/configuracoes/index'
+import { Route as ProtectedConfiguracoesCargosRouteImport } from './pages/_protected/configuracoes/cargos'
+import { Route as ProtectedConfiguracoesContaRouteImport } from './pages/_protected/configuracoes/conta'
+import { Route as ProtectedConfiguracoesGeralRouteImport } from './pages/_protected/configuracoes/geral'
+import { Route as ProtectedConfiguracoesGrupoRouteImport } from './pages/_protected/configuracoes/grupo'
 
 const ProtectedLayoutRoute = ProtectedLayoutRouteImport.update({
   id: '/_protected',
@@ -68,32 +68,33 @@ const ProtectedComponentsRoute = ProtectedComponentsRouteImport.update({
   path: '/components',
   getParentRoute: () => ProtectedLayoutRoute,
 } as any)
-const ProtectedConfiguracoesRoute = ProtectedConfiguracoesRouteImport.update({
-  id: '/configuracoes',
-  path: '/configuracoes',
-  getParentRoute: () => ProtectedLayoutRoute,
-} as any)
+const ProtectedConfiguracoesIndexRoute =
+  ProtectedConfiguracoesIndexRouteImport.update({
+    id: '/configuracoes/',
+    path: '/configuracoes/',
+    getParentRoute: () => ProtectedLayoutRoute,
+  } as any)
 const ProtectedConfiguracoesCargosRoute =
   ProtectedConfiguracoesCargosRouteImport.update({
-    id: '/configuracoes_/cargos',
+    id: '/configuracoes/cargos',
     path: '/configuracoes/cargos',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
 const ProtectedConfiguracoesContaRoute =
   ProtectedConfiguracoesContaRouteImport.update({
-    id: '/configuracoes_/conta',
+    id: '/configuracoes/conta',
     path: '/configuracoes/conta',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
 const ProtectedConfiguracoesGeralRoute =
   ProtectedConfiguracoesGeralRouteImport.update({
-    id: '/configuracoes_/geral',
+    id: '/configuracoes/geral',
     path: '/configuracoes/geral',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
 const ProtectedConfiguracoesGrupoRoute =
   ProtectedConfiguracoesGrupoRouteImport.update({
-    id: '/configuracoes_/grupo',
+    id: '/configuracoes/grupo',
     path: '/configuracoes/grupo',
     getParentRoute: () => ProtectedLayoutRoute,
   } as any)
@@ -107,11 +108,11 @@ export interface FileRoutesByFullPath {
   '/$': typeof ProtectedSplatRoute
   '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
-  '/configuracoes': typeof ProtectedConfiguracoesRoute
   '/configuracoes/cargos': typeof ProtectedConfiguracoesCargosRoute
   '/configuracoes/conta': typeof ProtectedConfiguracoesContaRoute
   '/configuracoes/geral': typeof ProtectedConfiguracoesGeralRoute
   '/configuracoes/grupo': typeof ProtectedConfiguracoesGrupoRoute
+  '/configuracoes/': typeof ProtectedConfiguracoesIndexRoute
 }
 export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
@@ -121,12 +122,12 @@ export interface FileRoutesByTo {
   '/$': typeof ProtectedSplatRoute
   '/atividades': typeof ProtectedAtividadesRoute
   '/components': typeof ProtectedComponentsRoute
-  '/configuracoes': typeof ProtectedConfiguracoesRoute
   '/': typeof ProtectedIndexRoute
   '/configuracoes/cargos': typeof ProtectedConfiguracoesCargosRoute
   '/configuracoes/conta': typeof ProtectedConfiguracoesContaRoute
   '/configuracoes/geral': typeof ProtectedConfiguracoesGeralRoute
   '/configuracoes/grupo': typeof ProtectedConfiguracoesGrupoRoute
+  '/configuracoes': typeof ProtectedConfiguracoesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -138,12 +139,12 @@ export interface FileRoutesById {
   '/_protected/$': typeof ProtectedSplatRoute
   '/_protected/atividades': typeof ProtectedAtividadesRoute
   '/_protected/components': typeof ProtectedComponentsRoute
-  '/_protected/configuracoes': typeof ProtectedConfiguracoesRoute
   '/_protected/': typeof ProtectedIndexRoute
-  '/_protected/configuracoes_/cargos': typeof ProtectedConfiguracoesCargosRoute
-  '/_protected/configuracoes_/conta': typeof ProtectedConfiguracoesContaRoute
-  '/_protected/configuracoes_/geral': typeof ProtectedConfiguracoesGeralRoute
-  '/_protected/configuracoes_/grupo': typeof ProtectedConfiguracoesGrupoRoute
+  '/_protected/configuracoes/cargos': typeof ProtectedConfiguracoesCargosRoute
+  '/_protected/configuracoes/conta': typeof ProtectedConfiguracoesContaRoute
+  '/_protected/configuracoes/geral': typeof ProtectedConfiguracoesGeralRoute
+  '/_protected/configuracoes/grupo': typeof ProtectedConfiguracoesGrupoRoute
+  '/_protected/configuracoes/': typeof ProtectedConfiguracoesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -156,11 +157,11 @@ export interface FileRouteTypes {
     | '/$'
     | '/atividades'
     | '/components'
-    | '/configuracoes'
     | '/configuracoes/cargos'
     | '/configuracoes/conta'
     | '/configuracoes/geral'
     | '/configuracoes/grupo'
+    | '/configuracoes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/cadastro'
@@ -170,12 +171,12 @@ export interface FileRouteTypes {
     | '/$'
     | '/atividades'
     | '/components'
-    | '/configuracoes'
     | '/'
     | '/configuracoes/cargos'
     | '/configuracoes/conta'
     | '/configuracoes/geral'
     | '/configuracoes/grupo'
+    | '/configuracoes'
   id:
     | '__root__'
     | '/_protected'
@@ -186,12 +187,12 @@ export interface FileRouteTypes {
     | '/_protected/$'
     | '/_protected/atividades'
     | '/_protected/components'
-    | '/_protected/configuracoes'
     | '/_protected/'
-    | '/_protected/configuracoes_/cargos'
-    | '/_protected/configuracoes_/conta'
-    | '/_protected/configuracoes_/geral'
-    | '/_protected/configuracoes_/grupo'
+    | '/_protected/configuracoes/cargos'
+    | '/_protected/configuracoes/conta'
+    | '/_protected/configuracoes/geral'
+    | '/_protected/configuracoes/grupo'
+    | '/_protected/configuracoes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -267,36 +268,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedComponentsRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes': {
-      id: '/_protected/configuracoes'
+    '/_protected/configuracoes/': {
+      id: '/_protected/configuracoes/'
       path: '/configuracoes'
-      fullPath: '/configuracoes'
-      preLoaderRoute: typeof ProtectedConfiguracoesRouteImport
+      fullPath: '/configuracoes/'
+      preLoaderRoute: typeof ProtectedConfiguracoesIndexRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes_/cargos': {
-      id: '/_protected/configuracoes_/cargos'
+    '/_protected/configuracoes/cargos': {
+      id: '/_protected/configuracoes/cargos'
       path: '/configuracoes/cargos'
       fullPath: '/configuracoes/cargos'
       preLoaderRoute: typeof ProtectedConfiguracoesCargosRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes_/conta': {
-      id: '/_protected/configuracoes_/conta'
+    '/_protected/configuracoes/conta': {
+      id: '/_protected/configuracoes/conta'
       path: '/configuracoes/conta'
       fullPath: '/configuracoes/conta'
       preLoaderRoute: typeof ProtectedConfiguracoesContaRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes_/geral': {
-      id: '/_protected/configuracoes_/geral'
+    '/_protected/configuracoes/geral': {
+      id: '/_protected/configuracoes/geral'
       path: '/configuracoes/geral'
       fullPath: '/configuracoes/geral'
       preLoaderRoute: typeof ProtectedConfiguracoesGeralRouteImport
       parentRoute: typeof ProtectedLayoutRoute
     }
-    '/_protected/configuracoes_/grupo': {
-      id: '/_protected/configuracoes_/grupo'
+    '/_protected/configuracoes/grupo': {
+      id: '/_protected/configuracoes/grupo'
       path: '/configuracoes/grupo'
       fullPath: '/configuracoes/grupo'
       preLoaderRoute: typeof ProtectedConfiguracoesGrupoRouteImport
@@ -309,24 +310,24 @@ interface ProtectedLayoutRouteChildren {
   ProtectedSplatRoute: typeof ProtectedSplatRoute
   ProtectedAtividadesRoute: typeof ProtectedAtividadesRoute
   ProtectedComponentsRoute: typeof ProtectedComponentsRoute
-  ProtectedConfiguracoesRoute: typeof ProtectedConfiguracoesRoute
   ProtectedIndexRoute: typeof ProtectedIndexRoute
   ProtectedConfiguracoesCargosRoute: typeof ProtectedConfiguracoesCargosRoute
   ProtectedConfiguracoesContaRoute: typeof ProtectedConfiguracoesContaRoute
   ProtectedConfiguracoesGeralRoute: typeof ProtectedConfiguracoesGeralRoute
   ProtectedConfiguracoesGrupoRoute: typeof ProtectedConfiguracoesGrupoRoute
+  ProtectedConfiguracoesIndexRoute: typeof ProtectedConfiguracoesIndexRoute
 }
 
 const ProtectedLayoutRouteChildren: ProtectedLayoutRouteChildren = {
   ProtectedSplatRoute: ProtectedSplatRoute,
   ProtectedAtividadesRoute: ProtectedAtividadesRoute,
   ProtectedComponentsRoute: ProtectedComponentsRoute,
-  ProtectedConfiguracoesRoute: ProtectedConfiguracoesRoute,
   ProtectedIndexRoute: ProtectedIndexRoute,
   ProtectedConfiguracoesCargosRoute: ProtectedConfiguracoesCargosRoute,
   ProtectedConfiguracoesContaRoute: ProtectedConfiguracoesContaRoute,
   ProtectedConfiguracoesGeralRoute: ProtectedConfiguracoesGeralRoute,
   ProtectedConfiguracoesGrupoRoute: ProtectedConfiguracoesGrupoRoute,
+  ProtectedConfiguracoesIndexRoute: ProtectedConfiguracoesIndexRoute,
 }
 
 const ProtectedLayoutRouteWithChildren = ProtectedLayoutRoute._addFileChildren(

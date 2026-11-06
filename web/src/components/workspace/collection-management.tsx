@@ -1,10 +1,9 @@
-import { EllipsisVertical, Folder, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { EllipsisVertical, Folder, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useId, useState } from 'react'
 import { z } from 'zod'
 import { getApiErrorMessage } from '@/api/get-api-error-message'
 import type { CollectionResponse } from '@/api/types'
-import { ShareAccessDialog } from '@/components/workspace/share-access-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -22,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { ShareAccessDialog } from '@/components/workspace/share-access-dialog'
 import { usePublicationManagementAccess } from '@/hooks/use-publication-management-access'
 import { useWorkspacePermissions } from '@/hooks/use-workspace-permissions'
 

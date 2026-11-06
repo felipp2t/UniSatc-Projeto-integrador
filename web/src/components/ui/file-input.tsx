@@ -1,5 +1,5 @@
-import { CircleCheck, Upload, CircleAlert } from 'lucide-react'
 import { cn } from 'cn'
+import { CircleAlert, CircleCheck, Upload } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
 import { ATTACHMENT_HINT } from '@/lib/item-validation'
